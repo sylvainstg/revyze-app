@@ -25,8 +25,38 @@ export const PricingPage: React.FC<PricingPageProps> = ({ enrichedPlans, pricing
         }
     };
 
-    // If still loading or no plans, show loading state
-    if (pricingLoading || !enrichedPlans) {
+    // Build plans array - show free plan immediately, paid plans when loaded
+    const plans = enrichedPlans ? [
+        {
+            ...enrichedPlans.free,
+            monthlyPrice: enrichedPlans.free.price?.monthly || '$0',
+            yearlyPrice: enrichedPlans.free.price?.yearly || '$0',
+            period: '/mo',
+            current: user?.plan === 'free' || (user && !user.plan),
+            priceId: null
+        },
+        {
+            ...enrichedPlans.pro,
+            monthlyPrice: enrichedPlans.pro.price?.monthly || '$10',
+            yearlyPrice: enrichedPlans.pro.price?.yearly || '$100',
+            period: billingCycle === 'monthly' ? '/mo' : '/yr',
+            current: user?.plan === 'pro',
+            priceId: enrichedPlans.pro.priceIds?.[billingCycle] || null,
+            isLoading: pricingLoading
+        },
+        {
+            ...enrichedPlans.business,
+            monthlyPrice: enrichedPlans.business.price?.monthly || '$50',
+            yearlyPrice: enrichedPlans.business.price?.yearly || '$500',
+            period: billingCycle === 'monthly' ? '/mo' : '/yr',
+            current: user?.plan === 'business',
+            priceId: enrichedPlans.business.priceIds?.[billingCycle] || null,
+            isLoading: pricingLoading
+        }
+    ] : null;
+
+    // If no plans are available at all (e.g., initial load and no enrichedPlans yet), show a general loading state
+    if (!plans) {
         return (
             <div className="min-h-screen bg-slate-50 py-12 px-4 sm:px-6 lg:px-8">
                 <div className="max-w-7xl mx-auto">
@@ -54,33 +84,6 @@ export const PricingPage: React.FC<PricingPageProps> = ({ enrichedPlans, pricing
             </div>
         );
     }
-
-    const plans = [
-        {
-            ...enrichedPlans.free,
-            monthlyPrice: enrichedPlans.free.price?.monthly || '$0',
-            yearlyPrice: enrichedPlans.free.price?.yearly || '$0',
-            period: '/mo',
-            current: user?.plan === 'free' || (user && !user.plan),
-            priceId: null
-        },
-        {
-            ...enrichedPlans.pro,
-            monthlyPrice: enrichedPlans.pro.price?.monthly || '$10',
-            yearlyPrice: enrichedPlans.pro.price?.yearly || '$100',
-            period: billingCycle === 'monthly' ? '/mo' : '/yr',
-            current: user?.plan === 'pro',
-            priceId: enrichedPlans.pro.priceIds?.[billingCycle] || null
-        },
-        {
-            ...enrichedPlans.business,
-            monthlyPrice: enrichedPlans.business.price?.monthly || '$50',
-            yearlyPrice: enrichedPlans.business.price?.yearly || '$500',
-            period: billingCycle === 'monthly' ? '/mo' : '/yr',
-            current: user?.plan === 'business',
-            priceId: enrichedPlans.business.priceIds?.[billingCycle] || null
-        }
-    ];
 
     return (
         <div className="min-h-screen bg-slate-50 py-12 px-4 sm:px-6 lg:px-8">
@@ -157,29 +160,28 @@ export const PricingPage: React.FC<PricingPageProps> = ({ enrichedPlans, pricing
                             <button
                                 onClick={() => {
                                     if (!user) {
-                                        // If no user, redirect to login/signup (handled by parent or just back to auth)
-                                        // For now, we'll just call onBack which (in App.tsx) might go to auth if we change it
-                                        // Or better, we should accept an onLogin prop?
-                                        // Let's assume onBack goes to Landing/Auth or we can trigger a login flow.
-                                        // Actually, let's just use window.location or a prop.
-                                        // For this fix, let's assume the user needs to log in.
-                                        onBack(); // Temporary: goes back. Ideally should go to /auth?mode=signup
+                                        // If no user, redirect to login/signup
+                                        onBack();
+                                    } else if (plan.id === 'free') {
+                                        // Free plan - no Stripe checkout needed, just go back to dashboard
+                                        onBack();
                                     } else if (plan.priceId) {
+                                        // Paid plans - create Stripe checkout session
                                         handleUpgrade(plan.priceId);
                                     }
                                 }}
-                                disabled={plan.current || (!!user && !plan.priceId) || !!loadingPriceId}
+                                disabled={plan.current || loadingPriceId !== null}
                                 className={`w-full py-3 px-4 rounded-lg font-semibold transition-colors flex items-center justify-center ${plan.current
                                     ? 'bg-slate-100 text-slate-400 cursor-default'
                                     : 'bg-indigo-600 text-white hover:bg-indigo-700'
                                     }`}
                             >
-                                {loadingPriceId === plan.priceId ? (
+                                {loadingPriceId && loadingPriceId === plan.priceId ? (
                                     <Loader2 className="w-5 h-5 animate-spin" />
                                 ) : plan.current ? (
                                     'Current Plan'
-                                ) : !user ? (
-                                    'Get Started'
+                                ) : plan.id === 'free' ? (
+                                    user ? 'Already on Free Plan' : 'Get Started Free'
                                 ) : (
                                     'Upgrade'
                                 )}

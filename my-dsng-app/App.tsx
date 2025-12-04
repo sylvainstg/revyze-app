@@ -117,10 +117,17 @@ const App: React.FC = () => {
         setEnrichedPlans(enriched);
         setPricingError(null);
       } catch (error) {
-        console.error('Failed to load pricing:', error);
-        setPricingError('Failed to load pricing. Please refresh the page.');
-        // Fallback: use metadata without pricing
-        setEnrichedPlans(PLAN_METADATA);
+        console.error('Failed to load pricing from Stripe:', error);
+        console.warn('Using plan metadata without Stripe pricing. Update functions/.env with production Stripe key.');
+        setPricingError('Could not load pricing from Stripe. Using default prices.');
+        // Fallback: use metadata with default prices (won't have real Stripe price IDs)
+        const fallbackPlans = {
+          ...PLAN_METADATA,
+          free: { ...PLAN_METADATA.free, price: { monthly: '$0', yearly: '$0' }, priceIds: { monthly: null, yearly: null } },
+          pro: { ...PLAN_METADATA.pro, price: { monthly: '$10', yearly: '$100' }, priceIds: { monthly: null, yearly: null } },
+          business: { ...PLAN_METADATA.business, price: { monthly: '$50', yearly: '$500' }, priceIds: { monthly: null, yearly: null } }
+        };
+        setEnrichedPlans(fallbackPlans);
       } finally {
         setPricingLoading(false);
       }

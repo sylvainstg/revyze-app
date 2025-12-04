@@ -35,6 +35,15 @@ export const fetchStripePricing = async (): Promise<StripePlanPricing[]> => {
 };
 
 /**
+ * Formats a price amount to show decimals only when there are non-zero cents
+ * Examples: 10.00 -> $10, 9.90 -> $9.90, 0.00 -> $0
+ */
+const formatPrice = (amount: number): string => {
+    const hasDecimals = amount % 1 !== 0;
+    return hasDecimals ? `$${amount.toFixed(2)}` : `$${Math.floor(amount)}`;
+};
+
+/**
  * Enriches plan metadata with Stripe pricing data
  */
 export const enrichPlansWithPricing = (planMetadata: any, stripePricing: StripePlanPricing[]) => {
@@ -43,8 +52,8 @@ export const enrichPlansWithPricing = (planMetadata: any, stripePricing: StripeP
     // Add free plan pricing (always $0)
     if (enrichedPlans.free) {
         enrichedPlans.free.price = {
-            monthly: '$0.00',
-            yearly: '$0.00'
+            monthly: '$0',
+            yearly: '$0'
         };
         enrichedPlans.free.priceIds = {
             monthly: null,
@@ -65,11 +74,11 @@ export const enrichPlansWithPricing = (planMetadata: any, stripePricing: StripeP
         if (planKey && enrichedPlans[planKey]) {
             enrichedPlans[planKey].price = {
                 monthly: stripePlan.pricing.monthly
-                    ? `$${stripePlan.pricing.monthly.amount.toFixed(2)}`
-                    : '$0.00',
+                    ? formatPrice(stripePlan.pricing.monthly.amount)
+                    : '$0',
                 yearly: stripePlan.pricing.yearly
-                    ? `$${stripePlan.pricing.yearly.amount.toFixed(2)}`
-                    : '$0.00'
+                    ? formatPrice(stripePlan.pricing.yearly.amount)
+                    : '$0'
             };
             enrichedPlans[planKey].priceIds = {
                 monthly: stripePlan.pricing.monthly?.priceId || null,
