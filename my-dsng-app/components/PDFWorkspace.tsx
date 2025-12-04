@@ -2,9 +2,10 @@ import React, { useState, useRef, useEffect } from 'react';
 import { Document, Page, pdfjs } from 'react-pdf';
 import { Comment, UserRole } from '../types';
 import { PDF_WORKER_URL } from '../constants';
-import { Plus, Loader2, ZoomIn, ZoomOut, Sparkles, X, AlertCircle } from 'lucide-react';
+import { Plus, Loader2, ZoomIn, ZoomOut, Sparkles, X, AlertCircle, Upload } from 'lucide-react';
 import * as geminiService from '../services/geminiService';
 import { getPDFObjectURL, revokePDFObjectURL } from '../utils/pdfUtils';
+import { VersionSelectorDetailed } from './VersionSelector';
 
 // Set worker
 pdfjs.GlobalWorkerOptions.workerSrc = PDF_WORKER_URL;
@@ -26,6 +27,21 @@ interface PDFWorkspaceProps {
   setPageNumber: (page: number) => void;
   scale: number;
   setScale: (scale: number | ((prev: number) => number)) => void;
+  filter: { active: boolean; resolved: boolean; deleted: boolean };
+  // Version management props
+  versions?: any[];
+  currentVersionId?: string;
+  onVersionChange?: (versionId: string) => void;
+  onUploadNewVersion?: () => void;
+  canUploadVersion?: boolean;
+  onEditVersion?: (versionId: string) => void;
+  initialPanOffset?: { x: number, y: number };
+  onPanChange?: (offset: { x: number, y: number }) => void;
+  onFocusComment?: (commentId: string) => void;
+  canAddComment?: boolean;
+  onCaptureThumbnail?: () => void;
+  onSetDefaultPage?: (page: number) => void;
+  isDefaultPage?: boolean;
 }
 
 export const PDFWorkspace: React.FC<PDFWorkspaceProps> = ({
@@ -38,30 +54,90 @@ export const PDFWorkspace: React.FC<PDFWorkspaceProps> = ({
   pageNumber,
   setPageNumber,
   scale,
-  setScale
+  setScale,
+  filter,
+  versions,
+  currentVersionId,
+  onVersionChange,
+  onUploadNewVersion,
+  canUploadVersion,
+  onEditVersion,
+  initialPanOffset = { x: 0, y: 0 },
+  onPanChange,
+  onFocusComment,
+  canAddComment = true,
+  onCaptureThumbnail,
+  onSetDefaultPage,
+  isDefaultPage = false
 }) => {
   const [numPages, setNumPages] = useState<number | null>(null);
+  const [isAddingComment, setIsAddingComment] = useState(false);
+  const [tempMarker, setTempMarker] = useState<{ x: number; y: number } | null>(null);
+  const [commentText, setCommentText] = useState('');
   const [isAnalyzing, setIsAnalyzing] = useState(false);
-  const [loadError, setLoadError] = useState<Error | null>(null);
-  const [pdfObjectURL, setPdfObjectURL] = useState<string | null>(null);
-
-  // Pan/drag state
-  const [panOffset, setPanOffset] = useState({ x: 0, y: 0 });
+  const [panOffset, setPanOffset] = useState(initialPanOffset);
   const [isDragging, setIsDragging] = useState(false);
   const [dragStart, setDragStart] = useState({ x: 0, y: 0 });
+  const [loadError, setLoadError] = useState<Error | null>(null);
+  const [pdfObjectURL, setPdfObjectURL] = useState<string | null>(null);
+  const [useAI, setUseAI] = useState(false);
+  const [defaultPageSet, setDefaultPageSet] = useState(false);
+  const [thumbnailSet, setThumbnailSet] = useState(false);
+
+  const hasDraggedRef = useRef(false); // Track if actual movement occurred
   const viewportRef = useRef<HTMLDivElement>(null);
+
+  // Update pan offset when initialPanOffset changes (e.g. when category switches)
+  useEffect(() => {
+    setPanOffset(initialPanOffset);
+  }, [initialPanOffset]);
+
+  // Notify parent of pan changes only when dragging ends (handled in mouseUp)
+
+  // Handle Esc key to close comment popup
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        if (tempMarker) {
+          setTempMarker(null);
+          setCommentText('');
+          setUseAI(false);
+        }
+        if (activeCommentId) {
+          setActiveCommentId(null);
+        }
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [tempMarker, activeCommentId, setTempMarker, setCommentText, setActiveCommentId]);
 
   // Convert Firebase Storage URL to object URL to bypass CORS
   useEffect(() => {
     let isMounted = true;
+    let currentObjectURL: string | null = null;
 
     const loadPDF = async () => {
       console.log('[PDFWorkspace] Loading PDF from URL:', fileUrl);
+
+      // Clean up previous object URL before loading new one
+      if (pdfObjectURL) {
+        console.log('[PDFWorkspace] Revoking previous PDF object URL');
+        revokePDFObjectURL(pdfObjectURL);
+        setPdfObjectURL(null);
+      }
+
       try {
         const objectURL = await getPDFObjectURL(fileUrl);
         console.log('[PDFWorkspace] Converted to proxy URL:', objectURL);
+        currentObjectURL = objectURL;
+
         if (isMounted) {
           setPdfObjectURL(objectURL);
+        } else {
+          // Component unmounted during load, clean up immediately
+          revokePDFObjectURL(objectURL);
         }
       } catch (error) {
         console.error('[PDFWorkspace] Failed to load PDF:', error);
@@ -76,22 +152,14 @@ export const PDFWorkspace: React.FC<PDFWorkspaceProps> = ({
     return () => {
       isMounted = false;
       // Cleanup object URL when component unmounts or fileUrl changes
-      if (pdfObjectURL) {
-        revokePDFObjectURL(pdfObjectURL);
+      if (currentObjectURL) {
+        console.log('[PDFWorkspace] Cleanup: Revoking PDF object URL');
+        revokePDFObjectURL(currentObjectURL);
       }
     };
   }, [fileUrl]);
 
-  // Reset pan when scale changes
-  useEffect(() => {
-    setPanOffset({ x: 0, y: 0 });
-  }, [scale, pageNumber]);
 
-
-  // Temporary marker for new comment creation
-  const [tempMarker, setTempMarker] = useState<{ x: number, y: number } | null>(null);
-  const [commentText, setCommentText] = useState('');
-  const [useAI, setUseAI] = useState(false);
 
   const pdfWrapperRef = useRef<HTMLDivElement>(null);
 
@@ -100,6 +168,15 @@ export const PDFWorkspace: React.FC<PDFWorkspaceProps> = ({
     setLoadError(null);
   };
 
+  // Fallback to page 1 if current page is invalid
+  useEffect(() => {
+    if (numPages && (pageNumber < 1 || pageNumber > numPages)) {
+      console.log(`Invalid page number ${pageNumber}, falling back to page 1`);
+      setPageNumber(1);
+    }
+  }, [numPages, pageNumber, setPageNumber]);
+
+
   const onDocumentLoadError = (error: Error) => {
     console.error("PDF Load Error:", error);
     setLoadError(error);
@@ -107,15 +184,16 @@ export const PDFWorkspace: React.FC<PDFWorkspaceProps> = ({
 
   // Pan/drag handlers
   const handleMouseDown = (e: React.MouseEvent) => {
-    if (scale > 1) { // Only allow panning when zoomed in
-      setIsDragging(true);
-      setDragStart({ x: e.clientX - panOffset.x, y: e.clientY - panOffset.y });
-      e.preventDefault();
-    }
+    // Allow panning at all zoom levels
+    setIsDragging(true);
+    hasDraggedRef.current = false; // Reset drag flag
+    setDragStart({ x: e.clientX - panOffset.x, y: e.clientY - panOffset.y });
+    e.preventDefault();
   };
 
   const handleMouseMove = (e: React.MouseEvent) => {
-    if (isDragging && scale > 1) {
+    if (isDragging) {
+      hasDraggedRef.current = true; // Mark that we have moved
       setPanOffset({
         x: e.clientX - dragStart.x,
         y: e.clientY - dragStart.y
@@ -124,14 +202,26 @@ export const PDFWorkspace: React.FC<PDFWorkspaceProps> = ({
   };
 
   const handleMouseUp = () => {
-    setIsDragging(false);
+    if (isDragging) {
+      setIsDragging(false);
+      onPanChange?.(panOffset);
+    }
   };
 
   const handlePdfClick = (e: React.MouseEvent) => {
-    // Don't create comments when dragging
-    if (isDragging) return;
+    // Don't create comments if we were dragging/panning
+    if (hasDraggedRef.current) {
+      hasDraggedRef.current = false; // Reset for next time
+      return;
+    }
 
     if (!pdfWrapperRef.current) return;
+
+    // Check if commenting is allowed
+    if (!canAddComment) {
+      setActiveCommentId(null);
+      return;
+    }
 
     // If we are already creating a comment, ignore clicks outside (or cancel?)
     // For simplicity, clicking elsewhere moves the marker
@@ -199,32 +289,144 @@ export const PDFWorkspace: React.FC<PDFWorkspaceProps> = ({
     setCommentText('');
   };
 
-  // Filter comments for the current page
-  // Legacy comments without pageNumber (undefined) will be shown on page 1 or handled gracefully
-  const visibleComments = comments.filter(c => (c.pageNumber || 1) === pageNumber);
+  // Filter comments for the current page and status
+  const visibleComments = comments.filter(c => {
+    if ((c.pageNumber || 1) !== pageNumber) return false;
+
+    // Status filters
+    if (c.deleted) return filter.deleted;
+    if (c.resolved) return filter.resolved;
+    return filter.active;
+  });
 
   return (
     <div className="flex-1 bg-slate-200/50 flex flex-col h-full">
-      {/* Page Navigation Toolbar */}
-      {!loadError && numPages && numPages > 1 && (
-        <div className="mt-4 mb-4 bg-white/90 backdrop-blur-sm px-4 py-2 rounded-full shadow-sm flex items-center gap-4 border border-white/50 w-fit mx-auto">
-          <button
-            disabled={pageNumber <= 1}
-            onClick={() => setPageNumber(prev => prev - 1)}
-            className="text-slate-500 disabled:opacity-30 hover:text-indigo-600 text-sm font-medium"
-          >
-            Previous
-          </button>
-          <span className="text-sm text-slate-600 font-medium">Page {pageNumber} of {numPages}</span>
-          <button
-            disabled={pageNumber >= numPages}
-            onClick={() => setPageNumber(prev => prev + 1)}
-            className="text-slate-500 disabled:opacity-30 hover:text-indigo-600 text-sm font-medium"
-          >
-            Next
-          </button>
+      {/* Version Toolbar */}
+      {(versions && versions.length > 0) || canUploadVersion ? (
+        <div className="bg-white border-b border-slate-200 px-4 py-3 flex items-center justify-between gap-4">
+          <div className="flex items-center gap-3">
+            {versions && versions.length > 0 && currentVersionId && (
+              <div className="flex items-center gap-2">
+                <span className="text-sm font-medium text-slate-600">Version:</span>
+                <VersionSelectorDetailed
+                  versions={versions}
+                  currentVersionId={currentVersionId}
+                  onVersionChange={onVersionChange}
+                  onEditVersion={onEditVersion}
+                />
+              </div>
+            )}
+          </div>
+
+          {/* Page Navigation Toolbar - Moved here */}
+          {!loadError && (
+            <div className="flex items-center gap-4">
+              {numPages && numPages > 1 && (
+                <div id="page-navigation" className="flex items-center gap-2">
+                  <button
+                    disabled={pageNumber <= 1}
+                    onClick={() => setPageNumber(prev => prev - 1)}
+                    className="px-3 py-1 bg-white border border-slate-200 rounded-full text-slate-700 hover:bg-slate-50 hover:text-indigo-600 disabled:opacity-50 disabled:hover:bg-white disabled:hover:text-slate-700 transition-all shadow-sm text-sm font-medium"
+                  >
+                    Previous
+                  </button>
+                  <span className="text-sm text-slate-600 font-medium whitespace-nowrap">Page {pageNumber} of {numPages}</span>
+                  <button
+                    disabled={pageNumber >= numPages}
+                    onClick={() => setPageNumber(prev => prev + 1)}
+                    className="px-3 py-1 bg-white border border-slate-200 rounded-full text-slate-700 hover:bg-slate-50 hover:text-indigo-600 disabled:opacity-50 disabled:hover:bg-white disabled:hover:text-slate-700 transition-all shadow-sm text-sm font-medium"
+                  >
+                    Next
+                  </button>
+                </div>
+              )}
+
+              {/* Zoom Controls */}
+              <div id="zoom-controls" className="flex items-center gap-2 border-l border-slate-300 pl-4">
+                <button
+                  onClick={() => setScale(prev => Math.max(0.5, prev - 0.1))}
+                  className="p-2 bg-white border border-slate-200 rounded-full text-slate-700 hover:bg-slate-50 hover:text-indigo-600 transition-all shadow-sm"
+                  title="Zoom out"
+                >
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0zM13 10H7" />
+                  </svg>
+                </button>
+                <button
+                  onClick={() => setScale(prev => Math.min(5, prev + 0.1))}
+                  className="p-2 bg-white border border-slate-200 rounded-full text-slate-700 hover:bg-slate-50 hover:text-indigo-600 transition-all shadow-sm"
+                  title="Zoom in"
+                >
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0zM10 7v3m0 0v3m0-3h3m-3 0H7" />
+                  </svg>
+                </button>
+              </div>
+
+              {/* Plan Preferences Menu */}
+              <div id="plan-preferences" className="relative group border-l border-slate-300 pl-4">
+                <button className="px-3 py-1 bg-white border border-slate-200 rounded-full text-slate-700 hover:bg-slate-50 hover:text-indigo-600 transition-all shadow-sm text-sm font-medium flex items-center gap-1">
+                  Plan Preferences
+                  <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                  </svg>
+                </button>
+
+                {/* Dropdown Menu */}
+                <div className="fixed bg-white border border-slate-200 rounded-lg shadow-2xl py-1 min-w-[200px] opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200" style={{ zIndex: 99999, marginTop: '0.5rem' }}>
+                  <button
+                    onClick={() => {
+                      if (onSetDefaultPage) {
+                        onSetDefaultPage(pageNumber);
+                        setDefaultPageSet(true);
+                        setTimeout(() => setDefaultPageSet(false), 2000);
+                      }
+                    }}
+                    className={`w-full px-4 py-2 text-left text-sm transition-colors flex items-center gap-2 ${defaultPageSet || isDefaultPage
+                      ? 'bg-green-50 text-green-700'
+                      : 'text-slate-700 hover:bg-indigo-50 hover:text-indigo-600'
+                      }`}
+                  >
+                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                    </svg>
+                    {defaultPageSet ? 'Default page set!' : isDefaultPage ? 'Default page' : 'Set this page as default'}
+                  </button>
+                  <button
+                    onClick={() => {
+                      if (onCaptureThumbnail) {
+                        onCaptureThumbnail();
+                        setThumbnailSet(true);
+                        setTimeout(() => setThumbnailSet(false), 2000);
+                      }
+                    }}
+                    className={`w-full px-4 py-2 text-left text-sm transition-colors flex items-center gap-2 ${thumbnailSet
+                      ? 'bg-green-50 text-green-700'
+                      : 'text-slate-700 hover:bg-indigo-50 hover:text-indigo-600'
+                      }`}
+                  >
+                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z" />
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 13a3 3 0 11-6 0 3 3 0 016 0z" />
+                    </svg>
+                    {thumbnailSet ? 'Thumbnail set!' : 'Set this page as thumbnail'}
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {canUploadVersion && onUploadNewVersion && (
+            <button
+              onClick={onUploadNewVersion}
+              className="flex items-center gap-2 px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition-colors text-sm font-medium"
+            >
+              <Upload className="w-4 h-4" />
+              Upload New Version
+            </button>
+          )}
         </div>
-      )}
+      ) : null}
 
       {/* PDF Card - Fixed height container with scroll */}
       <div className="flex-1 bg-white shadow-2xl border-l border-slate-200 overflow-hidden flex flex-col">
@@ -232,7 +434,7 @@ export const PDFWorkspace: React.FC<PDFWorkspaceProps> = ({
         <div
           ref={viewportRef}
           className="flex-1 overflow-hidden bg-slate-100 flex items-start justify-start"
-          style={{ cursor: scale > 1 ? (isDragging ? 'grabbing' : 'grab') : 'default' }}
+          style={{ cursor: isDragging ? 'grabbing' : 'grab' }}
           onMouseDown={handleMouseDown}
           onMouseMove={handleMouseMove}
           onMouseUp={handleMouseUp}
@@ -247,6 +449,7 @@ export const PDFWorkspace: React.FC<PDFWorkspaceProps> = ({
             }}
           >
             <Document
+              key={pdfObjectURL} // Force remount when PDF changes to prevent stale access
               file={pdfObjectURL}
               onLoadSuccess={onDocumentLoadSuccess}
               onLoadError={onDocumentLoadError}
@@ -286,26 +489,40 @@ export const PDFWorkspace: React.FC<PDFWorkspaceProps> = ({
                 onClick={(e) => {
                   e.stopPropagation();
                   setActiveCommentId(comment.id);
+                  onFocusComment?.(comment.id);
                 }}
-                className={`absolute w-8 h-8 -ml-4 -mt-8 transform transition-all duration-200 hover:scale-110 z-10 group ${activeCommentId === comment.id ? 'scale-125 z-20' : ''
-                  }`}
+                className={`absolute w-8 h-8 -ml-4 -mt-8 transform transition-all duration-200 hover:scale-110 z-10 group ${activeCommentId === comment.id ? 'scale-150 z-30' : ''
+                  } ${comment.deleted ? 'opacity-50 grayscale' : ''}`}
                 style={{ left: `${comment.x}%`, top: `${comment.y}%` }}
               >
-                <div className={`relative flex items-center justify-center w-full h-full rounded-full shadow-lg border-2 border-white ${comment.resolved ? 'bg-slate-400' : comment.author === UserRole.DESIGNER ? 'bg-purple-600' : 'bg-indigo-600'
-                  }`}>
-                  <span className="text-white text-xs font-bold">{
-                    // Initials or number could go here, simple dot for now
-                    comments.indexOf(comment) + 1
-                  }</span>
+                <div className={`relative flex items-center justify-center w-full h-full rounded-full shadow-lg border-2 transition-all duration-200 
+                  ${comment.deleted ? 'bg-red-100 border-red-200' :
+                    comment.resolved ? 'bg-slate-400 border-slate-500' :
+                      comment.author === currentUserRole ? 'bg-indigo-600 border-indigo-200 ring-2 ring-indigo-400' : // Emphasis for own comments
+                        comment.author === UserRole.DESIGNER ? 'bg-purple-600 border-white' : 'bg-blue-500 border-white'
+                  } ${activeCommentId === comment.id ? 'ring-4 ring-indigo-300/50 shadow-xl' : ''}`}>
 
-                  {/* Tooltip on hover */}
-                  <div className="absolute bottom-full mb-2 hidden group-hover:block whitespace-nowrap bg-slate-800 text-white text-xs py-1 px-2 rounded pointer-events-none">
-                    {comment.author}: {comment.text.substring(0, 20)}...
+                  {comment.deleted ? (
+                    <X className="w-4 h-4 text-red-500" />
+                  ) : (
+                    <span className="text-white text-xs font-bold">{
+                      // Use findIndex with ID comparison (same as CollaborationPanel)
+                      comments.findIndex(c => c.id === comment.id) + 1
+                    }</span>
+                  )}
+
+                  {/* Tooltip on hover - Full text */}
+                  <div className="absolute bottom-full mb-2 hidden group-hover:block w-48 bg-slate-800 text-white text-xs py-2 px-3 rounded shadow-xl pointer-events-none z-50">
+                    <p className="line-clamp-3">{comment.text}</p>
+                    <div className="absolute top-full left-1/2 -ml-1 border-4 border-transparent border-t-slate-800"></div>
                   </div>
                 </div>
                 {/* Arrow pointer */}
-                <div className={`absolute top-full left-1/2 -ml-1 -mt-1 w-0 h-0 border-l-4 border-l-transparent border-r-4 border-r-transparent border-t-4 ${comment.resolved ? 'border-t-slate-400' : comment.author === UserRole.DESIGNER ? 'border-t-purple-600' : 'border-t-indigo-600'
-                  }`}></div>
+                {!comment.deleted && (
+                  <div className={`absolute top-full left-1/2 -ml-1 -mt-1 w-0 h-0 border-l-4 border-l-transparent border-r-4 border-r-transparent border-t-4 ${comment.resolved ? 'border-t-slate-400' :
+                    comment.author === UserRole.DESIGNER ? 'border-t-purple-600' : 'border-t-indigo-600'
+                    }`}></div>
+                )}
               </button>
             ))}
 

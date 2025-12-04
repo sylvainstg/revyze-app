@@ -4,6 +4,7 @@ import { Input } from './ui/Input';
 import { UserRole, User } from '../types';
 import { Layout, ArrowLeft, Shield, AlertCircle, Cloud } from 'lucide-react';
 import * as authService from '../services/authService';
+import { applyReferralCode } from '../services/referralService';
 
 interface AuthPageProps {
   onAuthSuccess: (user: User, isNewUser: boolean) => void;
@@ -11,22 +12,32 @@ interface AuthPageProps {
   initialMode?: 'login' | 'register';
   inviterName?: string;
   projectName?: string;
+  inviteRole?: 'guest' | 'pro';
+  inviteeName?: string;
+  referralCode?: string;
 }
 
-export const AuthPage: React.FC<AuthPageProps> = ({ onAuthSuccess, onBack, initialMode = 'register', inviterName, projectName }) => {
+export const AuthPage: React.FC<AuthPageProps> = ({ onAuthSuccess, onBack, initialMode = 'register', inviterName, projectName, inviteRole, inviteeName, referralCode }) => {
   const [isLogin, setIsLogin] = useState(initialMode === 'login');
-  const [role, setRole] = useState<UserRole>(UserRole.HOMEOWNER);
+
+  // Determine initial role based on invite
+  const initialRole = inviteRole === 'pro' ? UserRole.DESIGNER : UserRole.HOMEOWNER;
+  const [role, setRole] = useState<UserRole>(initialRole);
+
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [resetSent, setResetSent] = useState(false);
 
   const [formData, setFormData] = useState({
-    name: '',
+    name: inviteeName || '',
     email: '',
     password: ''
   });
 
+  // ... (handlers) ...
+
   const handleForgotPassword = async () => {
+    // ... (existing code)
     if (!formData.email) {
       setError("Please enter your email address first.");
       return;
@@ -47,6 +58,7 @@ export const AuthPage: React.FC<AuthPageProps> = ({ onAuthSuccess, onBack, initi
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
+    // ... (existing code)
     e.preventDefault();
     setError(null);
     setResetSent(false);
@@ -71,14 +83,36 @@ export const AuthPage: React.FC<AuthPageProps> = ({ onAuthSuccess, onBack, initi
         }
       } else {
         // REGISTER LOGIC
+        // Determine plan based on invite role
+        let plan: 'free' | 'pro' = 'free';
+        let subscriptionStatus: 'active' | 'trialing' | undefined = 'active';
+
+        if (inviteRole === 'pro') {
+          plan = 'pro';
+          subscriptionStatus = 'trialing'; // Pro invitees get trial status
+        }
+
         const result = await authService.registerUser(
-          formData.email, // Use email as name
+          formData.name || formData.email, // Use provided name or email
           formData.email,
           formData.password,
-          role
+          role,
+          plan,
+          subscriptionStatus
         );
 
         if (result.success && result.user) {
+          // Apply referral code if present
+          if (referralCode) {
+            try {
+              await applyReferralCode(referralCode);
+              console.log('Referral code applied successfully');
+            } catch (error) {
+              console.error('Failed to apply referral code:', error);
+              // Don't block registration if referral fails
+            }
+          }
+
           onAuthSuccess(result.user, true);
         } else {
           setError(result.message || "Registration failed");
@@ -111,21 +145,39 @@ export const AuthPage: React.FC<AuthPageProps> = ({ onAuthSuccess, onBack, initi
           <div className="flex justify-center mb-6">
             <img src="/revyze-logo.png" alt="Revyze" className="h-16 w-auto object-contain" />
           </div>
-          <h1 className="text-2xl font-bold text-slate-900 tracking-tight">
-            {isLogin ? 'Welcome back' : 'Setup Cloud Workspace'}
-          </h1>
-          <p className="text-slate-500 mt-2 text-sm">
-            {isLogin ? 'Access your cloud projects.' :
-              (inviterName && projectName) ? (
-                <span className="block mt-2 p-3 bg-indigo-50 rounded-lg border border-indigo-100 text-indigo-900">
-                  <span className="font-semibold">{inviterName}</span> invited you to join <span className="font-semibold">{projectName}</span>.
-                  <span className="block mt-1 text-xs text-indigo-700">Create your account below to get started.</span>
-                </span>
-              ) : 'Create a secure environment for your designs.'}
-          </p>
+
+          {inviteeName && !isLogin ? (
+            <div className="bg-indigo-50 rounded-xl p-6 border border-indigo-100 animate-in fade-in zoom-in-95 duration-300">
+              <h1 className="text-2xl font-bold text-indigo-900 mb-2">
+                Hi {inviteeName}! 👋
+              </h1>
+              <p className="text-indigo-700 text-sm leading-relaxed">
+                <span className="font-semibold">{inviterName}</span> has invited you to collaborate on <span className="font-semibold">{projectName}</span>.
+              </p>
+              <div className="mt-4 pt-4 border-t border-indigo-100 text-xs font-medium text-indigo-600 uppercase tracking-wide">
+                Create your account to join them
+              </div>
+            </div>
+          ) : (
+            <>
+              <h1 className="text-2xl font-bold text-slate-900 tracking-tight">
+                {isLogin ? 'Welcome back' : 'Create Account'}
+              </h1>
+              <p className="text-slate-500 mt-2 text-sm">
+                {isLogin ? 'Access your cloud projects.' :
+                  (inviterName && projectName) ? (
+                    <span className="block mt-2 p-3 bg-indigo-50 rounded-lg border border-indigo-100 text-indigo-900">
+                      <span className="font-semibold">{inviterName}</span> invited you to join <span className="font-semibold">{projectName}</span>
+                      {inviteRole && <span> as a <span className="font-bold uppercase">{inviteRole === 'pro' ? 'Professional' : 'Guest'}</span></span>}.
+                      <span className="block mt-1 text-xs text-indigo-700">Create your account below to get started.</span>
+                    </span>
+                  ) : 'Create a secure environment for your designs.'}
+              </p>
+            </>
+          )}
         </div>
 
-        {!isLogin && (
+        {!isLogin && !inviteRole && (
           <div className="grid grid-cols-2 gap-3 mb-6 p-1 bg-slate-100 rounded-lg">
             <button
               type="button"
@@ -139,7 +191,7 @@ export const AuthPage: React.FC<AuthPageProps> = ({ onAuthSuccess, onBack, initi
               onClick={() => setRole(UserRole.DESIGNER)}
               className={`text-sm font-medium py-2 rounded-md transition-all ${role === UserRole.DESIGNER ? 'bg-white text-purple-600 shadow-sm ring-1 ring-black/5' : 'text-slate-500 hover:text-slate-700'}`}
             >
-              Designer
+              Professional
             </button>
           </div>
         )}

@@ -1,17 +1,30 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { Comment, UserRole } from '../types';
-import { Plus, Loader2, X, Sparkles, ZoomIn, ZoomOut } from 'lucide-react';
+import { Plus, Loader2, ZoomIn, ZoomOut, Sparkles, X, AlertCircle, Upload } from 'lucide-react';
+import { VersionSelectorDetailed } from './VersionSelector';
 import * as geminiService from '../services/geminiService';
 
 interface ImageWorkspaceProps {
     fileUrl: string;
     comments: Comment[];
-    onAddComment: (comment: Omit<Comment, 'id' | 'timestamp' | 'resolved' | 'audience'>) => void;
+    onAddComment: (comment: Omit<Comment, 'id' | 'timestamp' | 'resolved'>) => void;
     activeCommentId: string | null;
     setActiveCommentId: (id: string | null) => void;
     currentUserRole: UserRole;
     scale: number;
     setScale: (scale: number | ((prev: number) => number)) => void;
+    filter: { active: boolean; resolved: boolean; deleted: boolean };
+    // Version management props
+    versions?: any[];
+    currentVersionId?: string;
+    onVersionChange?: (versionId: string) => void;
+    onUploadNewVersion?: () => void;
+    canUploadVersion?: boolean;
+    onEditVersion?: (versionId: string) => void;
+    initialPanOffset?: { x: number, y: number };
+    onPanChange?: (offset: { x: number, y: number }) => void;
+    onFocusComment?: (commentId: string) => void;
+    canAddComment?: boolean;
 }
 
 export const ImageWorkspace: React.FC<ImageWorkspaceProps> = ({
@@ -22,37 +35,80 @@ export const ImageWorkspace: React.FC<ImageWorkspaceProps> = ({
     setActiveCommentId,
     currentUserRole,
     scale,
-    setScale
+    setScale,
+    filter,
+    versions,
+    currentVersionId,
+    onVersionChange,
+    onUploadNewVersion,
+    canUploadVersion,
+    onEditVersion,
+    initialPanOffset = { x: 0, y: 0 },
+    onPanChange,
+    onFocusComment,
+    canAddComment = true
 }) => {
+    const [isAddingComment, setIsAddingComment] = useState(false);
+    const [tempMarker, setTempMarker] = useState<{ x: number; y: number } | null>(null);
+    const [commentText, setCommentText] = useState('');
     const [isAnalyzing, setIsAnalyzing] = useState(false);
+    const [panOffset, setPanOffset] = useState(initialPanOffset);
+    const [isDragging, setIsDragging] = useState(false);
+    const [dragStart, setDragStart] = useState({ x: 0, y: 0 });
+    const [imageDimensions, setImageDimensions] = useState<{ width: number; height: number } | null>(null);
     const [imageLoaded, setImageLoaded] = useState(false);
     const [imageError, setImageError] = useState(false);
 
+    // Update pan offset when initialPanOffset changes
+    useEffect(() => {
+        setPanOffset(initialPanOffset);
+    }, [initialPanOffset]);
+
+    // Notify parent of pan changes only when dragging ends (handled in mouseUp)
+    // useEffect(() => {
+    //     onPanChange?.(panOffset);
+    // }, [panOffset, onPanChange]);
+
     // Pan/drag state
-    const [panOffset, setPanOffset] = useState({ x: 0, y: 0 });
-    const [isDragging, setIsDragging] = useState(false);
-    const [dragStart, setDragStart] = useState({ x: 0, y: 0 });
+    const hasDraggedRef = useRef(false); // Track if actual movement occurred
     const viewportRef = useRef<HTMLDivElement>(null);
 
-    // Temporary marker for new comment creation
-    const [tempMarker, setTempMarker] = useState<{ x: number, y: number } | null>(null);
-    const [commentText, setCommentText] = useState('');
     const [useAI, setUseAI] = useState(false);
 
     const imageWrapperRef = useRef<HTMLDivElement>(null);
     const imageRef = useRef<HTMLImageElement>(null);
 
+    // Handle Esc key to close comment popup
+    useEffect(() => {
+        const handleKeyDown = (e: KeyboardEvent) => {
+            if (e.key === 'Escape') {
+                if (tempMarker) {
+                    setTempMarker(null);
+                    setCommentText('');
+                    setUseAI(false);
+                }
+                if (activeCommentId) {
+                    setActiveCommentId(null);
+                }
+            }
+        };
+
+        window.addEventListener('keydown', handleKeyDown);
+        return () => window.removeEventListener('keydown', handleKeyDown);
+    }, [tempMarker, activeCommentId, setTempMarker, setCommentText, setActiveCommentId]);
+
     // Pan/drag handlers
     const handleMouseDown = (e: React.MouseEvent) => {
-        if (scale > 1) {
-            setIsDragging(true);
-            setDragStart({ x: e.clientX - panOffset.x, y: e.clientY - panOffset.y });
-            e.preventDefault();
-        }
+        // Allow panning at all zoom levels
+        setIsDragging(true);
+        hasDraggedRef.current = false; // Reset drag flag
+        setDragStart({ x: e.clientX - panOffset.x, y: e.clientY - panOffset.y });
+        e.preventDefault();
     };
 
     const handleMouseMove = (e: React.MouseEvent) => {
-        if (isDragging && scale > 1) {
+        if (isDragging) {
+            hasDraggedRef.current = true; // Mark that we have moved
             setPanOffset({
                 x: e.clientX - dragStart.x,
                 y: e.clientY - dragStart.y
@@ -61,12 +117,26 @@ export const ImageWorkspace: React.FC<ImageWorkspaceProps> = ({
     };
 
     const handleMouseUp = () => {
-        setIsDragging(false);
+        if (isDragging) {
+            setIsDragging(false);
+            onPanChange?.(panOffset);
+        }
     };
 
     const handleImageClick = (e: React.MouseEvent) => {
-        if (isDragging) return;
+        // Don't create comments if we were dragging/panning
+        if (hasDraggedRef.current) {
+            hasDraggedRef.current = false; // Reset for next time
+            return;
+        }
+
         if (!imageWrapperRef.current) return;
+
+        // Check if commenting is allowed
+        if (!canAddComment) {
+            setActiveCommentId(null);
+            return;
+        }
 
         const rect = imageWrapperRef.current.getBoundingClientRect();
         const x = ((e.clientX - rect.left) / rect.width) * 100;
@@ -131,17 +201,53 @@ export const ImageWorkspace: React.FC<ImageWorkspaceProps> = ({
     };
 
     // All comments are visible (images don't have pages)
-    const visibleComments = comments.filter(c => (c.pageNumber || 1) === 1);
+    // Filter comments for the current page (images only have one "page") and status
+    const visibleComments = comments.filter(c => {
+        if ((c.pageNumber || 1) !== 1) return false;
+
+        // Status filters
+        if (c.deleted) return filter.deleted;
+        if (c.resolved) return filter.resolved;
+        return filter.active;
+    });
 
     return (
         <div className="flex-1 bg-slate-200/50 flex flex-col h-full">
-            {/* Image Card */}
+            {/* Version Toolbar */}
+            {(versions && versions.length > 0) || canUploadVersion ? (
+                <div className="bg-white border-b border-slate-200 px-4 py-3 flex items-center justify-between">
+                    <div className="flex items-center gap-3">
+                        {versions && versions.length > 0 && onVersionChange && currentVersionId && (
+                            <div className="flex items-center gap-2">
+                                <span className="text-sm font-medium text-slate-600">Version:</span>
+                                <VersionSelectorDetailed
+                                    versions={versions}
+                                    currentVersionId={currentVersionId}
+                                    onVersionChange={onVersionChange}
+                                    onEditVersion={onEditVersion}
+                                />
+                            </div>
+                        )}
+                    </div>
+                    {canUploadVersion && onUploadNewVersion && (
+                        <button
+                            onClick={onUploadNewVersion}
+                            className="flex items-center gap-2 px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition-colors text-sm font-medium"
+                        >
+                            <Upload className="w-4 h-4" />
+                            Upload New Version
+                        </button>
+                    )}
+                </div>
+            ) : null}
+
+            {/* Main Content */}
             <div className="flex-1 bg-white shadow-2xl border-l border-slate-200 overflow-hidden flex flex-col">
                 {/* Image Viewport */}
                 <div
                     ref={viewportRef}
                     className="flex-1 overflow-hidden bg-slate-100 flex items-center justify-center"
-                    style={{ cursor: scale > 1 ? (isDragging ? 'grabbing' : 'grab') : 'default' }}
+                    style={{ cursor: isDragging ? 'grabbing' : 'grab' }}
                     onMouseDown={handleMouseDown}
                     onMouseMove={handleMouseMove}
                     onMouseUp={handleMouseUp}
@@ -194,37 +300,42 @@ export const ImageWorkspace: React.FC<ImageWorkspaceProps> = ({
                                     onClick={(e) => {
                                         e.stopPropagation();
                                         setActiveCommentId(comment.id);
+                                        onFocusComment?.(comment.id);
                                     }}
-                                    className={`absolute w-8 h-8 -ml-4 -mt-8 transform transition-all duration-200 hover:scale-110 z-10 group ${activeCommentId === comment.id ? 'scale-125 z-20' : ''
-                                        }`}
+                                    className={`absolute w-8 h-8 -ml-4 -mt-8 transform transition-all duration-200 hover:scale-110 z-10 group ${activeCommentId === comment.id ? 'scale-150 z-30' : ''
+                                        } ${comment.deleted ? 'opacity-50 grayscale' : ''} `}
                                     style={{ left: `${comment.x}%`, top: `${comment.y}%` }}
                                 >
                                     <div
-                                        className={`relative flex items-center justify-center w-full h-full rounded-full shadow-lg border-2 border-white ${comment.resolved
-                                            ? 'bg-slate-400'
-                                            : comment.author === UserRole.DESIGNER
-                                                ? 'bg-purple-600'
-                                                : 'bg-indigo-600'
-                                            }`}
+                                        className={`relative flex items-center justify-center w-full h-full rounded-full shadow-lg border-2 transition-all duration-200 
+                                            ${comment.deleted ? 'bg-red-100 border-red-200' :
+                                                comment.resolved ? 'bg-slate-400 border-slate-500' :
+                                                    comment.author === currentUserRole ? 'bg-indigo-600 border-indigo-200 ring-2 ring-indigo-400' : // Emphasis for own comments
+                                                        comment.author === UserRole.DESIGNER ? 'bg-purple-600 border-white' : 'bg-blue-500 border-white'
+                                            } ${activeCommentId === comment.id ? 'ring-4 ring-indigo-300/50 shadow-xl' : ''} `}
                                     >
-                                        <span className="text-white text-xs font-bold">
-                                            {comments.indexOf(comment) + 1}
-                                        </span>
+                                        {comment.deleted ? (
+                                            <X className="w-4 h-4 text-red-500" />
+                                        ) : (
+                                            <span className="text-white text-xs font-bold">
+                                                {comments.indexOf(comment) + 1}
+                                            </span>
+                                        )}
 
-                                        {/* Tooltip on hover */}
-                                        <div className="absolute bottom-full mb-2 hidden group-hover:block whitespace-nowrap bg-slate-800 text-white text-xs py-1 px-2 rounded pointer-events-none">
-                                            {comment.author}: {comment.text.substring(0, 20)}...
+                                        {/* Tooltip on hover - Full text */}
+                                        <div className="absolute bottom-full mb-2 hidden group-hover:block w-48 bg-slate-800 text-white text-xs py-2 px-3 rounded shadow-xl pointer-events-none z-50">
+                                            <p className="line-clamp-3">{comment.text}</p>
+                                            <div className="absolute top-full left-1/2 -ml-1 border-4 border-transparent border-t-slate-800"></div>
                                         </div>
                                     </div>
                                     {/* Arrow pointer */}
-                                    <div
-                                        className={`absolute top-full left-1/2 -ml-1 -mt-1 w-0 h-0 border-l-4 border-l-transparent border-r-4 border-r-transparent border-t-4 ${comment.resolved
-                                            ? 'border-t-slate-400'
-                                            : comment.author === UserRole.DESIGNER
-                                                ? 'border-t-purple-600'
-                                                : 'border-t-indigo-600'
-                                            }`}
-                                    ></div>
+                                    {!comment.deleted && (
+                                        <div
+                                            className={`absolute top-full left-1/2 -ml-1 -mt-1 w-0 h-0 border-l-4 border-l-transparent border-r-4 border-r-transparent border-t-4 ${comment.resolved ? 'border-t-slate-400' :
+                                                comment.author === UserRole.DESIGNER ? 'border-t-purple-600' : 'border-t-indigo-600'
+                                                } `}
+                                        ></div>
+                                    )}
                                 </button>
                             ))}
 
@@ -233,8 +344,8 @@ export const ImageWorkspace: React.FC<ImageWorkspaceProps> = ({
                                 <div
                                     className="absolute bg-white rounded-lg shadow-2xl p-4 w-80 z-30 border border-slate-200"
                                     style={{
-                                        left: `${tempMarker.x}%`,
-                                        top: `${tempMarker.y}%`,
+                                        left: `${tempMarker.x}% `,
+                                        top: `${tempMarker.y}% `,
                                         transform: 'translate(-50%, calc(-100% - 20px))'
                                     }}
                                     onClick={(e) => e.stopPropagation()}
@@ -264,10 +375,10 @@ export const ImageWorkspace: React.FC<ImageWorkspaceProps> = ({
 
                                     <div className="flex items-center justify-between">
                                         <label
-                                            className={`flex items-center gap-1.5 text-xs font-medium cursor-pointer select-none px-2 py-1.5 rounded transition-colors ${useAI
+                                            className={`flex items - center gap - 1.5 text - xs font - medium cursor - pointer select - none px - 2 py - 1.5 rounded transition - colors ${useAI
                                                 ? 'bg-indigo-50 text-indigo-700'
                                                 : 'text-slate-500 hover:bg-slate-50'
-                                                }`}
+                                                } `}
                                         >
                                             <input
                                                 type="checkbox"
@@ -276,7 +387,7 @@ export const ImageWorkspace: React.FC<ImageWorkspaceProps> = ({
                                                 className="hidden"
                                             />
                                             <Sparkles
-                                                className={`w-3.5 h-3.5 ${useAI ? 'text-indigo-500' : 'text-slate-400'}`}
+                                                className={`w - 3.5 h - 3.5 ${useAI ? 'text-indigo-500' : 'text-slate-400'} `}
                                             />
                                             {useAI ? 'AI Analysis On' : 'AI Analysis Off'}
                                         </label>
@@ -306,7 +417,7 @@ export const ImageWorkspace: React.FC<ImageWorkspaceProps> = ({
                             {imageLoaded && tempMarker && (
                                 <div
                                     className="absolute w-4 h-4 bg-indigo-500/50 rounded-full -ml-2 -mt-2 animate-ping pointer-events-none"
-                                    style={{ left: `${tempMarker.x}%`, top: `${tempMarker.y}%` }}
+                                    style={{ left: `${tempMarker.x}% `, top: `${tempMarker.y}% ` }}
                                 />
                             )}
                         </div>

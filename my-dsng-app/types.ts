@@ -3,7 +3,7 @@ export enum UserRole {
   DESIGNER = 'Designer'
 }
 
-export type ViewState = 'landing' | 'auth' | 'checkout' | 'dashboard' | 'workspace' | 'pricing' | 'thank-you';
+export type ViewState = 'landing' | 'auth' | 'checkout' | 'dashboard' | 'workspace' | 'pricing' | 'thank-you' | 'admin' | 'onboarding' | 'cemetery';
 
 export interface User {
   id: string;
@@ -12,7 +12,20 @@ export interface User {
   role: UserRole;
   plan?: 'free' | 'pro' | 'business';
   subscriptionStatus?: 'active' | 'canceled' | 'past_due' | 'trialing';
+  stripeCustomerId?: string;
   isAdmin?: boolean;
+  // Engagement Metrics
+  loginCount?: number;
+  lastLogin?: number;
+  shareCountGuest?: number;
+  shareCountPro?: number;
+  projectCount?: number;
+  // Referral Program
+  referralCode?: string;
+  referredBy?: string;
+  tokenBalance?: number;
+  totalReferrals?: number;
+  hasCompletedOnboarding?: boolean;
 }
 
 export interface CommentReply {
@@ -41,15 +54,19 @@ export interface Comment {
   timestamp: number;
   aiAnalysis?: string; // Optional AI analysis of the pinned area
   resolved: boolean;
+  deleted?: boolean; // Soft delete flag
   replies?: CommentReply[];
 }
 
 export interface ProjectVersion {
   id: string;
-  versionNumber: number;
+  versionNumber: number; // Global version number across all categories
+  category: string; // Document category: 'Structural', 'Electrical', 'Plumbing', etc.
+  categoryVersionNumber: number; // Version number within this category
   fileUrl: string; // Data URL or Object URL
   fileName: string;
   uploadedBy: UserRole;
+  uploaderEmail?: string;
   timestamp: number;
   comments: Comment[];
 }
@@ -58,6 +75,10 @@ export interface ShareSettings {
   enabled: boolean;
   accessLevel: 'view' | 'comment';
   shareToken: string;
+}
+
+export interface CategorySettings {
+  defaultPage?: number;
 }
 
 export interface Project {
@@ -69,10 +90,15 @@ export interface Project {
   collaborators: string[];
   versions: ProjectVersion[];
   currentVersionId: string;
+  activeCategory?: string; // Currently selected document category
+  categorySettings?: Record<string, CategorySettings>; // Settings per category
+  zoomLevel?: number; // User's preferred zoom level for this project (default 1.0)
   createdAt: number;
   lastModified: number;
   shareSettings?: ShareSettings;
   thumbnailUrl?: string; // Captured image URL for project thumbnail
+  deletedAt?: number; // Timestamp when project was soft-deleted
+  deletedBy?: string; // User ID who deleted the project
 }
 
 // Gemini API related types
@@ -105,4 +131,59 @@ export interface FeatureVote {
   timestamp: number;
   userRole: UserRole;
   userEmail?: string;
+}
+
+// Referral and Fidelity Program Types
+export type ReferralStatus = 'pending' | 'converted' | 'expired';
+
+export interface Referral {
+  id: string;
+  referrerId: string;
+  referredUserId: string;
+  referralCode: string;
+  status: ReferralStatus;
+  createdAt: number;
+  convertedAt?: number;
+  rewardAmount?: number;
+  expiresAt: number;
+}
+
+export type TransactionType = 'earned' | 'redeemed' | 'expired';
+
+export interface RewardTransaction {
+  id: string;
+  userId: string;
+  type: TransactionType;
+  amount: number;
+  description: string;
+  timestamp: number;
+  relatedReferralId?: string;
+  relatedFeatureId?: string;
+}
+
+export interface FeatureCost {
+  id: string;
+  featureName: string;
+  description: string;
+  tokenCost: number;
+  enabled: boolean;
+  createdAt: number;
+  updatedAt: number;
+}
+
+export interface ReferralStats {
+  referralCode: string;
+  totalReferrals: number;
+  pendingReferrals: number;
+  convertedReferrals: number;
+  expiredReferrals: number;
+  tokenBalance: number;
+  lifetimeEarnings: number;
+  recentTransactions: RewardTransaction[];
+}
+
+export interface ReferralConstants {
+  tokensPerReferral: number;
+  referralExpirationDays: number;
+  minimumRedemption: number;
 }

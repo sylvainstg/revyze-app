@@ -1,11 +1,11 @@
 import React, { useState, useRef } from 'react';
 import { Project, User, UserRole } from '../types';
 import { Button } from './ui/Button';
-import { Plus, Search, FileText, Clock, FolderOpen, LogOut, Share2, Users, Upload, MessageSquare, Trash2, Shield } from 'lucide-react';
+import { Plus, Search, FileText, Clock, FolderOpen, LogOut, Share2, Users, Upload, MessageSquare, Trash2, Shield, Gift } from 'lucide-react';
+import { ReferralDashboard } from './ReferralDashboard';
 import { PLANS } from '../constants';
 import { getProjectRole, canSeeComment } from '../utils/projectRoleHelper';
 import { getSubscriptionStatusDisplay } from '../utils/planHelpers';
-import { FeatureVoteAnalytics } from './FeatureVoteAnalytics';
 import { BarChart3 } from 'lucide-react';
 import { useAdmin } from '../contexts/AdminContext';
 
@@ -19,6 +19,8 @@ interface DashboardProps {
   onLogout: () => void;
   onUpgrade: () => void;
   onDeleteProject: (project: Project) => void;
+  onOpenAdmin: () => void;
+  onOpenCemetery: () => void;
 }
 
 export const Dashboard: React.FC<DashboardProps> = ({
@@ -30,14 +32,18 @@ export const Dashboard: React.FC<DashboardProps> = ({
   onShareProject,
   onLogout,
   onUpgrade,
-  onDeleteProject
+  onDeleteProject,
+  onOpenAdmin,
+  onOpenCemetery
 }) => {
   const [search, setSearch] = useState('');
   const [isEditProfileOpen, setIsEditProfileOpen] = useState(false);
+  const [isProfileMenuOpen, setIsProfileMenuOpen] = useState(false);
   const [editName, setEditName] = useState(user.name);
   const [isSavingProfile, setIsSavingProfile] = useState(false);
-  const [showAnalytics, setShowAnalytics] = useState(false);
-  const [projectToDelete, setProjectToDelete] = useState<Project | null>(null);
+  const [showReferralDashboard, setShowReferralDashboard] = useState(false);
+
+
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const { toggleAdminMode, impersonatedRole } = useAdmin();
@@ -56,6 +62,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
 
     try {
       const { updateUserProfile } = await import('../services/authService');
+      const { createPortalSession } = await import('../services/paymentService');
       const success = await updateUserProfile(user.id, { name: editName });
       if (success) {
         setIsEditProfileOpen(false);
@@ -83,30 +90,16 @@ export const Dashboard: React.FC<DashboardProps> = ({
             </div>
 
             <div className="flex items-center gap-6">
-              {user.isAdmin && (
-                <>
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={() => setShowAnalytics(true)}
-                    className="hidden md:flex gap-2 text-slate-600"
-                  >
-                    <BarChart3 className="w-4 h-4" />
-                    Admin Stats
-                  </Button>
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={toggleAdminMode}
-                    className="hidden md:flex gap-2 text-indigo-600 font-medium"
-                  >
-                    <Shield className="w-4 h-4" />
-                    System Admin
-                  </Button>
-                </>
-              )}
-
-
+              {/* Referral Button */}
+              <Button
+                size="sm"
+                variant="secondary"
+                onClick={() => setShowReferralDashboard(true)}
+                icon={<Gift className="w-4 h-4" />}
+                className="hidden md:flex"
+              >
+                Referrals
+              </Button>
 
               {/* Show Upgrade button for Free users OR Trial users */}
               {(currentPlan.id === 'free' || user.subscriptionStatus === 'trialing') && (
@@ -115,21 +108,74 @@ export const Dashboard: React.FC<DashboardProps> = ({
                 </Button>
               )}
 
-              <div className="flex items-center gap-3 cursor-pointer hover:opacity-80" onClick={() => {
-                setEditName(user.name);
-                setIsEditProfileOpen(true);
-              }}>
-                <div className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-bold text-white ${user.role === UserRole.DESIGNER ? 'bg-purple-600' : 'bg-blue-600'}`}>
-                  {user.name.charAt(0)}
+              <div className="relative">
+                <div
+                  className="flex items-center gap-3 cursor-pointer hover:opacity-80"
+                  onClick={() => setIsProfileMenuOpen(!isProfileMenuOpen)}
+                >
+                  <div className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-bold text-white ${user.role === UserRole.DESIGNER ? 'bg-purple-600' : 'bg-blue-600'}`}>
+                    {user.name.charAt(0)}
+                  </div>
+                  <div className="hidden md:block">
+                    <p className="text-sm font-medium text-slate-900">{user.name}</p>
+                    <p className="text-xs text-slate-500 capitalize">{getSubscriptionStatusDisplay(user)} Plan</p>
+                  </div>
                 </div>
-                <div className="hidden md:block">
-                  <p className="text-sm font-medium text-slate-900">{user.name}</p>
-                  <p className="text-xs text-slate-500 capitalize">{getSubscriptionStatusDisplay(user)} Plan</p>
-                </div>
+
+                {isProfileMenuOpen && (
+                  <>
+                    <div className="fixed inset-0 z-10" onClick={() => setIsProfileMenuOpen(false)} />
+                    <div className="absolute right-0 mt-2 w-48 bg-white rounded-xl shadow-lg border border-slate-100 py-1 z-20 animate-in fade-in zoom-in-95 duration-100">
+                      <div className="px-4 py-2 border-b border-slate-50 md:hidden">
+                        <p className="text-sm font-medium text-slate-900">{user.name}</p>
+                        <p className="text-xs text-slate-500 capitalize">{getSubscriptionStatusDisplay(user)} Plan</p>
+                      </div>
+
+                      <button
+                        onClick={() => {
+                          setEditName(user.name);
+                          setIsEditProfileOpen(true);
+                          setIsProfileMenuOpen(false);
+                        }}
+                        className="w-full text-left px-4 py-2 text-sm text-slate-700 hover:bg-slate-50 flex items-center gap-2"
+                      >
+                        <Users className="w-4 h-4" /> Account Settings
+                      </button>
+
+                      {user.isAdmin && (
+                        <button
+                          onClick={() => {
+                            onOpenAdmin();
+                            setIsProfileMenuOpen(false);
+                          }}
+                          className="w-full text-left px-4 py-2 text-sm text-indigo-600 hover:bg-indigo-50 flex items-center gap-2 font-medium"
+                        >
+                          <Shield className="w-4 h-4" /> System Admin
+                        </button>
+                      )}
+
+                      <button
+                        onClick={() => {
+                          onOpenCemetery();
+                          setIsProfileMenuOpen(false);
+                        }}
+                        className="w-full text-left px-4 py-2 text-sm text-slate-700 hover:bg-slate-50 flex items-center gap-2"
+                      >
+                        <Trash2 className="w-4 h-4" /> Trash
+                      </button>
+
+                      <div className="h-px bg-slate-100 my-1" />
+
+                      <button
+                        onClick={onLogout}
+                        className="w-full text-left px-4 py-2 text-sm text-red-600 hover:bg-red-50 flex items-center gap-2"
+                      >
+                        <LogOut className="w-4 h-4" /> Sign Out
+                      </button>
+                    </div>
+                  </>
+                )}
               </div>
-              <button onClick={onLogout} className="text-slate-400 hover:text-slate-600">
-                <LogOut className="w-5 h-5" />
-              </button>
             </div>
           </div>
         </div>
@@ -289,7 +335,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
                             <button
                               onClick={(e) => {
                                 e.stopPropagation();
-                                setProjectToDelete(project);
+                                onDeleteProject(project);
                               }}
                               className="p-1.5 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-full transition-colors"
                               title="Delete Project"
@@ -362,9 +408,10 @@ export const Dashboard: React.FC<DashboardProps> = ({
       {isEditProfileOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm">
           <div className="bg-white rounded-xl shadow-xl w-full max-w-md p-6">
-            <h2 className="text-xl font-bold text-slate-900 mb-4">Edit Profile</h2>
-            <div className="space-y-4">
+            <h2 className="text-xl font-bold text-slate-900 mb-4">Account Settings</h2>
+            <div className="space-y-6">
               <div>
+                <h3 className="text-sm font-medium text-slate-900 mb-3">Profile</h3>
                 <label className="block text-sm font-medium text-slate-700 mb-1">Full Name</label>
                 <input
                   type="text"
@@ -373,7 +420,44 @@ export const Dashboard: React.FC<DashboardProps> = ({
                   className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 bg-white text-slate-900"
                 />
               </div>
-              <div className="flex justify-end gap-3 mt-6">
+
+              {/* Subscription Section */}
+              {(currentPlan.id !== 'free' || user.stripeCustomerId) && (
+                <div className="pt-4 border-t border-slate-100">
+                  <h3 className="text-sm font-medium text-slate-900 mb-3">Subscription</h3>
+                  <div className="bg-slate-50 p-4 rounded-lg border border-slate-200">
+                    <div className="flex justify-between items-center mb-2">
+                      <span className="text-sm font-medium text-slate-700">{currentPlan.name}</span>
+                      <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${user.subscriptionStatus === 'active' ? 'bg-green-100 text-green-700' : 'bg-yellow-100 text-yellow-700'}`}>
+                        {user.subscriptionStatus ? user.subscriptionStatus.charAt(0).toUpperCase() + user.subscriptionStatus.slice(1) : 'Active'}
+                      </span>
+                    </div>
+                    <Button
+                      variant="secondary"
+                      size="sm"
+                      className="w-full mt-2"
+                      onClick={async () => {
+                        try {
+                          const { createPortalSession } = await import('../services/paymentService');
+                          const url = await createPortalSession();
+                          if (url) {
+                            window.location.href = url;
+                          } else {
+                            alert("Failed to load subscription portal.");
+                          }
+                        } catch (e) {
+                          console.error(e);
+                          alert("Error loading portal.");
+                        }
+                      }}
+                    >
+                      Manage Subscription
+                    </Button>
+                  </div>
+                </div>
+              )}
+
+              <div className="flex justify-end gap-3 pt-2 border-t border-slate-100">
                 <Button variant="secondary" onClick={() => setIsEditProfileOpen(false)}>Cancel</Button>
                 <Button onClick={handleUpdateProfile} isLoading={isSavingProfile}>Save Changes</Button>
               </div>
@@ -382,45 +466,24 @@ export const Dashboard: React.FC<DashboardProps> = ({
         </div>
       )}
 
-      {/* Delete Confirmation Modal */}
-      {projectToDelete && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm">
-          <div className="bg-white rounded-xl shadow-xl w-full max-w-md p-6">
-            <div className="flex items-center gap-3 text-red-600 mb-4">
-              <div className="w-10 h-10 rounded-full bg-red-100 flex items-center justify-center">
-                <LogOut className="w-5 h-5" />
-              </div>
-              <h2 className="text-xl font-bold text-slate-900">Delete Project?</h2>
-            </div>
-
-            <p className="text-slate-600 mb-6">
-              Are you sure you want to delete <span className="font-bold text-slate-900">{projectToDelete.name}</span>?
-              This action cannot be undone and all data including comments and versions will be permanently lost.
-            </p>
-
-            <div className="flex justify-end gap-3">
-              <Button variant="secondary" onClick={() => setProjectToDelete(null)}>Cancel</Button>
-              <Button
-                onClick={() => {
-                  onDeleteProject(projectToDelete);
-                  setProjectToDelete(null);
-                }}
-                className="bg-red-600 hover:bg-red-700 text-white border-none"
-              >
-                Delete Project
+      {/* Referral Dashboard Modal */}
+      {showReferralDashboard && (
+        <div className="fixed inset-0 z-50 bg-black/50 backdrop-blur-sm flex items-start justify-center p-4 overflow-y-auto">
+          <div className="bg-white rounded-xl shadow-xl w-full max-w-4xl my-8">
+            <div className="p-6 border-b border-slate-100 flex items-center justify-between sticky top-0 bg-white rounded-t-xl">
+              <h2 className="text-xl font-bold text-slate-900">Referral Program</h2>
+              <Button variant="secondary" onClick={() => setShowReferralDashboard(false)}>
+                Close
               </Button>
+            </div>
+            <div className="p-6">
+              <ReferralDashboard currentUser={user} />
             </div>
           </div>
         </div>
       )}
 
-      {/* Analytics Modal */}
-      {showAnalytics && (
-        <FeatureVoteAnalytics
-          featureId="ai-summary"
-          onClose={() => setShowAnalytics(false)}
-        />
-      )}
+
     </div>
   );
 };

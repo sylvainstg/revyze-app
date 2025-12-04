@@ -1,20 +1,33 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { Button } from './ui/Button';
 import { Input } from './ui/Input';
 import { X, Upload } from 'lucide-react';
+import { UserRole } from '../types';
 
 interface CreateProjectModalProps {
     isOpen: boolean;
     onClose: () => void;
     onCreate: (file: File, name: string, clientName: string) => Promise<void>;
+    userRole?: UserRole;
+    userName?: string;
 }
 
-export const CreateProjectModal: React.FC<CreateProjectModalProps> = ({ isOpen, onClose, onCreate }) => {
+export const CreateProjectModal: React.FC<CreateProjectModalProps> = ({ isOpen, onClose, onCreate, userRole, userName }) => {
     const [name, setName] = useState('');
     const [clientName, setClientName] = useState('');
     const [file, setFile] = useState<File | null>(null);
     const [isCreating, setIsCreating] = useState(false);
     const fileInputRef = useRef<HTMLInputElement>(null);
+
+    // Auto-fill client name for homeowners
+    useEffect(() => {
+        if (isOpen && userRole === UserRole.HOMEOWNER && userName) {
+            setClientName(userName);
+        } else if (isOpen && !clientName) {
+            // Reset if opening fresh for non-homeowner (optional, but good practice)
+            setClientName('');
+        }
+    }, [isOpen, userRole, userName]);
 
     if (!isOpen) return null;
 
@@ -59,13 +72,15 @@ export const CreateProjectModal: React.FC<CreateProjectModalProps> = ({ isOpen, 
                         required
                     />
 
-                    <Input
-                        label="Client Name"
-                        placeholder="John Smith"
-                        value={clientName}
-                        onChange={(e) => setClientName(e.target.value)}
-                        required
-                    />
+                    {userRole !== UserRole.HOMEOWNER && (
+                        <Input
+                            label="Client Name"
+                            placeholder="John Smith"
+                            value={clientName}
+                            onChange={(e) => setClientName(e.target.value)}
+                            required
+                        />
+                    )}
 
                     {/* File Upload */}
                     <div>

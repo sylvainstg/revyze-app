@@ -1,8 +1,10 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Check, Loader2 } from 'lucide-react';
 import { createCheckoutSession } from '../services/paymentService';
 import { User } from '../types';
 import { PLANS } from '../constants';
+import { functions } from '../firebaseConfig';
+import { httpsCallable } from 'firebase/functions';
 
 interface PricingPageProps {
     user: User;
@@ -12,6 +14,27 @@ interface PricingPageProps {
 export const PricingPage: React.FC<PricingPageProps> = ({ user, onBack }) => {
     const [loadingPriceId, setLoadingPriceId] = useState<string | null>(null);
     const [billingCycle, setBillingCycle] = useState<'monthly' | 'yearly'>('monthly');
+    const [priceIds, setPriceIds] = useState<{ [key: string]: string }>({});
+
+    useEffect(() => {
+        const fetchPlans = async () => {
+            try {
+                const getSubscriptionPlans = httpsCallable(functions, 'getSubscriptionPlansFunction');
+                const result = await getSubscriptionPlans();
+                const data = result.data as { plans: { id: string; priceId: string }[] };
+
+                const prices: { [key: string]: string } = {};
+                data.plans.forEach(plan => {
+                    prices[plan.id] = plan.priceId;
+                });
+                setPriceIds(prices);
+            } catch (error) {
+                console.error("Error fetching plans:", error);
+            }
+        };
+
+        fetchPlans();
+    }, []);
 
     const handleUpgrade = async (priceId: string) => {
         setLoadingPriceId(priceId);
@@ -39,7 +62,7 @@ export const PricingPage: React.FC<PricingPageProps> = ({ user, onBack }) => {
             yearlyPrice: PLANS.pro.price.yearly,
             period: billingCycle === 'monthly' ? '/mo' : '/yr',
             current: user.plan === 'pro',
-            priceId: null // Will need to be updated when Stripe is properly configured
+            priceId: priceIds['pro_plan']
         },
         {
             ...PLANS.business,
@@ -47,7 +70,7 @@ export const PricingPage: React.FC<PricingPageProps> = ({ user, onBack }) => {
             yearlyPrice: PLANS.business.price.yearly,
             period: billingCycle === 'monthly' ? '/mo' : '/yr',
             current: user.plan === 'business',
-            priceId: null // Will need to be updated when Stripe is properly configured
+            priceId: priceIds['corporate_plan']
         }
     ];
 

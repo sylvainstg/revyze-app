@@ -14,7 +14,14 @@ import { User, UserRole } from '../types';
 // Collection reference
 const USERS_COLLECTION = 'users';
 
-export const registerUser = async (name: string, email: string, password: string, role: UserRole): Promise<{ success: boolean; user?: User; message?: string }> => {
+export const registerUser = async (
+    name: string,
+    email: string,
+    password: string,
+    role: UserRole,
+    plan: 'free' | 'pro' = 'free',
+    subscriptionStatus?: 'active' | 'trialing' | 'canceled' | 'past_due'
+): Promise<{ success: boolean; user?: User; message?: string }> => {
     try {
         const userCredential = await createUserWithEmailAndPassword(auth, email, password);
         const firebaseUser = userCredential.user;
@@ -27,7 +34,14 @@ export const registerUser = async (name: string, email: string, password: string
             name,
             email: email.toLowerCase(),
             role,
-            plan: 'free'
+            plan,
+
+            subscriptionStatus,
+            loginCount: 1,
+            lastLogin: Date.now(),
+            shareCountGuest: 0,
+            shareCountPro: 0,
+            projectCount: 0
         };
 
         // Save user profile to Firestore
@@ -53,7 +67,15 @@ export const loginUser = async (email: string, password: string): Promise<{ succ
         const userDoc = await getDoc(doc(db, USERS_COLLECTION, firebaseUser.uid));
 
         if (userDoc.exists()) {
-            return { success: true, user: userDoc.data() as User };
+            const userData = userDoc.data() as User;
+            // Update login stats
+            const updates = {
+                loginCount: (userData.loginCount || 0) + 1,
+                lastLogin: Date.now()
+            };
+            await updateDoc(doc(db, USERS_COLLECTION, firebaseUser.uid), updates);
+
+            return { success: true, user: { ...userData, ...updates } };
         } else {
             // HEALING: User exists in Auth but not in Firestore. Create default profile.
             const newUser: User = {
@@ -61,7 +83,13 @@ export const loginUser = async (email: string, password: string): Promise<{ succ
                 name: firebaseUser.displayName || 'User',
                 email: email.toLowerCase(),
                 role: UserRole.HOMEOWNER, // Default role
-                plan: 'free'
+
+                plan: 'free',
+                loginCount: 1,
+                lastLogin: Date.now(),
+                shareCountGuest: 0,
+                shareCountPro: 0,
+                projectCount: 0
             };
 
             try {
@@ -134,7 +162,13 @@ export const subscribeToAuth = (callback: (user: User | null) => void) => {
                         name: firebaseUser.displayName || 'User',
                         email: firebaseUser.email || '',
                         role: UserRole.HOMEOWNER, // Default role
-                        plan: 'free'
+
+                        plan: 'free',
+                        loginCount: 1,
+                        lastLogin: Date.now(),
+                        shareCountGuest: 0,
+                        shareCountPro: 0,
+                        projectCount: 0
                     };
 
                     try {

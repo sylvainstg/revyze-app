@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { PDFWorkspace } from './components/PDFWorkspace';
 import { ImageWorkspace } from './components/ImageWorkspace';
 import { CollaborationPanel } from './components/CollaborationPanel';
@@ -9,9 +9,12 @@ import { Dashboard } from './components/Dashboard';
 import { Button } from './components/ui/Button';
 import { PricingPage } from './components/PricingPage';
 import { ThankYouPage } from './components/ThankYouPage';
-import { UserRole, Comment, Project, ViewState, User, CommentReply, ShareSettings } from './types';
+import { WelcomeLandingPage } from './components/WelcomeLandingPage';
+import { OnboardingTooltip } from './components/OnboardingTooltip';
+import { ONBOARDING_STEPS } from './constants/onboardingSteps';
+import { UserRole, Comment, Project, ViewState, User, CommentReply, ShareSettings, ProjectVersion } from './types';
 import { Layout, Upload, FileText, Share2, ArrowLeft, ZoomIn, ZoomOut, AlertCircle, Camera } from 'lucide-react';
-import { SAMPLE_PROJECT_ID, MAX_FILE_SIZE_MB, PLAN_LIMITS } from './constants';
+import { SAMPLE_PROJECT_ID, MAX_FILE_SIZE_MB, PLAN_LIMITS, STANDARD_CATEGORIES } from './constants';
 import { v4 as uuidv4 } from 'uuid';
 import { ShareModal } from './components/ShareModal';
 import { CreateProjectModal } from './components/CreateProjectModal';
@@ -21,11 +24,20 @@ import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 import * as authService from './services/authService';
 import { getPDFObjectURL, revokePDFObjectURL } from './utils/pdfUtils';
 import { getProjectRole, getProjectRoleDisplay, getCommentAudience, canSeeComment } from './utils/projectRoleHelper';
-import { AdminDashboard } from './components/AdminDashboard';
+import { getCategories, getVersionsByCategory, getNextCategoryVersion, DEFAULT_CATEGORY, migrateVersionsToCategories } from './utils/categoryHelpers';
+
+import { AdminPage } from './components/AdminPage';
 import { useAdmin } from './contexts/AdminContext';
 import { functions } from './firebaseConfig';
 import { httpsCallable } from 'firebase/functions';
 import { Toast, ToastType } from './components/ui/Toast';
+import { VersionUploadModal } from './components/VersionUploadModal';
+import { VersionSelectorDetailed } from './components/VersionSelector';
+import { CategorySelector } from './components/CategorySelector';
+import { EditVersionModal } from './components/EditVersionModal';
+import { EnhancedDeleteDialog } from './components/EnhancedDeleteDialog';
+import { CemeteryView } from './components/CemeteryView';
+
 
 const App: React.FC = () => {
   // Navigation State
@@ -42,37 +54,81 @@ const App: React.FC = () => {
   // Projects State
   const [projects, setProjects] = useState<Project[]>([]);
   const [activeProjectId, setActiveProjectId] = useState<string | null>(null);
+  const [activeCategory, setActiveCategory] = useState<string>(DEFAULT_CATEGORY); // Active document category
   const [activeCommentId, setActiveCommentId] = useState<string | null>(null);
 
-  // Modal State
+  // Track last optimistic update to prevent realtime listener from overwriting it
+  const lastOptimisticUpdateRef = useRef<number>(0);
+
+  // Track view state (pan/zoom) per category
+  const [categoryViewStates, setCategoryViewStates] = useState<Record<string, { scale: number, panOffset: { x: number, y: number } }>>({});
+  const [isSidebarOpen, setIsSidebarOpen] = useState(true);
+  // Ref to track current pan offset without causing re-renders in App
+  const currentPanOffsetRef = useRef<{ x: number, y: number }>({ x: 0, y: 0 });
+
+  const [commentFilter, setCommentFilter] = useState({
+    active: true,
+    resolved: false,
+    deleted: false
+  });
   const [isShareModalOpen, setIsShareModalOpen] = useState(false);
 
 
   // Toast State
   const [toast, setToast] = useState<{ message: string; type: ToastType } | null>(null);
 
+  // Referral State
+  const [referralCode, setReferralCode] = useState<string | null>(null);
+
   // Invite Details State
-  const [inviteDetails, setInviteDetails] = useState<{ inviterName?: string; projectName?: string } | null>(null);
+  const [inviteDetails, setInviteDetails] = useState<{ inviterName?: string; projectName?: string; role?: 'guest' | 'pro' } | null>(null);
 
   // Workspace State
   const [pageNumber, setPageNumber] = useState(1);
-  const [pdfScale, setPdfScale] = useState(1.0);
+  const [pdfScale, _setPdfScale] = useState(1.0);
+  const isUserZooming = useRef(false);
+
+  const setPdfScale = (newScale: number | ((prev: number) => number)) => {
+    isUserZooming.current = true;
+    _setPdfScale(newScale);
+  };
 
   // --- Effects ---
 
-  // 0. Handle Shared Link
+  // 0. Handle Shared Link and Referral Code
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
     const projectId = params.get('project');
     const token = params.get('token');
     const inviterName = params.get('inviterName');
     const projectName = params.get('projectName');
+    const role = params.get('role') as 'guest' | 'pro' | null;
+    const ref = params.get('ref');
 
-    if (inviterName || projectName) {
+    // Handle referral code
+    if (ref && !currentUser && !authLoading) {
+      setReferralCode(ref);
+      setView('landing'); // Show welcome landing page
+      return;
+    }
+
+    if (inviterName || projectName || role) {
       setInviteDetails({
         inviterName: inviterName || undefined,
-        projectName: projectName || undefined
+        projectName: projectName || undefined,
+        role: role || undefined
       });
+      // Show welcome landing page for project invitations too
+      if (!currentUser && !authLoading) {
+        setView('landing');
+        return;
+      }
+    }
+
+    // If there's a project invitation but no user is logged in, redirect to landing
+    if (projectId && !currentUser && !authLoading) {
+      setView('landing');
+      return;
     }
 
     if (projectId && token) {
@@ -105,7 +161,7 @@ const App: React.FC = () => {
       };
       loadSharedProject();
     }
-  }, []);
+  }, [currentUser, authLoading]);
 
   // Handle Payment Success
   useEffect(() => {
@@ -139,7 +195,27 @@ const App: React.FC = () => {
     const loadProjects = async () => {
       if (currentUser && !isGuest) {
         const userProjects = await storageService.getProjectsForUser(currentUser);
-        setProjects(userProjects);
+        // Migrate versions to ensure they have category fields
+        const migratedProjects = userProjects.map(project => {
+          const migratedVersions = migrateVersionsToCategories(project.versions);
+          // Check if migration actually changed anything
+          const needsMigration = migratedVersions.some((v, i) =>
+            v.category !== project.versions[i]?.category ||
+            v.categoryVersionNumber !== project.versions[i]?.categoryVersionNumber
+          );
+
+          // If migration added fields, save to Firestore
+          if (needsMigration) {
+            console.log('[Migration] Saving migrated versions to Firestore for project:', project.id);
+            storageService.updateProjectPartial(project.id, { versions: migratedVersions });
+          }
+
+          return {
+            ...project,
+            versions: migratedVersions
+          };
+        });
+        setProjects(migratedProjects);
       } else if (!isGuest) {
         setProjects([]);
       }
@@ -147,16 +223,110 @@ const App: React.FC = () => {
     loadProjects();
   }, [currentUser, isGuest]);
 
+  // 3. Subscribe to active project changes (Realtime Updates)
+  useEffect(() => {
+    if (!activeProjectId) return;
+
+    const unsubscribe = storageService.subscribeToProject(activeProjectId, (updatedProject) => {
+      console.log('[Realtime Listener] Received update for project:', updatedProject.id);
+
+      // If project was deleted, remove it from state and navigate to dashboard
+      if (updatedProject.deletedAt) {
+        console.log('[Realtime Listener] Project was deleted, removing from state');
+        setProjects(prev => prev.filter(p => p.id !== updatedProject.id));
+        setView('dashboard');
+        return;
+      }
+
+      // Migrate versions to ensure they have category fields
+      const migratedProject = {
+        ...updatedProject,
+        versions: migrateVersionsToCategories(updatedProject.versions)
+      };
+
+      console.log('[Realtime Listener] Versions in update:',
+        migratedProject.versions.map(v => ({ id: v.id, category: v.category, catVer: v.categoryVersionNumber }))
+      );
+
+      // Ignore updates that come within 2 seconds of an optimistic update
+      const timeSinceOptimistic = Date.now() - lastOptimisticUpdateRef.current;
+      if (timeSinceOptimistic < 2000) {
+        console.log('[Realtime Listener] Ignoring update - too soon after optimistic update (', timeSinceOptimistic, 'ms)');
+        return;
+      }
+
+      setProjects(prev => {
+        // Check if project actually changed to avoid unnecessary re-renders
+        const current = prev.find(p => p.id === migratedProject.id);
+
+        if (current) {
+          console.log('[Realtime Listener] Current versions:',
+            current.versions.map(v => ({ id: v.id, category: v.category, catVer: v.categoryVersionNumber }))
+          );
+        }
+
+        if (JSON.stringify(current) === JSON.stringify(migratedProject)) {
+          console.log('[Realtime Listener] No changes detected, skipping update');
+          return prev;
+        }
+
+        console.log('[Realtime Listener] Applying update to projects state');
+        return prev.map(p => p.id === migratedProject.id ? migratedProject : p);
+      });
+    });
+
+    return () => unsubscribe();
+  }, [activeProjectId]);
+
+
   // 3. Scroll to top whenever view changes
   useEffect(() => {
     window.scrollTo(0, 0);
   }, [view]);
+
 
   // Derived State
   const activeProject = projects.find(p => p.id === activeProjectId);
   // Robust version finding: try ID match, fallback to latest
   const activeVersion = activeProject?.versions.find(v => v.id === activeProject.currentVersionId)
     || (activeProject?.versions && activeProject.versions.length > 0 ? activeProject.versions[activeProject.versions.length - 1] : undefined);
+
+  // Save zoom level to Firestore when it changes (debounced)
+  // Save zoom level to Firestore when it changes (debounced)
+  useEffect(() => {
+    if (!activeProject || !currentUser) return;
+
+    // Only save if the change came from user interaction
+    if (!isUserZooming.current) {
+      console.log('[Zoom Persistence] Skipping save - change not initiated by user');
+      return;
+    }
+
+    // Robust check: handle undefined and float precision
+    const currentDbZoom = activeProject.zoomLevel ?? 1.0;
+    const diff = Math.abs(currentDbZoom - pdfScale);
+
+    // If difference is negligible, don't save
+    if (diff < 0.001) return;
+
+    const timer = setTimeout(async () => {
+      // Double check inside timeout with latest activeProject ref (if we had it)
+      // But we removed activeProject from deps, so we use the one from closure.
+      // This is risky if activeProject changes significantly (e.g. ID change).
+      // But we only care about zoom here.
+
+      // We should probably check if the project ID is still the same active one
+      // But for now, let's just save.
+
+      console.log('[Zoom Persistence] Saving zoom:', pdfScale, 'Previous:', currentDbZoom);
+      await storageService.updateProjectZoom(activeProject.id, pdfScale);
+
+    }, 1000); // Debounce for 1s
+
+    return () => clearTimeout(timer);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [pdfScale]);
+
 
   // --- Helper to save state and persist to DB ---
   const updateProjectState = async (updatedProject: Project) => {
@@ -253,28 +423,60 @@ const App: React.FC = () => {
     }
   };
 
-  const handleUpdateShareSettings = async (settings: ShareSettings) => {
-    if (!projectToShare) return;
-
-    const success = await storageService.updateProjectShareSettings(projectToShare.id, settings);
-    if (success) {
-      // Update local state
-      const updatedProject = { ...projectToShare, shareSettings: settings };
-      setProjects(prev => prev.map(p => p.id === projectToShare.id ? updatedProject : p));
-      setToast({ message: 'Share settings updated', type: 'success' });
-    } else {
-      setToast({ message: 'Failed to update settings', type: 'error' });
-    }
-  };
+  // Enhanced Delete Dialog State
+  const [projectToDelete, setProjectToDelete] = useState<Project | null>(null);
 
   const handleDeleteProject = async (project: Project) => {
-    const success = await storageService.deleteProject(project.id);
+    // Show enhanced delete dialog instead of immediate delete
+    console.log('[Delete] Setting projectToDelete:', project.name);
+    console.log('[Delete] Current view:', view);
+    setProjectToDelete(project);
+  };
+
+  const confirmDeleteProject = async () => {
+    if (!projectToDelete || !currentUser) return;
+
+    const success = await storageService.deleteProject(projectToDelete.id, currentUser.id);
     if (success) {
-      setProjects(prev => prev.filter(p => p.id !== project.id));
-      setToast({ message: 'Project deleted successfully', type: 'success' });
+      setProjects(prev => prev.filter(p => p.id !== projectToDelete.id));
+      setToast({ message: 'Project moved to trash', type: 'success' });
+      setProjectToDelete(null);
     } else {
       setToast({ message: 'Failed to delete project', type: 'error' });
     }
+  };
+
+  const handleRestoreProject = (project: Project) => {
+    // Add restored project back to projects list
+    setProjects(prev => [...prev, project].sort((a, b) => b.lastModified - a.lastModified));
+    setToast({ message: 'Project restored successfully', type: 'success' });
+    setView('dashboard');
+  };
+
+  // Debug: Log when projectToDelete changes
+  useEffect(() => {
+    console.log('[projectToDelete state changed]:', projectToDelete?.name || 'null', 'view:', view);
+  }, [projectToDelete, view]);
+
+  const handleSetDefaultPage = async (page: number) => {
+    if (!activeProject || !activeCategory) return;
+
+    const updatedSettings = {
+      ...activeProject.categorySettings,
+      [activeCategory]: {
+        ...activeProject.categorySettings?.[activeCategory],
+        defaultPage: page
+      }
+    };
+
+    const updatedProject = {
+      ...activeProject,
+      categorySettings: updatedSettings,
+      lastModified: Date.now()
+    };
+
+    await updateProjectState(updatedProject);
+    setToast({ message: `Page ${page} set as default for ${activeCategory}`, type: 'success' });
   };
 
   // --- Actions ---
@@ -282,6 +484,7 @@ const App: React.FC = () => {
   const handleAuthSuccess = (user: User, isNewUser: boolean) => {
     // Auth state is handled by the subscription, but we can handle redirection here
     if (isNewUser) {
+      // New users go to checkout first to select plan
       setView('checkout');
     } else {
       setView('dashboard');
@@ -289,21 +492,44 @@ const App: React.FC = () => {
   };
 
   const handleCheckoutSuccess = async (planId: string) => {
-    if (currentUser) {
+    try {
+      console.log('[handleCheckoutSuccess] Starting with planId:', planId);
+
+      if (!currentUser) {
+        console.error('[handleCheckoutSuccess] No current user');
+        throw new Error('No user logged in');
+      }
+
       // Update plan in DB
       // Ensure planId is a valid plan type
       const validPlan = (planId === 'free' || planId === 'pro' || planId === 'business') ? planId : 'free';
+      console.log('[handleCheckoutSuccess] Valid plan:', validPlan);
 
       // Set subscription status based on plan
       // Pro users start with trial (free to experience, pay to invite)
       // Free users have no subscription status
       const subscriptionStatus = validPlan === 'pro' ? 'trialing' : undefined;
 
+      console.log('[handleCheckoutSuccess] Updating user plan in DB...');
       await storageService.updateUserPlan(currentUser.id, validPlan, subscriptionStatus);
+
       // Update local state (will eventually be synced by auth listener if we re-fetched, but manual update is faster)
       setCurrentUser({ ...currentUser, plan: validPlan, subscriptionStatus });
+      console.log('[handleCheckoutSuccess] User state updated');
+
+      // After selecting plan, show onboarding if not completed
+      if (!currentUser.hasCompletedOnboarding) {
+        console.log('[handleCheckoutSuccess] Redirecting to onboarding');
+        setView('onboarding');
+        return;
+      }
+
+      console.log('[handleCheckoutSuccess] Redirecting to thank-you');
+      setView('thank-you');
+    } catch (error) {
+      console.error('[handleCheckoutSuccess] Error:', error);
+      throw error; // Re-throw to let CheckoutPage handle it
     }
-    setView('thank-you');
   };
 
   const handleCreateProjectWithData = async (file: File, name: string, clientName: string) => {
@@ -363,12 +589,16 @@ const App: React.FC = () => {
       lastModified: Date.now(),
       createdAt: Date.now(),
       currentVersionId: 'v1',
+      activeCategory: DEFAULT_CATEGORY, // Set initial category
       versions: [{
         id: 'v1',
         versionNumber: 1,
+        category: DEFAULT_CATEGORY,
+        categoryVersionNumber: 1,
         fileUrl: downloadURL,
         fileName: file.name,
         uploadedBy: currentUser.role,
+        uploaderEmail: currentUser.email,
         timestamp: Date.now(),
         comments: []
       }]
@@ -379,6 +609,7 @@ const App: React.FC = () => {
     if (success) {
       setProjects(prev => [newProject, ...prev]);
       setActiveProjectId(newProject.id);
+      setActiveCategory(DEFAULT_CATEGORY); // Set active category state
       setView('workspace');
     } else {
       alert("Could not save project to the cloud.");
@@ -431,24 +662,213 @@ const App: React.FC = () => {
   };
 
   const handleOpenProject = (id: string) => {
+    const project = projects.find(p => p.id === id);
+    if (!project) return;
+
     setActiveProjectId(id);
+
+    // Load saved zoom level or default to 1.0
+    // IMPORTANT: Set isUserZooming to false to prevent this load from triggering a save
+    isUserZooming.current = false;
+    _setPdfScale(project.zoomLevel || 1.0);
+
+    // Set active category
+    const projectActiveCategory = project.activeCategory || getCategories(project.versions)[0] || DEFAULT_CATEGORY;
+    setActiveCategory(projectActiveCategory);
+
     setView('workspace');
+
+    // Check for default page in the active category
+    const defaultPage = project.categorySettings?.[projectActiveCategory]?.defaultPage;
+    if (defaultPage) {
+      setPageNumber(defaultPage);
+    } else {
+      setPageNumber(1);
+    }
   };
+
 
   // Modal State
   const [shareModalProjectId, setShareModalProjectId] = useState<string | null>(null);
   const [isCreateProjectModalOpen, setIsCreateProjectModalOpen] = useState(false);
+  const [showVersionUploadModal, setShowVersionUploadModal] = useState(false);
+
+  // Edit Version State
+  const [editVersionModalOpen, setEditVersionModalOpen] = useState(false);
+  const [versionToEdit, setVersionToEdit] = useState<ProjectVersion | null>(null);
 
   const handleShareClick = (project: Project) => {
     setShareModalProjectId(project.id);
     setIsShareModalOpen(true);
   };
 
+  // Version Management Functions
+  const handleUploadNewVersion = async (file: File, transferComments: boolean, category: string) => {
+    if (!activeProject || !currentUser) return;
+
+    // Validate file size
+    const fileSizeMB = file.size / (1024 * 1024);
+    if (fileSizeMB > MAX_FILE_SIZE_MB) {
+      setToast({ message: `File is too large (${fileSizeMB.toFixed(1)}MB). Please choose a file under ${MAX_FILE_SIZE_MB}MB.`, type: 'error' });
+      return;
+    }
+
+    try {
+      // Upload file to Firebase Storage
+      const globalVersionNumber = activeProject.versions.length + 1;
+      const categoryVersionNumber = getNextCategoryVersion(activeProject.versions, category);
+
+      const storageRef = ref(storage, `projects/${activeProject.id}/v${globalVersionNumber}_${file.name}`);
+      await uploadBytes(storageRef, file);
+      const downloadURL = await getDownloadURL(storageRef);
+
+      // Create new version object
+      const newVersion: ProjectVersion = {
+        id: uuidv4(),
+        versionNumber: globalVersionNumber,
+        category,
+        categoryVersionNumber,
+        fileUrl: downloadURL,
+        fileName: file.name,
+        uploadedBy: currentUser.role,
+        uploaderEmail: currentUser.email,
+        timestamp: Date.now(),
+        comments: []
+      };
+
+      // Transfer unresolved comments if requested
+      let commentsToTransfer: Comment[] = [];
+      if (transferComments) {
+        const activeVer = activeProject.versions.find(v => v.id === activeProject.currentVersionId);
+        if (activeVer) {
+          const unresolvedComments = activeVer.comments.filter(c => !c.resolved && !c.deleted);
+          commentsToTransfer = unresolvedComments.map(c => ({
+            ...c,
+            id: uuidv4(), // New IDs for transferred comments
+            timestamp: Date.now(),
+            replies: [] // Don't transfer replies? Or should we? Usually just the issue.
+          }));
+          newVersion.comments = commentsToTransfer;
+        }
+      }
+
+      // Update project
+      const updatedProject = {
+        ...activeProject,
+        versions: [...activeProject.versions, newVersion],
+        currentVersionId: newVersion.id,
+        activeCategory: category, // Switch to this category
+        lastModified: Date.now()
+      };
+
+      await updateProjectState(updatedProject);
+      setActiveCategory(category);
+      setShowVersionUploadModal(false);
+
+      // Show success message
+      const transferMsg = transferComments && commentsToTransfer.length > 0
+        ? ` ${commentsToTransfer.length} unresolved comment${commentsToTransfer.length !== 1 ? 's' : ''} transferred.`
+        : '';
+      setToast({ message: `Version ${categoryVersionNumber} uploaded to ${category}!${transferMsg}`, type: 'success' });
+
+    } catch (error) {
+      console.error('Error uploading new version:', error);
+      setToast({ message: 'Failed to upload new version. Please try again.', type: 'error' });
+    }
+  };
+
+  const handleEditVersionClick = (version: ProjectVersion) => {
+    setVersionToEdit(version);
+    setEditVersionModalOpen(true);
+  };
+
+  const handleUpdateVersionCategory = async (newCategory: string) => {
+    if (!activeProject || !versionToEdit) return;
+
+    // 1. Calculate new version number for this category
+    const nextCatVer = getNextCategoryVersion(activeProject.versions, newCategory);
+
+    console.log('[handleUpdateVersionCategory] Starting update:', {
+      versionId: versionToEdit.id,
+      oldCategory: versionToEdit.category,
+      newCategory,
+      nextCatVer,
+      allVersions: activeProject.versions.map(v => ({ id: v.id, category: v.category, catVer: v.categoryVersionNumber }))
+    });
+
+    // 2. Update the version
+    const updatedVersion = {
+      ...versionToEdit,
+      category: newCategory,
+      categoryVersionNumber: nextCatVer
+    };
+
+    // 3. Update project versions
+    const updatedVersions = activeProject.versions.map(v => v.id === versionToEdit.id ? updatedVersion : v);
+
+    console.log('[handleUpdateVersionCategory] Updated versions:',
+      updatedVersions.map(v => ({ id: v.id, category: v.category, catVer: v.categoryVersionNumber }))
+    );
+
+    const updatedProject = {
+      ...activeProject,
+      versions: updatedVersions,
+      lastModified: Date.now()
+    };
+
+    // If we moved the currently active version, switch the active category view to the new one
+    if (versionToEdit.id === activeProject.currentVersionId) {
+      updatedProject.activeCategory = newCategory;
+      setActiveCategory(newCategory);
+    }
+
+    // 4. Save using partial update to be safe
+    // Optimistic update
+    lastOptimisticUpdateRef.current = Date.now(); // Mark the time of optimistic update
+    setProjects(prev => prev.map(p => p.id === activeProject.id ? updatedProject : p));
+
+    console.log('[handleUpdateVersionCategory] Optimistic update applied at', lastOptimisticUpdateRef.current, ', sending to Firestore...');
+
+    const success = await storageService.updateProjectPartial(activeProject.id, {
+      versions: updatedVersions,
+      activeCategory: updatedProject.activeCategory
+    });
+
+    console.log('[handleUpdateVersionCategory] Firestore update result:', success);
+
+    if (success) {
+      setToast({ message: `Version moved to ${newCategory}`, type: 'success' });
+      setEditVersionModalOpen(false);
+      setVersionToEdit(null);
+    } else {
+      setToast({ message: 'Failed to update category', type: 'error' });
+    }
+  };
+
+
+
+  const handleChangeVersion = async (versionId: string) => {
+    if (!activeProject) return;
+
+    const updatedProject = {
+      ...activeProject,
+      currentVersionId: versionId,
+      lastModified: Date.now()
+    };
+
+    await updateProjectState(updatedProject);
+  };
+
+  const getUnresolvedCommentsCount = (): number => {
+    if (!activeVersion) return 0;
+    return activeVersion.comments.filter(c => !c.resolved && !c.deleted).length;
+  };
+
   // Derived project for modal
   const projectToShare = projects.find(p => p.id === shareModalProjectId) || null;
 
-  const handleInviteUser = async (email: string) => {
-    console.log('[handleInviteUser] START - email:', email, 'projectToShare:', projectToShare?.id);
+  const handleInviteUser = async (email: string, role: 'guest' | 'pro', name?: string) => {
+    console.log('[handleInviteUser] START - email:', email, 'role:', role, 'name:', name, 'projectToShare:', projectToShare?.id);
     if (!projectToShare) {
       console.log('[handleInviteUser] ABORT - no projectToShare');
       return;
@@ -497,15 +917,27 @@ const App: React.FC = () => {
       // Send invitation email
       try {
         const sendInvitation = httpsCallable(functions, 'sendInvitationEmail');
-        const shareUrl = projectToShare.shareSettings?.enabled
-          ? `${window.location.origin}?project=${projectToShare.id}&token=${projectToShare.shareSettings.shareToken}&inviterName=${encodeURIComponent(currentUser?.name || 'A colleague')}&projectName=${encodeURIComponent(projectToShare.name)}`
-          : `${window.location.origin}?project=${projectToShare.id}&inviterName=${encodeURIComponent(currentUser?.name || 'A colleague')}&projectName=${encodeURIComponent(projectToShare.name)}`;
+
+        // Construct base URL parameters
+        const params = new URLSearchParams();
+        params.append('project', projectToShare.id);
+        params.append('inviterName', currentUser?.name || 'A colleague');
+        params.append('projectName', projectToShare.name);
+        params.append('role', role);
+        if (name) params.append('inviteeName', name);
+
+        if (projectToShare.shareSettings?.enabled) {
+          params.append('token', projectToShare.shareSettings.shareToken);
+        }
+
+        const shareUrl = `${window.location.origin}?${params.toString()}`;
 
         await sendInvitation({
           email,
           projectName: projectToShare.name,
           url: shareUrl,
-          inviterName: currentUser?.name || 'A colleague'
+          inviterName: currentUser?.name || 'A colleague',
+          inviteeName: name
         });
         console.log('[handleInviteUser] Invitation email sent');
 
@@ -569,6 +1001,27 @@ const App: React.FC = () => {
     }
   };
 
+  const handleUpdateShareSettings = async (projectId: string, settings: ShareSettings) => {
+    // Optimistic Update
+    setProjects(prev => prev.map(p => {
+      if (p.id === projectId) {
+        return {
+          ...p,
+          shareSettings: settings
+        };
+      }
+      return p;
+    }));
+
+    const success = await storageService.updateProjectShareSettings(projectId, settings);
+    if (!success) {
+      console.error('Failed to update share settings');
+      // Revert optimistic update (optional, but good practice)
+      // For now, we rely on the user refreshing if it fails, or we could fetch the project again.
+      alert('Failed to update share settings');
+    }
+  };
+
   // --- Workspace Actions ---
 
   const handleAddComment = async (newCommentData: Omit<Comment, 'id' | 'timestamp' | 'resolved' | 'audience'>) => {
@@ -590,7 +1043,7 @@ const App: React.FC = () => {
       resolved: false,
       replies: [],
       audience,
-      authorName: isGuest ? 'Guest' : currentUser.email,
+      authorName: isGuest ? 'Guest' : currentUser.name,
       ...newCommentData
     };
 
@@ -662,7 +1115,8 @@ const App: React.FC = () => {
       ...activeProject,
       versions: activeProject.versions.map(v => {
         if (v.id === activeProject.currentVersionId) {
-          return { ...v, comments: v.comments.filter(c => c.id !== id) };
+          // Soft delete: mark as deleted instead of removing
+          return { ...v, comments: v.comments.map(c => c.id === id ? { ...c, deleted: true } : c) };
         }
         return v;
       })
@@ -713,7 +1167,44 @@ const App: React.FC = () => {
     );
   }
 
+  // Render views
+
+  // Enhanced Delete Dialog - render at absolute top level
+  const renderDeleteDialog = () => {
+    if (projectToDelete && view === 'dashboard') {
+      console.log('[App.tsx] About to render EnhancedDeleteDialog');
+      return (
+        <EnhancedDeleteDialog
+          project={projectToDelete}
+          onConfirm={confirmDeleteProject}
+          onCancel={() => setProjectToDelete(null)}
+        />
+      );
+    }
+    return null;
+  };
+
   if (view === 'landing') {
+    // Show welcome landing page for referrals or project invitations
+    if (referralCode || inviteDetails) {
+      return (
+        <>
+          {renderDeleteDialog()}
+          <WelcomeLandingPage
+            referralCode={referralCode || undefined}
+            inviterName={inviteDetails?.inviterName}
+            projectName={inviteDetails?.projectName}
+            inviteRole={inviteDetails?.role}
+            onGetStarted={() => {
+              setAuthMode('register');
+              setView('auth');
+            }}
+          />
+        </>
+      );
+    }
+
+    // Show regular landing page
     return (
       <LandingPage
         onGetStarted={() => {
@@ -724,6 +1215,7 @@ const App: React.FC = () => {
           setAuthMode('login');
           setView('auth');
         }}
+        onPricingClick={() => setView('checkout')}
       />
     );
   }
@@ -736,6 +1228,9 @@ const App: React.FC = () => {
         onBack={() => setView('landing')}
         inviterName={inviteDetails?.inviterName}
         projectName={inviteDetails?.projectName}
+        inviteRole={inviteDetails?.role}
+        inviteeName={inviteDetails?.inviteeName}
+        referralCode={referralCode || undefined}
       />
     );
   }
@@ -750,13 +1245,32 @@ const App: React.FC = () => {
     );
   }
 
+  if (view === 'admin' && currentUser) {
+    return (
+      <AdminPage
+        onBack={() => setView('dashboard')}
+        currentUser={currentUser}
+      />
+    );
+  }
+
+  if (view === 'cemetery' && currentUser) {
+    return (
+      <CemeteryView
+        currentUser={currentUser}
+        onRestore={handleRestoreProject}
+        onBack={() => setView('dashboard')}
+      />
+    );
+  }
+
   if (view === 'dashboard' && currentUser) {
     return (
       <>
         <Dashboard
           user={currentUser}
           projects={projects}
-          onCreateProject={handleCreateProject}
+          onCreateProject={() => setIsCreateProjectModalOpen(true)}
           onImportProject={handleImportProject}
           onOpenProject={handleOpenProject}
           onShareProject={handleShareClick}
@@ -766,18 +1280,40 @@ const App: React.FC = () => {
           }}
           onUpgrade={() => setView('pricing')}
           onDeleteProject={handleDeleteProject}
+          onOpenAdmin={() => setView('admin')}
+          onOpenCemetery={() => setView('cemetery')}
         />
         <ShareModal
           isOpen={isShareModalOpen}
           onClose={() => setIsShareModalOpen(false)}
           onInvite={handleInviteUser}
           onUpdateShareSettings={handleUpdateShareSettings}
-          project={projectToShare}
+          onTransferOwnership={async (newOwnerEmail) => {
+            if (!activeProject || !currentUser) return;
+
+            try {
+              const result = await storageService.transferProjectOwnership(activeProject.id, currentUser.id, newOwnerEmail);
+              if (result.success) {
+                alert('Ownership transferred successfully.');
+                setIsShareModalOpen(false);
+                // Optionally reload project or redirect
+                // Since we are now a guest, the realtime listener should update the project role
+              } else {
+                alert(`Transfer failed: ${result.message}`);
+              }
+            } catch (error) {
+              console.error('Transfer ownership error:', error);
+              alert('An error occurred during ownership transfer.');
+            }
+          }}
+          project={activeProject}
         />
         <CreateProjectModal
           isOpen={isCreateProjectModalOpen}
           onClose={() => setIsCreateProjectModalOpen(false)}
           onCreate={handleCreateProjectWithData}
+          userRole={currentUser?.role}
+          userName={currentUser?.name}
         />
       </>
     );
@@ -795,11 +1331,43 @@ const App: React.FC = () => {
   // Add ThankYouPage route
   if (view === 'thank-you') {
     return (
-      <ThankYouPage onGoToDashboard={() => setView('dashboard')} />
+      <ThankYouPage
+        onGoToDashboard={() => setView('dashboard')}
+        plan={currentUser?.plan}
+      />
     );
   }
 
+  // Onboarding Logic
+  const [onboardingStep, setOnboardingStep] = useState(0);
+  const showOnboarding = currentUser && !currentUser.hasCompletedOnboarding && view === 'workspace';
+
+  const handleOnboardingNext = async () => {
+    if (onboardingStep < ONBOARDING_STEPS.length - 1) {
+      setOnboardingStep(prev => prev + 1);
+    } else {
+      // Complete
+      await authService.updateUserProfile(currentUser!.id, { hasCompletedOnboarding: true });
+      setCurrentUser({ ...currentUser!, hasCompletedOnboarding: true });
+    }
+  };
+
+  const handleOnboardingSkip = async () => {
+    await authService.updateUserProfile(currentUser!.id, { hasCompletedOnboarding: true });
+    setCurrentUser({ ...currentUser!, hasCompletedOnboarding: true });
+  };
+
   // Workspace View
+  const handlePanChange = (offset: { x: number; y: number }) => {
+    setCategoryViewStates(prev => ({
+      ...prev,
+      [activeCategory]: {
+        ...prev[activeCategory],
+        panOffset: offset
+      }
+    }));
+  };
+
   if (view === 'workspace' && activeProject && currentUser) {
     if (!activeVersion) {
       return (
@@ -850,62 +1418,104 @@ const App: React.FC = () => {
                 )}
               </div>
 
-              {/* Zoom Controls */}
-              <div className="flex items-center gap-2 bg-slate-100 rounded-full px-2 py-1">
-                <button
-                  onClick={() => setPdfScale(s => Math.max(0.5, s - 0.1))}
-                  className="p-1 hover:bg-slate-200 rounded-full text-slate-600"
-                  title="Zoom Out"
-                >
-                  <ZoomOut className="w-4 h-4" />
-                </button>
-                <span className="text-xs font-medium text-slate-600 tabular-nums min-w-[3rem] text-center">
-                  {Math.round(pdfScale * 100)}%
-                </span>
-                <button
-                  onClick={() => setPdfScale(s => Math.min(2.5, s + 0.1))}
-                  className="p-1 hover:bg-slate-200 rounded-full text-slate-600"
-                  title="Zoom In"
-                >
-                  <ZoomIn className="w-4 h-4" />
-                </button>
-              </div>
-
               {canShare && activeProject && (
-                <>
-                  <Button
-                    variant="secondary"
-                    size="sm"
-                    icon={<Camera className="w-4 h-4" />}
-                    onClick={handleCaptureThumbnail}
-                    title="Set page as project thumbnail"
-                  >
-                    Set as Thumbnail
-                  </Button>
-                  <Button
-                    variant="secondary"
-                    size="sm"
-                    icon={<Share2 className="w-4 h-4" />}
-                    onClick={() => handleShareClick(activeProject)}
-                  >
-                    Share
-                  </Button>
-                </>
+                <Button
+                  variant="secondary"
+                  size="sm"
+                  icon={<Share2 className="w-4 h-4" />}
+                  onClick={() => handleShareClick(activeProject)}
+                >
+                  Share
+                </Button>
               )}
             </div>
           </header>
 
+          {/* Category Selector */}
+          {activeProject && (
+            <CategorySelector
+              versions={activeProject.versions}
+              activeCategory={activeCategory}
+              onCategoryChange={(category) => {
+                setActiveCategory(category);
+                // Switch to latest version of the new category
+                const categoryVersions = getVersionsByCategory(activeProject.versions, category);
+                if (categoryVersions.length > 0) {
+                  const latestVersion = categoryVersions[0];
+                  const updatedProject = {
+                    ...activeProject,
+                    currentVersionId: latestVersion.id,
+                    activeCategory: category
+                  };
+                  updateProjectState(updatedProject);
+
+                  // Set page to default if exists, otherwise 1
+                  const defaultPage = activeProject.categorySettings?.[category]?.defaultPage;
+                  setPageNumber(defaultPage || 1);
+                }
+              }}
+            />
+          )}
+
           {/* Main workspace area - flex layout */}
           <main className="flex-1 flex overflow-hidden">
             {/* PDF Viewer - grows to fill available space */}
-            <div className="flex-1 overflow-hidden">
+            <div className="flex-1 flex flex-col overflow-hidden">
               {(() => {
                 // Detect file type from fileName
                 const fileName = activeVersion.fileName.toLowerCase();
                 const isPDF = fileName.endsWith('.pdf');
 
                 const currentProjectRole = getProjectRole(activeProject, currentUser, isGuest, impersonatedRole);
-                const filteredComments = activeVersion.comments.filter(c => canSeeComment(c, currentProjectRole));
+                const filteredComments = activeVersion.comments.filter(c => canSeeComment(c, currentProjectRole) && !c.deleted);
+
+                const handleFocusComment = (commentId: string) => {
+                  setIsSidebarOpen(true);
+                  setActiveCommentId(commentId);
+                  // The sidebar list item will handle scrolling into view when activeCommentId changes
+                };
+
+                // Filter versions by active category for version selector
+                const categoryVersions = getVersionsByCategory(activeProject.versions, activeCategory);
+
+                // If no versions in this category, show upload prompt
+                if (categoryVersions.length === 0) {
+                  return (
+                    <div className="flex-1 flex flex-col items-center justify-center bg-slate-50 p-8 text-center">
+                      <div className="bg-white p-8 rounded-xl shadow-sm max-w-md w-full">
+                        <FileText className="w-16 h-16 text-slate-300 mx-auto mb-4" />
+                        <h3 className="text-lg font-semibold text-slate-900 mb-2">
+                          {activeCategory} is empty
+                        </h3>
+                        <p className="text-slate-500 mb-6">
+                          There are no documents in this category yet. Upload the first version to get started.
+                        </p>
+                        <Button
+                          onClick={() => setShowVersionUploadModal(true)}
+                          icon={<Upload className="w-4 h-4" />}
+                        >
+                          Upload Version
+                        </Button>
+                      </div>
+                    </div>
+                  );
+                }
+
+                // Debug logging for onEditVersion
+                console.log('[DEBUG] Rendering workspace:', {
+                  isPDF,
+                  ownerId: activeProject.ownerId,
+                  currentUserId: currentUser.id,
+                  isOwner: activeProject.ownerId === currentUser.id,
+                  onEditVersionDefined: !!(activeProject.ownerId === currentUser.id ? handleEditVersionClick : undefined),
+                  categoryVersionsCount: categoryVersions.length
+                });
+
+                // Determine if this is the latest version in the category
+                // Sort versions by timestamp descending to find the latest
+                const sortedCategoryVersions = [...categoryVersions].sort((a, b) => b.timestamp - a.timestamp);
+                const latestVersionId = sortedCategoryVersions.length > 0 ? sortedCategoryVersions[0].id : null;
+                const isLatestVersion = activeVersion.id === latestVersionId;
 
                 return isPDF ? (
                   <PDFWorkspace
@@ -919,6 +1529,20 @@ const App: React.FC = () => {
                     setPageNumber={setPageNumber}
                     scale={pdfScale}
                     setScale={setPdfScale}
+                    filter={commentFilter}
+                    versions={categoryVersions}
+                    currentVersionId={activeProject.currentVersionId}
+                    onVersionChange={handleChangeVersion}
+                    onUploadNewVersion={() => setShowVersionUploadModal(true)}
+                    canUploadVersion={activeProject.ownerId === currentUser.id}
+                    onEditVersion={activeProject.ownerId === currentUser.id ? handleEditVersionClick : undefined}
+                    initialPanOffset={categoryViewStates[activeCategory]?.panOffset || { x: 0, y: 0 }}
+                    onPanChange={handlePanChange}
+                    onFocusComment={handleFocusComment}
+                    canAddComment={isLatestVersion}
+                    onCaptureThumbnail={handleCaptureThumbnail}
+                    onSetDefaultPage={handleSetDefaultPage}
+                    isDefaultPage={activeProject.categorySettings?.[activeCategory]?.defaultPage === pageNumber}
                   />
                 ) : (
                   <ImageWorkspace
@@ -930,6 +1554,17 @@ const App: React.FC = () => {
                     currentUserRole={currentUser.role}
                     scale={pdfScale}
                     setScale={setPdfScale}
+                    filter={commentFilter}
+                    versions={categoryVersions}
+                    currentVersionId={activeProject.currentVersionId}
+                    onVersionChange={handleChangeVersion}
+                    onUploadNewVersion={() => setShowVersionUploadModal(true)}
+                    canUploadVersion={activeProject.ownerId === currentUser.id}
+                    onEditVersion={activeProject.ownerId === currentUser.id ? handleEditVersionClick : undefined}
+                    initialPanOffset={categoryViewStates[activeCategory]?.panOffset || { x: 0, y: 0 }}
+                    onPanChange={handlePanChange}
+                    onFocusComment={handleFocusComment}
+                    canAddComment={isLatestVersion}
                   />
                 );
               })()}
@@ -952,6 +1587,10 @@ const App: React.FC = () => {
               projectRole={getProjectRole(activeProject, currentUser, isGuest, impersonatedRole)}
               pageNumber={pageNumber}
               currentUser={currentUser}
+              filter={commentFilter}
+              onUpdateFilter={setCommentFilter}
+              isCollapsed={!isSidebarOpen}
+              onToggleCollapse={(collapsed) => setIsSidebarOpen(!collapsed)}
             />
           </main>
         </div>
@@ -964,9 +1603,9 @@ const App: React.FC = () => {
             setIsShareModalOpen(false);
           }}
           project={projectToShare}
-          onInvite={(email) => {
-            console.log('[ShareModal] onInvite called with email:', email);
-            handleInviteUser(email);
+          onInvite={(email, role, name) => {
+            console.log('[ShareModal] onInvite called with email:', email, 'role:', role, 'name:', name);
+            handleInviteUser(email, role, name);
           }}
           onRemoveCollaborator={(email) => {
             console.log('[ShareModal] onRemoveCollaborator called with email:', email);
@@ -987,6 +1626,21 @@ const App: React.FC = () => {
           onCreate={handleCreateProjectWithData}
         />
 
+        {/* Edit Version Modal */}
+        {activeProject && versionToEdit && (
+          <EditVersionModal
+            isOpen={editVersionModalOpen}
+            onClose={() => {
+              setEditVersionModalOpen(false);
+              setVersionToEdit(null);
+            }}
+            onSave={handleUpdateVersionCategory}
+            currentCategory={versionToEdit.category || DEFAULT_CATEGORY}
+            existingCategories={getCategories(activeProject.versions)}
+            versionName={`Version ${versionToEdit.versionNumber} - ${versionToEdit.fileName} `}
+          />
+        )}
+
         {/* Toast Notifications */}
         {toast && (
           <Toast
@@ -996,8 +1650,38 @@ const App: React.FC = () => {
           />
         )}
 
+        {/* Version Upload Modal */}
+        {showVersionUploadModal && activeProject && activeVersion && (
+          <VersionUploadModal
+            isOpen={showVersionUploadModal}
+            onClose={() => setShowVersionUploadModal(false)}
+            onUpload={handleUploadNewVersion}
+            unresolvedCommentsCount={getUnresolvedCommentsCount()}
+            currentFileName={activeVersion.fileName}
+            existingCategories={Array.from(new Set([...getCategories(activeProject.versions), ...STANDARD_CATEGORIES, activeCategory])).sort()}
+            activeCategory={activeCategory}
+          />
+        )}
+
         {/* Admin Dashboard */}
-        {isAdminMode && <AdminDashboard onClose={toggleAdminMode} />}
+        {isAdminMode && currentUser && (
+          <div className="fixed inset-0 z-50 bg-white overflow-auto">
+            <AdminPage onBack={toggleAdminMode} currentUser={currentUser} />
+          </div>
+        )}
+
+
+        {/* Onboarding Tooltip */}
+        {showOnboarding && (
+          <OnboardingTooltip
+            step={ONBOARDING_STEPS[onboardingStep]}
+            currentStep={onboardingStep}
+            totalSteps={ONBOARDING_STEPS.length}
+            onNext={handleOnboardingNext}
+            onSkip={handleOnboardingSkip}
+          />
+        )}
+
       </React.Fragment>
     );
   }

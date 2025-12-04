@@ -1,5 +1,18 @@
 import { PricingPlan, UserRole } from './types';
 
+export const DEFAULT_CATEGORY = 'Architectural';
+
+export const STANDARD_CATEGORIES = [
+  'Architectural',
+  'Structural',
+  'Electrical',
+  'Plumbing',
+  'Mechanical',
+  'Landscaping',
+  'Interior',
+  'Other'
+];
+
 export const APP_NAME = "DesignSync AI";
 // Limit file size to 6MB
 export const MAX_FILE_SIZE_MB = 6;
@@ -55,7 +68,7 @@ export const PLANS = {
       aiAnalysis: Infinity
     },
     features: ['Unlimited Projects', '10GB Storage', 'Unlimited Collaborators', 'Unlimited AI Analysis', 'Priority Support'],
-    price: { monthly: '$15', yearly: '$150' }
+    price: { monthly: '$10', yearly: '$100' }
   },
   business: {
     id: 'business',

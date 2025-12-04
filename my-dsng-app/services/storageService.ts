@@ -12,7 +12,8 @@ import {
   arrayUnion,
   arrayRemove,
   or,
-  deleteDoc
+  deleteDoc,
+  onSnapshot
 } from 'firebase/firestore';
 import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 import { storage } from '../firebaseConfig';
@@ -46,21 +47,35 @@ const sanitizeProject = (data: any): Project => {
 export const getProjectsForUser = async (user: User): Promise<Project[]> => {
   try {
     // Fetch projects where user is owner OR collaborator
-    // Firestore doesn't support logical OR in 'where' clauses easily for this.
-    // We'll fetch both and merge.
-    const ownerQuery = query(collection(db, PROJECTS_COLLECTION), where('ownerId', '==', user.id));
-    const collabQuery = query(collection(db, PROJECTS_COLLECTION), where('collaborators', 'array-contains', user.email));
+    // Note: We don't filter by deletedAt in the query because existing projects
+    // don't have this field, and Firestore won't match documents with missing fields
+    const ownerQuery = query(
+      collection(db, PROJECTS_COLLECTION),
+      where('ownerId', '==', user.id)
+    );
+    const collabQuery = query(
+      collection(db, PROJECTS_COLLECTION),
+      where('collaborators', 'array-contains', user.email)
+    );
 
     const [ownerSnapshot, collabSnapshot] = await Promise.all([getDocs(ownerQuery), getDocs(collabQuery)]);
 
     const projectsMap = new Map<string, Project>();
 
     ownerSnapshot.forEach(doc => {
-      projectsMap.set(doc.id, sanitizeProject(doc.data()));
+      const data = doc.data();
+      // Filter out deleted projects in code
+      if (!data.deletedAt) {
+        projectsMap.set(doc.id, sanitizeProject(data));
+      }
     });
 
     collabSnapshot.forEach(doc => {
-      projectsMap.set(doc.id, sanitizeProject(doc.data()));
+      const data = doc.data();
+      // Filter out deleted projects in code
+      if (!data.deletedAt) {
+        projectsMap.set(doc.id, sanitizeProject(data));
+      }
     });
 
     return Array.from(projectsMap.values()).sort((a, b) => b.lastModified - a.lastModified);
@@ -77,25 +92,49 @@ export const saveProject = async (project: Project): Promise<boolean> => {
     // Solution: Convert the comments arrays to JSON strings for storage
     const projectData = {
       ...project,
-      versions: project.versions.map(version => ({
-        id: version.id,
-        versionNumber: version.versionNumber,
-        fileUrl: version.fileUrl,
-        fileName: version.fileName,
-        uploadedBy: version.uploadedBy,
-        timestamp: version.timestamp,
-        // Serialize comments to avoid nested array issue
-        commentsJson: JSON.stringify(version.comments || [])
-      }))
+      versions: project.versions.map(version => {
+        const { comments, ...versionWithoutComments } = version;
+        return {
+          ...versionWithoutComments, // Preserve ALL fields except comments
+          commentsJson: JSON.stringify(comments || [])
+        };
+      })
     };
 
-    await setDoc(doc(db, PROJECTS_COLLECTION, project.id), projectData);
+    const docRef = doc(db, PROJECTS_COLLECTION, project.id);
+    const docSnap = await getDoc(docRef);
+    const isNew = !docSnap.exists();
+
+    await setDoc(docRef, projectData);
+
+    if (isNew) {
+      const { increment } = await import('firebase/firestore');
+      const userRef = doc(db, USERS_COLLECTION, project.ownerId);
+      await updateDoc(userRef, {
+        projectCount: increment(1)
+      });
+    }
+
     return true;
   } catch (e) {
     console.error("Error saving project:", e);
     return false;
   }
 };
+
+export const subscribeToProject = (projectId: string, onUpdate: (project: Project) => void) => {
+  const docRef = doc(db, PROJECTS_COLLECTION, projectId);
+
+  return onSnapshot(docRef, (docSnap: any) => {
+    if (docSnap.exists()) {
+      const project = sanitizeProject({ id: docSnap.id, ...docSnap.data() });
+      onUpdate(project);
+    }
+  }, (error: any) => {
+    console.error("Error subscribing to project:", error);
+  });
+};
+
 
 export const addCollaborator = async (projectId: string, email: string): Promise<Project | null> => {
   try {
@@ -295,12 +334,102 @@ export const updateProjectThumbnail = async (projectId: string, pageNumber: numb
     return false;
   }
 };
-export const deleteProject = async (projectId: string): Promise<boolean> => {
+
+export const updateProjectZoom = async (projectId: string, zoomLevel: number): Promise<boolean> => {
+  try {
+    const projectRef = doc(db, PROJECTS_COLLECTION, projectId);
+    await updateDoc(projectRef, {
+      zoomLevel,
+      lastModified: Date.now()
+    });
+    return true;
+  } catch (error) {
+    console.error('Error updating project zoom:', error);
+    return false;
+  }
+};
+
+export const updateProjectPartial = async (projectId: string, data: Partial<Project>): Promise<boolean> => {
+  try {
+    const projectRef = doc(db, PROJECTS_COLLECTION, projectId);
+    // Remove id from data if present to avoid overwriting document ID (though Firestore ignores it usually)
+    const { id, ...updateData } = data;
+
+    await updateDoc(projectRef, {
+      ...updateData,
+      lastModified: Date.now()
+    });
+    return true;
+  } catch (error) {
+    console.error('Error updating project partial:', error);
+    return false;
+  }
+};
+
+
+// Soft delete a project
+export const deleteProject = async (projectId: string, userId: string): Promise<boolean> => {
+  try {
+    const projectRef = doc(db, PROJECTS_COLLECTION, projectId);
+    await updateDoc(projectRef, {
+      deletedAt: Date.now(),
+      deletedBy: userId,
+      lastModified: Date.now()
+    });
+    return true;
+  } catch (e) {
+    console.error("Error deleting project:", e);
+    return false;
+  }
+};
+
+// Restore a deleted project
+export const restoreProject = async (projectId: string): Promise<boolean> => {
+  try {
+    const { deleteField } = await import('firebase/firestore');
+    const projectRef = doc(db, PROJECTS_COLLECTION, projectId);
+    await updateDoc(projectRef, {
+      deletedAt: deleteField(),
+      deletedBy: deleteField(),
+      lastModified: Date.now()
+    });
+    return true;
+  } catch (e) {
+    console.error("Error restoring project:", e);
+    return false;
+  }
+};
+
+// Get deleted projects for a user
+export const getDeletedProjects = async (user: User): Promise<Project[]> => {
+  try {
+    // Only fetch deleted projects where user is owner
+    const q = query(
+      collection(db, PROJECTS_COLLECTION),
+      where('ownerId', '==', user.id),
+      where('deletedAt', '!=', null)
+    );
+
+    const snapshot = await getDocs(q);
+    const projects = snapshot.docs
+      .map(doc => sanitizeProject(doc.data()))
+      .filter(p => p.deletedAt) // Extra safety check
+      .sort((a, b) => (b.deletedAt || 0) - (a.deletedAt || 0)); // Sort by deletion date, newest first
+
+    return projects;
+  } catch (e) {
+    console.error("Error fetching deleted projects:", e);
+    return [];
+  }
+};
+
+// Permanently delete a project (hard delete)
+export const permanentlyDeleteProject = async (projectId: string): Promise<boolean> => {
   try {
     await deleteDoc(doc(db, PROJECTS_COLLECTION, projectId));
     return true;
   } catch (e) {
-    console.error("Error deleting project:", e);
+    console.error("Error permanently deleting project:", e);
     return false;
   }
 };
@@ -338,5 +467,33 @@ export const updateAdminStatus = async (email: string, isAdmin: boolean): Promis
   } catch (e) {
     console.error("Error updating admin status:", e);
     return false;
+  }
+};
+
+export const transferProjectOwnership = async (projectId: string, currentOwnerId: string, newOwnerEmail: string): Promise<{ success: boolean; message: string }> => {
+  try {
+    // 1. Find new owner
+    const newOwner = await getUserByEmail(newOwnerEmail);
+    if (!newOwner) {
+      return { success: false, message: 'User with this email not found.' };
+    }
+
+    if (newOwner.id === currentOwnerId) {
+      return { success: false, message: 'You are already the owner.' };
+    }
+
+    const projectRef = doc(db, PROJECTS_COLLECTION, projectId);
+
+    // 2. Update project: set new owner, add old owner to collaborators
+    await updateDoc(projectRef, {
+      ownerId: newOwner.id,
+      ownerEmail: newOwner.email,
+      collaborators: arrayUnion(currentOwnerId)
+    });
+
+    return { success: true, message: 'Ownership transferred successfully.' };
+  } catch (e) {
+    console.error("Error transferring ownership:", e);
+    return { success: false, message: 'Failed to transfer ownership.' };
   }
 };

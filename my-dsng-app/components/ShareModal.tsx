@@ -8,10 +8,11 @@ import { generateShareToken, getUserByEmail } from '../services/storageService';
 interface ShareModalProps {
   isOpen: boolean;
   onClose: () => void;
-  onInvite: (email: string) => void;
+  onInvite: (email: string, role: 'guest' | 'pro', name?: string) => void;
   onRemoveCollaborator: (email: string) => void;
   onRevokeAll: () => void;
   onUpdateShareSettings: (projectId: string, settings: ShareSettings) => void;
+  onTransferOwnership?: (newOwnerEmail: string) => Promise<void>;
   project: Project | null;
 }
 
@@ -22,17 +23,23 @@ export const ShareModal: React.FC<ShareModalProps> = ({
   onRemoveCollaborator,
   onRevokeAll,
   onUpdateShareSettings,
+  onTransferOwnership,
   project
 }) => {
   const [email, setEmail] = useState('');
+  const [inviteeName, setInviteeName] = useState('');
   const [error, setError] = useState('');
   const [copied, setCopied] = useState(false);
+  const [inviteRole, setInviteRole] = useState<'guest' | 'pro'>('guest');
+
+  // ... (existing state and effects) ...
 
   // Local state for share settings to allow immediate UI updates
   const [shareEnabled, setShareEnabled] = useState(false);
   const [accessLevel, setAccessLevel] = useState<'view' | 'comment'>('view');
   const [shareToken, setShareToken] = useState('');
   const [collaboratorDetails, setCollaboratorDetails] = useState<Record<string, User | null>>({});
+  const [transferEmail, setTransferEmail] = useState('');
 
   const [confirmation, setConfirmation] = useState<{
     type: 'remove' | 'regenerate';
@@ -40,6 +47,7 @@ export const ShareModal: React.FC<ShareModalProps> = ({
     message: string;
   } | null>(null);
 
+  // ... (existing effects) ...
   // Sync state with project when it opens/changes
   useEffect(() => {
     if (project) {
@@ -62,9 +70,6 @@ export const ShareModal: React.FC<ShareModalProps> = ({
       if (!project || !project.collaborators) return;
 
       const details: Record<string, User | null> = {};
-
-      // Add owner details if not in collaborators list (though owner usually isn't)
-      // We mainly care about collaborators here.
 
       for (const email of project.collaborators) {
         if (!collaboratorDetails[email]) {
@@ -133,14 +138,11 @@ export const ShareModal: React.FC<ShareModalProps> = ({
       return;
     }
 
-    onInvite(email);
+    onInvite(email, inviteRole, inviteeName);
     setEmail('');
+    setInviteeName('');
     setError('');
   };
-
-
-
-
 
   const handleRemoveClick = (email: string) => {
     setConfirmation({
@@ -290,17 +292,42 @@ export const ShareModal: React.FC<ShareModalProps> = ({
             <h4 className="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-3 flex items-center gap-2">
               <Mail className="w-3.5 h-3.5" /> Invite by Email
             </h4>
-            <form onSubmit={handleSubmit}>
-              <Input
-                placeholder="colleague@example.com"
-                value={email}
-                onChange={(e) => {
-                  setEmail(e.target.value);
-                  setError('');
-                }}
-                error={error}
-              />
-              <div className="mt-2 flex justify-end">
+            <form onSubmit={handleSubmit} className="space-y-3">
+              <div className="flex gap-2 p-1 bg-slate-100 rounded-lg">
+                <button
+                  type="button"
+                  onClick={() => setInviteRole('guest')}
+                  className={`flex-1 px-3 py-1.5 text-sm font-medium rounded-md transition-all ${inviteRole === 'guest' ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
+                >
+                  Guest
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setInviteRole('pro')}
+                  className={`flex-1 px-3 py-1.5 text-sm font-medium rounded-md transition-all ${inviteRole === 'pro' ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
+                >
+                  Professional
+                </button>
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <Input
+                  placeholder="Name (Optional)"
+                  value={inviteeName}
+                  onChange={(e) => setInviteeName(e.target.value)}
+                />
+                <Input
+                  placeholder="colleague@example.com"
+                  value={email}
+                  onChange={(e) => {
+                    setEmail(e.target.value);
+                    setError('');
+                  }}
+                  error={error}
+                />
+              </div>
+
+              <div className="flex justify-end">
                 <Button type="submit" size="sm" disabled={!email}>Add User</Button>
               </div>
             </form>
@@ -347,6 +374,45 @@ export const ShareModal: React.FC<ShareModalProps> = ({
           </div>
 
         </div>
+
+        {/* Danger Zone - Ownership Transfer */}
+        {onTransferOwnership && (
+          <div className="mt-8 pt-6 border-t border-slate-200 p-6">
+            <h4 className="text-sm font-semibold text-red-600 mb-4 flex items-center gap-2">
+              <AlertCircle className="w-4 h-4" />
+              Danger Zone
+            </h4>
+
+            <div className="bg-red-50 border border-red-100 rounded-lg p-4">
+              <h5 className="text-sm font-medium text-red-900 mb-2">Transfer Ownership</h5>
+              <p className="text-xs text-red-700 mb-4">
+                Transfer this project to another user. You will become a guest on this project. This action cannot be undone.
+              </p>
+
+              <div className="flex gap-2">
+                <Input
+                  placeholder="New owner's email"
+                  value={transferEmail}
+                  onChange={(e) => setTransferEmail(e.target.value)}
+                  className="flex-1"
+                />
+                <Button
+                  variant="danger"
+                  disabled={!transferEmail || !onTransferOwnership}
+                  onClick={() => {
+                    if (onTransferOwnership && transferEmail) {
+                      if (window.confirm(`Are you sure you want to transfer ownership to ${transferEmail}? You will lose owner privileges.`)) {
+                        onTransferOwnership(transferEmail);
+                      }
+                    }
+                  }}
+                >
+                  Transfer
+                </Button>
+              </div>
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );

@@ -1,15 +1,17 @@
 import React, { useState } from 'react';
 import { Button } from './ui/Button';
 import { UserRole } from '../types';
-import { CheckCircle, ArrowRight, Layout, Users, ShieldCheck, Sparkles, Menu, X } from 'lucide-react';
+import { CheckCircle, ArrowRight, Layout, Users, ShieldCheck, Sparkles, Menu, X, MessageSquare, Share2, FileText, UserPlus } from 'lucide-react';
 
 interface LandingPageProps {
   onGetStarted: () => void;
   onLogin: () => void;
+  onPricingClick: () => void;
 }
 
-export const LandingPage: React.FC<LandingPageProps> = ({ onGetStarted, onLogin }) => {
+export const LandingPage: React.FC<LandingPageProps> = ({ onGetStarted, onLogin, onPricingClick }) => {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const [activeTab, setActiveTab] = useState<'client' | 'pro'>('client');
 
   return (
     <div className="min-h-screen bg-white flex flex-col font-sans text-slate-900">
@@ -24,7 +26,7 @@ export const LandingPage: React.FC<LandingPageProps> = ({ onGetStarted, onLogin 
             <div className="hidden md:flex items-center gap-8">
               <a href="#features" className="text-sm font-medium text-slate-600 hover:text-indigo-600 transition-colors">Features</a>
               <a href="#how-it-works" className="text-sm font-medium text-slate-600 hover:text-indigo-600 transition-colors">How it Works</a>
-              <a href="#pricing" className="text-sm font-medium text-slate-600 hover:text-indigo-600 transition-colors">Pricing</a>
+              <button onClick={onPricingClick} className="text-sm font-medium text-slate-600 hover:text-indigo-600 transition-colors">Pricing</button>
               <div className="flex items-center gap-4 ml-4">
                 <button onClick={onLogin} className="text-sm font-semibold text-slate-900 hover:text-indigo-600">Log in</button>
                 <Button onClick={onGetStarted} size="sm">Get Started</Button>
@@ -78,6 +80,151 @@ export const LandingPage: React.FC<LandingPageProps> = ({ onGetStarted, onLogin 
                     <p className="text-slate-600 text-sm mt-1">"I've updated the kitchen layout based on your request. Check the island dimensions."</p>
                   </div>
                 </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {/* How it Works Section */}
+      <section id="how-it-works" className="py-24 bg-white">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="text-center mb-16">
+            <h2 className="text-3xl font-bold text-slate-900 mb-4">How it Works</h2>
+            <p className="text-lg text-slate-600 max-w-2xl mx-auto">Whether you're a homeowner or a pro, Revyze simplifies the feedback loop.</p>
+
+            {/* Toggle */}
+            <div className="mt-8 inline-flex bg-slate-100 p-1 rounded-full">
+              <button
+                onClick={() => setActiveTab('client')}
+                className={`px-6 py-2 rounded-full text-sm font-medium transition-all ${activeTab === 'client'
+                    ? 'bg-white text-indigo-600 shadow-sm'
+                    : 'text-slate-500 hover:text-slate-900'
+                  }`}
+              >
+                Client Led
+              </button>
+              <button
+                onClick={() => setActiveTab('pro')}
+                className={`px-6 py-2 rounded-full text-sm font-medium transition-all ${activeTab === 'pro'
+                    ? 'bg-white text-indigo-600 shadow-sm'
+                    : 'text-slate-500 hover:text-slate-900'
+                  }`}
+              >
+                Pro Led
+              </button>
+            </div>
+          </div>
+
+          <div className="grid md:grid-cols-2 gap-12 items-center">
+            {/* Visual Side */}
+            <div className="relative">
+              <div className="absolute inset-0 bg-gradient-to-tr from-indigo-100 to-purple-100 rounded-3xl transform rotate-3"></div>
+              <div className="relative bg-white border border-slate-100 rounded-3xl shadow-xl p-8 min-h-[400px] flex flex-col justify-center">
+                {activeTab === 'client' ? (
+                  <div className="space-y-6">
+                    <div className="flex items-start gap-4 p-4 bg-slate-50 rounded-xl border border-slate-100">
+                      <div className="w-10 h-10 rounded-full bg-blue-100 flex items-center justify-center text-blue-600 flex-shrink-0">
+                        <FileText className="w-5 h-5" />
+                      </div>
+                      <div>
+                        <h4 className="font-semibold text-slate-900">Upload Plans</h4>
+                        <p className="text-sm text-slate-600 mt-1">Take the PDF your architect sent and upload it to your project.</p>
+                      </div>
+                    </div>
+                    <div className="flex items-start gap-4 p-4 bg-slate-50 rounded-xl border border-slate-100">
+                      <div className="w-10 h-10 rounded-full bg-green-100 flex items-center justify-center text-green-600 flex-shrink-0">
+                        <MessageSquare className="w-5 h-5" />
+                      </div>
+                      <div>
+                        <h4 className="font-semibold text-slate-900">Comment Away</h4>
+                        <p className="text-sm text-slate-600 mt-1">Pin comments exactly where you want changes. "Move this wall", "Enlarge this window".</p>
+                      </div>
+                    </div>
+                    <div className="flex items-start gap-4 p-4 bg-slate-50 rounded-xl border border-slate-100">
+                      <div className="w-10 h-10 rounded-full bg-purple-100 flex items-center justify-center text-purple-600 flex-shrink-0">
+                        <Share2 className="w-5 h-5" />
+                      </div>
+                      <div>
+                        <h4 className="font-semibold text-slate-900">Gather Feedback</h4>
+                        <p className="text-sm text-slate-600 mt-1">Invite friends and family to weigh in on your dream home.</p>
+                      </div>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="space-y-6">
+                    <div className="flex items-start gap-4 p-4 bg-slate-50 rounded-xl border border-slate-100">
+                      <div className="w-10 h-10 rounded-full bg-indigo-100 flex items-center justify-center text-indigo-600 flex-shrink-0">
+                        <UserPlus className="w-5 h-5" />
+                      </div>
+                      <div>
+                        <h4 className="font-semibold text-slate-900">Invite Clients</h4>
+                        <p className="text-sm text-slate-600 mt-1">Upload your project and invite your client to Revyze for a structured feedback session.</p>
+                      </div>
+                    </div>
+                    <div className="flex items-start gap-4 p-4 bg-slate-50 rounded-xl border border-slate-100">
+                      <div className="w-10 h-10 rounded-full bg-orange-100 flex items-center justify-center text-orange-600 flex-shrink-0">
+                        <Users className="w-5 h-5" />
+                      </div>
+                      <div>
+                        <h4 className="font-semibold text-slate-900">Collaborate with Peers</h4>
+                        <p className="text-sm text-slate-600 mt-1">Invite your design team, architects, and contractors to align on technical details.</p>
+                      </div>
+                    </div>
+                    <div className="flex items-start gap-4 p-4 bg-slate-50 rounded-xl border border-slate-100">
+                      <div className="w-10 h-10 rounded-full bg-teal-100 flex items-center justify-center text-teal-600 flex-shrink-0">
+                        <CheckCircle className="w-5 h-5" />
+                      </div>
+                      <div>
+                        <h4 className="font-semibold text-slate-900">Resolve Faster</h4>
+                        <p className="text-sm text-slate-600 mt-1">Turn feedback into tasks and mark them resolved as you update the plans.</p>
+                      </div>
+                    </div>
+                  </div>
+                )}
+              </div>
+            </div>
+
+            {/* Content Side */}
+            <div>
+              <h3 className="text-2xl font-bold text-slate-900 mb-6">
+                {activeTab === 'client' ? 'For Homeowners' : 'For Professionals'}
+              </h3>
+              <div className="space-y-8">
+                {activeTab === 'client' ? (
+                  <>
+                    <div>
+                      <h4 className="text-lg font-semibold text-slate-900 mb-2">Take Control of Your Project</h4>
+                      <p className="text-slate-600 leading-relaxed">
+                        A home owner wishes to communicate feedback to their pro design and architect team. They take the PDF that their team provided them with and they comment away directly on the plan.
+                      </p>
+                    </div>
+                    <div>
+                      <h4 className="text-lg font-semibold text-slate-900 mb-2">Involve Your Circle</h4>
+                      <p className="text-slate-600 leading-relaxed">
+                        Home owners can invite their friends and family to gather their feedback on their project. Get second opinions from the people who matter most.
+                      </p>
+                    </div>
+                  </>
+                ) : (
+                  <>
+                    <div>
+                      <h4 className="text-lg font-semibold text-slate-900 mb-2">Streamline Client Reviews</h4>
+                      <p className="text-slate-600 leading-relaxed">
+                        A pro wishes to obtain feedback from their client. They upload the PDF about the project and they invite their client to Revyze for feedback. No more confusing email threads.
+                      </p>
+                    </div>
+                    <div>
+                      <h4 className="text-lg font-semibold text-slate-900 mb-2">Team Alignment</h4>
+                      <p className="text-slate-600 leading-relaxed">
+                        Pros can invite their peers, designers, and architect teams to gather their feedback on their project. Ensure everyone is building from the same vision.
+                      </p>
+                    </div>
+                  </>
+                )}
+                <Button onClick={onGetStarted} variant="outline" className="mt-4">
+                  {activeTab === 'client' ? 'Start as Homeowner' : 'Start as Professional'}
+                </Button>
               </div>
             </div>
           </div>

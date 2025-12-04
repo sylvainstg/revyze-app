@@ -15,6 +15,7 @@ export const CheckoutPage: React.FC<CheckoutPageProps> = ({ userRole, onSuccess,
   const [selectedPlanId, setSelectedPlanId] = useState<string | null>(null);
   const [step, setStep] = useState<'plans' | 'payment'>('plans');
   const [isProcessing, setIsProcessing] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   // Use hardcoded pricing from constants
   const plans = PRICING_PLANS;
@@ -23,27 +24,46 @@ export const CheckoutPage: React.FC<CheckoutPageProps> = ({ userRole, onSuccess,
 
   const handlePlanSelect = (id: string) => {
     setSelectedPlanId(id);
+    setError(null);
   };
 
-  const handleContinue = () => {
+  const handleContinue = async () => {
     if (!selectedPlanId) return;
 
-    // If plan is Free ($0), skip payment and complete immediately
-    if (selectedPlan?.price === '$0') {
-      onSuccess(selectedPlanId);
-    } else {
-      setStep('payment');
+    setIsProcessing(true);
+    setError(null);
+
+    try {
+      // If plan is Free ($0), skip payment and complete immediately
+      if (selectedPlan?.price === '$0') {
+        await onSuccess(selectedPlanId);
+      } else {
+        setStep('payment');
+        setIsProcessing(false);
+      }
+    } catch (err) {
+      console.error('Error during checkout:', err);
+      setError('Failed to process your selection. Please try again.');
+      setIsProcessing(false);
     }
   };
 
-  const handlePayment = (e: React.FormEvent) => {
+  const handlePayment = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (!selectedPlanId) return;
+
     setIsProcessing(true);
-    // Simulate payment processing
-    setTimeout(() => {
+    setError(null);
+
+    try {
+      // Simulate payment processing
+      await new Promise(resolve => setTimeout(resolve, 2000));
+      await onSuccess(selectedPlanId);
+    } catch (err) {
+      console.error('Error during payment:', err);
+      setError('Payment processing failed. Please try again.');
       setIsProcessing(false);
-      onSuccess(selectedPlanId);
-    }, 2000);
+    }
   };
 
   return (
@@ -132,8 +152,14 @@ export const CheckoutPage: React.FC<CheckoutPageProps> = ({ userRole, onSuccess,
                   Payments are secure and encrypted.
                 </div>
 
+                {error && (
+                  <div className="text-red-600 text-sm bg-red-50 px-3 py-2 rounded-lg border border-red-200 mb-4">
+                    {error}
+                  </div>
+                )}
+
                 <div className="flex gap-3">
-                  <Button type="button" variant="secondary" onClick={() => setStep('plans')} className="flex-1">
+                  <Button type="button" variant="secondary" onClick={() => setStep('plans')} className="flex-1" disabled={isProcessing}>
                     Back
                   </Button>
                   <Button type="submit" className="flex-1" isLoading={isProcessing}>
@@ -146,16 +172,24 @@ export const CheckoutPage: React.FC<CheckoutPageProps> = ({ userRole, onSuccess,
         )}
 
         {step === 'plans' && (
-          <div className="mt-8 flex justify-center gap-4">
-            <Button variant="ghost" onClick={onBack}>Cancel</Button>
-            <Button
-              disabled={!selectedPlanId}
-              onClick={handleContinue}
-              size="lg"
-              className="w-48"
-            >
-              {selectedPlan?.price === '$0' ? 'Complete Setup' : 'Continue'}
-            </Button>
+          <div className="mt-8 flex flex-col items-center gap-4">
+            {error && (
+              <div className="text-red-600 text-sm bg-red-50 px-4 py-2 rounded-lg border border-red-200">
+                {error}
+              </div>
+            )}
+            <div className="flex gap-4">
+              <Button variant="ghost" onClick={onBack} disabled={isProcessing}>Cancel</Button>
+              <Button
+                disabled={!selectedPlanId || isProcessing}
+                onClick={handleContinue}
+                size="lg"
+                className="w-48"
+                isLoading={isProcessing}
+              >
+                {selectedPlan?.price === '$0' ? 'Complete Setup' : 'Continue'}
+              </Button>
+            </div>
           </div>
         )}
       </div>

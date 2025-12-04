@@ -7,19 +7,24 @@ import * as featureVoteService from '../services/featureVoteService';
 import { canSeeComment } from '../utils/projectRoleHelper';
 import { ConfirmDialog } from './ui/ConfirmDialog';
 import { FeatureVoteModal } from './FeatureVoteModal';
+import { CollapsibleComingSoon } from './CollapsibleComingSoon';
 
 interface CollaborationPanelProps {
   comments: Comment[];
   onResolveComment: (id: string) => void;
   onDeleteComment: (id: string) => void;
   onReplyComment: (id: string, text: string) => void;
-  onPushToProfessional?: (commentId: string) => void; // NEW
+  onPushToProfessional?: (commentId: string) => void;
   activeCommentId: string | null;
   setActiveCommentId: (id: string | null) => void;
   currentUserRole: UserRole;
-  projectRole: ProjectRole; // NEW
+  projectRole: ProjectRole;
   pageNumber: number;
-  currentUser: User; // For feature voting
+  currentUser: User;
+  filter: { active: boolean; resolved: boolean; deleted: boolean };
+  onUpdateFilter: (filter: { active: boolean; resolved: boolean; deleted: boolean }) => void;
+  isCollapsed?: boolean;
+  onToggleCollapse?: (collapsed: boolean) => void;
 }
 
 export const CollaborationPanel: React.FC<CollaborationPanelProps> = ({
@@ -33,9 +38,24 @@ export const CollaborationPanel: React.FC<CollaborationPanelProps> = ({
   currentUserRole,
   projectRole,
   pageNumber,
-  currentUser // Destructure currentUser
+  currentUser,
+  filter,
+  onUpdateFilter,
+  isCollapsed: propIsCollapsed,
+  onToggleCollapse
 }) => {
-  const [isCollapsed, setIsCollapsed] = useState(false);
+  const [localIsCollapsed, setLocalIsCollapsed] = useState(false);
+
+  // Use prop if provided, otherwise local state
+  const isCollapsed = propIsCollapsed !== undefined ? propIsCollapsed : localIsCollapsed;
+  const setIsCollapsed = (collapsed: boolean) => {
+    if (onToggleCollapse) {
+      onToggleCollapse(collapsed);
+    } else {
+      setLocalIsCollapsed(collapsed);
+    }
+  };
+
   const [showFeatureVoteModal, setShowFeatureVoteModal] = useState(false);
   const [hasVoted, setHasVoted] = useState(false);
   const [deleteConfirm, setDeleteConfirm] = useState<{ id: string; show: boolean }>({ id: '', show: false });
@@ -49,10 +69,15 @@ export const CollaborationPanel: React.FC<CollaborationPanelProps> = ({
     checkVote();
   }, [currentUser]);
 
-  // Filter comments for the current page AND by visibility
+  // Filter comments for the current page AND by visibility AND by status filter
   const visibleComments = comments.filter(c => {
     if (c.pageNumber && c.pageNumber !== pageNumber) return false;
-    return canSeeComment(c, projectRole);
+    if (!canSeeComment(c, projectRole)) return false;
+
+    // Status filters
+    if (c.deleted) return filter.deleted;
+    if (c.resolved) return filter.resolved;
+    return filter.active;
   });
 
   // Sort: unresolved first, then by timestamp
@@ -76,58 +101,72 @@ export const CollaborationPanel: React.FC<CollaborationPanelProps> = ({
 
       {!isCollapsed && (
         <>
-          <div className="p-4 border-b border-slate-100 flex flex-row justify-between items-center bg-slate-50">
-            {/* Collapse button - left side of header */}
-            <button
-              onClick={() => setIsCollapsed(true)}
-              className="bg-white border border-slate-200 rounded-lg p-2 hover:bg-slate-50 transition-colors shadow-sm"
-              title="Collapse comments"
-            >
-              <ChevronRight className="w-4 h-4 text-slate-600" />
-            </button>
+          <div className="p-4 border-b border-slate-100 bg-slate-50">
+            <div className="flex flex-row justify-between items-center mb-3">
+              {/* Collapse button - left side of header */}
+              <button
+                onClick={() => setIsCollapsed(true)}
+                className="bg-white border border-slate-200 rounded-lg p-2 hover:bg-slate-50 transition-colors shadow-sm"
+                title="Collapse comments"
+              >
+                <ChevronRight className="w-4 h-4 text-slate-600" />
+              </button>
 
-            <h2 className="font-semibold text-slate-800 flex items-center gap-2">
-              <MessageSquare className="w-4 h-4" />
-              Feedback
-              <span className="bg-indigo-100 text-indigo-700 text-xs px-2 py-0.5 rounded-full">
-                {comments.filter(c => !c.resolved).length}
-              </span>
-            </h2>
+              <h2 className="font-semibold text-slate-800 flex items-center gap-2">
+                <MessageSquare className="w-4 h-4" />
+                Feedback
+                <span className="bg-indigo-100 text-indigo-700 text-xs px-2 py-0.5 rounded-full">
+                  {visibleComments.length}
+                </span>
+              </h2>
+            </div>
+
+            {/* Filter Toggles */}
+            <div className="flex gap-1 p-1 bg-slate-200/50 rounded-lg">
+              <button
+                onClick={() => onUpdateFilter({ ...filter, active: !filter.active })}
+                className={`flex-1 px-2 py-1 text-[10px] font-medium rounded-md transition-all ${filter.active ? 'bg-white text-indigo-600 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
+              >
+                Active
+              </button>
+              <button
+                onClick={() => onUpdateFilter({ ...filter, resolved: !filter.resolved })}
+                className={`flex-1 px-2 py-1 text-[10px] font-medium rounded-md transition-all ${filter.resolved ? 'bg-white text-green-600 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
+              >
+                Done
+              </button>
+              <button
+                onClick={() => onUpdateFilter({ ...filter, deleted: !filter.deleted })}
+                className={`flex-1 px-2 py-1 text-[10px] font-medium rounded-md transition-all ${filter.deleted ? 'bg-white text-red-600 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
+              >
+                Deleted
+              </button>
+            </div>
           </div>
+
 
           {/* Coming Soon Panel */}
           {comments.length > 0 && (
-            <div className="p-4 bg-gradient-to-r from-indigo-50 to-purple-50 border-b border-indigo-100">
-              <div className="flex items-start gap-3">
-                <div className="p-2 bg-white rounded-lg shadow-sm">
-                  <Sparkles className="w-5 h-5 text-indigo-600" />
+            <CollapsibleComingSoon
+              title="AI Design Summary"
+              description="Get instant AI-powered summaries of all feedback and comments"
+              icon={<Sparkles />}
+              defaultCollapsed={true}
+            >
+              {hasVoted ? (
+                <div className="flex items-center gap-2 text-sm text-green-700">
+                  <CheckCircle className="w-4 h-4" />
+                  <span>Thanks for your feedback!</span>
                 </div>
-                <div className="flex-1">
-                  <div className="flex items-center gap-2 mb-1">
-                    <p className="font-semibold text-slate-900">AI Design Summary</p>
-                    <span className="px-2 py-0.5 bg-amber-400 text-amber-900 text-xs font-bold rounded-full">
-                      COMING SOON
-                    </span>
-                  </div>
-                  <p className="text-sm text-slate-600 mb-3">
-                    Get instant AI-powered summaries of all feedback and comments
-                  </p>
-                  {hasVoted ? (
-                    <div className="flex items-center gap-2 text-sm text-green-700">
-                      <CheckCircle className="w-4 h-4" />
-                      <span>Thanks for your feedback!</span>
-                    </div>
-                  ) : (
-                    <button
-                      onClick={() => setShowFeatureVoteModal(true)}
-                      className="text-sm font-semibold text-indigo-600 hover:text-indigo-700 underline"
-                    >
-                      Vote for this feature →
-                    </button>
-                  )}
-                </div>
-              </div>
-            </div>
+              ) : (
+                <button
+                  onClick={() => setShowFeatureVoteModal(true)}
+                  className="text-sm font-semibold text-indigo-600 hover:text-indigo-700 underline"
+                >
+                  Vote for this feature →
+                </button>
+              )}
+            </CollapsibleComingSoon>
           )}
 
           <div className="flex-1 overflow-y-auto p-4 space-y-4 no-scrollbar">
@@ -138,20 +177,26 @@ export const CollaborationPanel: React.FC<CollaborationPanelProps> = ({
                 <p className="text-sm mt-1">Click anywhere on the PDF to add one.</p>
               </div>
             ) : (
-              sortedComments.map((comment) => (
-                <CommentCard
-                  key={comment.id}
-                  comment={comment}
-                  isActive={activeCommentId === comment.id}
-                  onResolve={onResolveComment}
-                  onDelete={(id) => setDeleteConfirm({ id, show: true })}
-                  onReply={onReplyComment}
-                  onPushToProfessional={onPushToProfessional}
-                  onClick={() => setActiveCommentId(comment.id)}
-                  currentUserRole={currentUserRole}
-                  projectRole={projectRole}
-                />
-              ))
+              sortedComments.map((comment, index) => {
+                // Find the marker number by getting the index in the original comments array
+                const markerNumber = comments.findIndex(c => c.id === comment.id) + 1;
+                return (
+                  <CommentCard
+                    key={comment.id}
+                    comment={comment}
+                    markerNumber={markerNumber}
+                    isActive={activeCommentId === comment.id}
+                    onResolve={onResolveComment}
+                    onDelete={(id) => setDeleteConfirm({ id, show: true })}
+                    onReply={onReplyComment}
+                    onPushToProfessional={onPushToProfessional}
+                    onClick={() => setActiveCommentId(comment.id)}
+                    currentUserRole={currentUserRole}
+                    projectRole={projectRole}
+                    currentUser={currentUser}
+                  />
+                );
+              })
             )}
           </div>
 
@@ -190,6 +235,7 @@ export const CollaborationPanel: React.FC<CollaborationPanelProps> = ({
 // Comment Card Component
 const CommentCard: React.FC<{
   comment: Comment;
+  markerNumber: number;
   isActive: boolean;
   onResolve: (id: string) => void;
   onDelete: (id: string) => void;
@@ -198,7 +244,8 @@ const CommentCard: React.FC<{
   onClick: () => void;
   currentUserRole: UserRole;
   projectRole: ProjectRole;
-}> = ({ comment, isActive, onResolve, onDelete, onReply, onPushToProfessional, onClick, currentUserRole, projectRole }) => {
+  currentUser: User;
+}> = ({ comment, markerNumber, isActive, onResolve, onDelete, onReply, onPushToProfessional, onClick, currentUserRole, projectRole, currentUser }) => {
   const [replyText, setReplyText] = useState('');
   const [showReplyBox, setShowReplyBox] = useState(false);
   const [isExpanded, setIsExpanded] = useState(!comment.resolved); // Resolved comments start collapsed
@@ -233,8 +280,12 @@ const CommentCard: React.FC<{
       >
         <div className="flex justify-between items-start mb-2">
           <div className="flex items-center gap-2">
+            {/* Marker Number Badge */}
+            <span className="flex items-center justify-center w-5 h-5 rounded-full bg-indigo-600 text-white text-[10px] font-bold">
+              {markerNumber}
+            </span>
             <span className={`w-2 h-2 rounded-full ${comment.author === UserRole.DESIGNER ? 'bg-purple-500' : 'bg-blue-500'}`} />
-            <span className="text-xs font-semibold text-slate-700">{comment.authorName || comment.author}</span>
+            <span className="text-xs font-semibold text-slate-700">{comment.authorName || currentUser.name}</span>
             <span className="text-[10px] text-slate-400">{new Date(comment.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
             {comment.pushedFromGuestComment && (
               <span className="ml-1 px-1.5 py-0.5 bg-green-100 text-green-700 text-[10px] font-medium rounded-full flex items-center gap-1" title="Promoted from Guest comment">
