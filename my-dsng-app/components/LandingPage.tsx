@@ -1,17 +1,19 @@
 import React, { useState } from 'react';
 import { Button } from './ui/Button';
 import { UserRole } from '../types';
-import { CheckCircle, ArrowRight, Layout, Users, ShieldCheck, Sparkles, Menu, X, MessageSquare, Share2, FileText, UserPlus } from 'lucide-react';
+import { CheckCircle, ArrowRight, Layout, Users, ShieldCheck, Sparkles, Menu, X, MessageSquare, Share2, FileText, UserPlus, Check } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { LanguageSwitcher } from './LanguageSwitcher';
 
 interface LandingPageProps {
+  enrichedPlans: any | null;
+  pricingLoading: boolean;
   onGetStarted: () => void;
   onLogin: () => void;
   onPricingClick: () => void;
 }
 
-export const LandingPage: React.FC<LandingPageProps> = ({ onGetStarted, onLogin, onPricingClick }) => {
+export const LandingPage: React.FC<LandingPageProps> = ({ enrichedPlans, pricingLoading, onGetStarted, onLogin, onPricingClick }) => {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [activeTab, setActiveTab] = useState<'client' | 'pro'>('client');
   const { t } = useTranslation();
@@ -270,6 +272,97 @@ export const LandingPage: React.FC<LandingPageProps> = ({ onGetStarted, onLogin,
               </div>
             ))}
           </div>
+        </div>
+      </section>
+
+      {/* Pricing Section */}
+      <section id="pricing" className="py-24 bg-white">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="text-center mb-16">
+            <h2 className="text-3xl font-bold text-slate-900 mb-4">Simple, Transparent Pricing</h2>
+            <p className="text-lg text-slate-600 max-w-2xl mx-auto">Choose the plan that fits your needs. Start free, upgrade anytime.</p>
+          </div>
+
+          {pricingLoading || !enrichedPlans ? (
+            // Loading skeleton
+            <div className="grid md:grid-cols-3 gap-8 max-w-5xl mx-auto">
+              {[1, 2, 3].map((i) => (
+                <div key={i} className="bg-white rounded-2xl border-2 border-slate-200 p-8 animate-pulse">
+                  <div className="h-6 bg-slate-200 rounded w-1/2 mb-4"></div>
+                  <div className="h-4 bg-slate-200 rounded w-3/4 mb-6"></div>
+                  <div className="h-10 bg-slate-200 rounded w-1/3 mb-6"></div>
+                  <div className="space-y-3 mb-8">
+                    <div className="h-4 bg-slate-200 rounded"></div>
+                    <div className="h-4 bg-slate-200 rounded"></div>
+                    <div className="h-4 bg-slate-200 rounded"></div>
+                  </div>
+                  <div className="h-10 bg-slate-200 rounded"></div>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <div className="grid md:grid-cols-3 gap-8 max-w-5xl mx-auto">
+              {/* Free Plan */}
+              <div className="bg-white rounded-2xl border-2 border-slate-200 p-8 hover:border-indigo-200 hover:shadow-lg transition-all">
+                <h3 className="text-xl font-bold text-slate-900 mb-2">{enrichedPlans.free.name}</h3>
+                <p className="text-slate-600 text-sm mb-6">{enrichedPlans.free.description}</p>
+                <div className="mb-6">
+                  <span className="text-4xl font-extrabold text-slate-900">{enrichedPlans.free.price?.monthly || '$0'}</span>
+                  <span className="text-slate-500 ml-2">forever</span>
+                </div>
+                <ul className="space-y-3 mb-8">
+                  {enrichedPlans.free.features.map((feature: string, i: number) => (
+                    <li key={i} className="flex items-start gap-2">
+                      <Check className="w-5 h-5 text-green-500 flex-shrink-0 mt-0.5" />
+                      <span className="text-sm text-slate-600">{feature}</span>
+                    </li>
+                  ))}
+                </ul>
+                <Button onClick={onGetStarted} variant="outline" className="w-full">Get Started Free</Button>
+              </div>
+
+              {/* Pro Plan */}
+              <div className="bg-gradient-to-br from-indigo-600 to-purple-600 rounded-2xl p-8 text-white relative transform scale-105 shadow-2xl">
+                <div className="absolute -top-4 left-1/2 transform -translate-x-1/2 bg-yellow-400 text-slate-900 text-xs font-bold px-4 py-1 rounded-full uppercase tracking-wide">
+                  Most Popular
+                </div>
+                <h3 className="text-xl font-bold mb-2">{enrichedPlans.pro.name}</h3>
+                <p className="text-indigo-100 text-sm mb-6">{enrichedPlans.pro.description}</p>
+                <div className="mb-6">
+                  <span className="text-4xl font-extrabold">{enrichedPlans.pro.price?.monthly || '...'}</span>
+                  <span className="text-indigo-100 ml-2">/month</span>
+                </div>
+                <ul className="space-y-3 mb-8">
+                  {enrichedPlans.pro.features.map((feature: string, i: number) => (
+                    <li key={i} className="flex items-start gap-2">
+                      <Check className="w-5 h-5 text-green-300 flex-shrink-0 mt-0.5" />
+                      <span className="text-sm text-white">{feature}</span>
+                    </li>
+                  ))}
+                </ul>
+                <Button onClick={onPricingClick} className="w-full bg-white text-indigo-600 hover:bg-indigo-50">Start Pro Trial</Button>
+              </div>
+
+              {/* Corporate Plan */}
+              <div className="bg-white rounded-2xl border-2 border-slate-200 p-8 hover:border-indigo-200 hover:shadow-lg transition-all">
+                <h3 className="text-xl font-bold text-slate-900 mb-2">{enrichedPlans.business.name}</h3>
+                <p className="text-slate-600 text-sm mb-6">{enrichedPlans.business.description}</p>
+                <div className="mb-6">
+                  <span className="text-4xl font-extrabold text-slate-900">{enrichedPlans.business.price?.monthly || '...'}</span>
+                  <span className="text-slate-500 ml-2">/month</span>
+                </div>
+                <ul className="space-y-3 mb-8">
+                  {enrichedPlans.business.features.map((feature: string, i: number) => (
+                    <li key={i} className="flex items-start gap-2">
+                      <Check className="w-5 h-5 text-green-500 flex-shrink-0 mt-0.5" />
+                      <span className="text-sm text-slate-600">{feature}</span>
+                    </li>
+                  ))}
+                </ul>
+                <Button onClick={onPricingClick} variant="outline" className="w-full">Contact Sales</Button>
+              </div>
+            </div>
+          )}
         </div>
       </section>
 

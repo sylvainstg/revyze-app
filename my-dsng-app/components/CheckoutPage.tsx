@@ -3,7 +3,7 @@ import { UserRole } from '../types';
 import { Button } from './ui/Button';
 import { Input } from './ui/Input';
 import { Check, Lock, CreditCard, Loader2 } from 'lucide-react';
-import { PRICING_PLANS } from '../constants';
+import { getPricingPlansForCheckout } from '../constants';
 
 interface CheckoutPageProps {
   userRole: UserRole;
@@ -18,7 +18,7 @@ export const CheckoutPage: React.FC<CheckoutPageProps> = ({ userRole, onSuccess,
   const [error, setError] = useState<string | null>(null);
 
   // Use hardcoded pricing from constants
-  const plans = PRICING_PLANS;
+  const plans = getPricingPlansForCheckout();
 
   const selectedPlan = plans.find(p => p.id === selectedPlanId);
 

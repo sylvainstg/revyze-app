@@ -151,24 +151,66 @@ export const getSubscriptionPlans = async () => {
 
     for (const plan of plans) {
         try {
-            const product = await stripe.products.retrieve(plan.id);
-            if (product.default_price) {
-                let priceId = product.default_price as string;
+            console.log(`[getSubscriptionPlans] Fetching product: ${plan.id}`);
 
-                // If default_price is an object (expanded), get the ID
-                if (typeof product.default_price !== 'string') {
-                    priceId = (product.default_price as Stripe.Price).id;
-                }
+            const product = await stripe.products.retrieve(plan.id, {
+                expand: ['default_price']
+            });
 
-                result.push({
-                    id: plan.id,
-                    priceId: priceId
+            console.log(`[getSubscriptionPlans] Product ${plan.id}:`, {
+                name: product.name,
+                description: product.description
+            });
+
+            // Get all prices for this product (monthly and yearly)
+            const prices = await stripe.prices.list({
+                product: plan.id,
+                active: true
+            });
+
+            console.log(`[getSubscriptionPlans] Found ${prices.data.length} active prices for ${plan.id}`);
+
+            prices.data.forEach((price, index) => {
+                console.log(`[getSubscriptionPlans] Price ${index + 1}:`, {
+                    id: price.id,
+                    amount: price.unit_amount,
+                    amountDollars: price.unit_amount ? price.unit_amount / 100 : 0,
+                    currency: price.currency,
+                    interval: price.recurring?.interval
                 });
-            }
+            });
+
+            const monthlyPrice = prices.data.find(p => p.recurring?.interval === 'month');
+            const yearlyPrice = prices.data.find(p => p.recurring?.interval === 'year');
+
+            console.log(`[getSubscriptionPlans] ${plan.id} - Monthly:`, monthlyPrice ? `$${monthlyPrice.unit_amount! / 100}` : 'NOT FOUND');
+            console.log(`[getSubscriptionPlans] ${plan.id} - Yearly:`, yearlyPrice ? `$${yearlyPrice.unit_amount! / 100}` : 'NOT FOUND');
+
+            const planData = {
+                id: plan.id,
+                name: product.name,
+                description: product.description || '',
+                pricing: {
+                    monthly: monthlyPrice ? {
+                        priceId: monthlyPrice.id,
+                        amount: monthlyPrice.unit_amount! / 100,
+                        currency: monthlyPrice.currency
+                    } : null,
+                    yearly: yearlyPrice ? {
+                        priceId: yearlyPrice.id,
+                        amount: yearlyPrice.unit_amount! / 100,
+                        currency: yearlyPrice.currency
+                    } : null
+                }
+            };
+
+            console.log(`[getSubscriptionPlans] Returning data for ${plan.id}:`, JSON.stringify(planData, null, 2));
+            result.push(planData);
         } catch (error) {
-            console.error(`Error fetching plan ${plan.id}:`, error);
+            console.error(`[getSubscriptionPlans] Error fetching plan ${plan.id}:`, error);
         }
     }
 
+    console.log(`[getSubscriptionPlans] Final result:`, JSON.stringify(result, null, 2));
     return result;
 };

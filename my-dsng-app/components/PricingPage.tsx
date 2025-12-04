@@ -1,40 +1,18 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { Check, Loader2 } from 'lucide-react';
 import { createCheckoutSession } from '../services/paymentService';
 import { User } from '../types';
-import { PLANS } from '../constants';
-import { functions } from '../firebaseConfig';
-import { httpsCallable } from 'firebase/functions';
 
 interface PricingPageProps {
-    user: User;
+    enrichedPlans: any | null;
+    pricingLoading: boolean;
+    user?: User | null;
     onBack: () => void;
 }
 
-export const PricingPage: React.FC<PricingPageProps> = ({ user, onBack }) => {
+export const PricingPage: React.FC<PricingPageProps> = ({ enrichedPlans, pricingLoading, user, onBack }) => {
     const [loadingPriceId, setLoadingPriceId] = useState<string | null>(null);
     const [billingCycle, setBillingCycle] = useState<'monthly' | 'yearly'>('monthly');
-    const [priceIds, setPriceIds] = useState<{ [key: string]: string }>({});
-
-    useEffect(() => {
-        const fetchPlans = async () => {
-            try {
-                const getSubscriptionPlans = httpsCallable(functions, 'getSubscriptionPlansFunction');
-                const result = await getSubscriptionPlans();
-                const data = result.data as { plans: { id: string; priceId: string }[] };
-
-                const prices: { [key: string]: string } = {};
-                data.plans.forEach(plan => {
-                    prices[plan.id] = plan.priceId;
-                });
-                setPriceIds(prices);
-            } catch (error) {
-                console.error("Error fetching plans:", error);
-            }
-        };
-
-        fetchPlans();
-    }, []);
 
     const handleUpgrade = async (priceId: string) => {
         setLoadingPriceId(priceId);
@@ -47,30 +25,60 @@ export const PricingPage: React.FC<PricingPageProps> = ({ user, onBack }) => {
         }
     };
 
+    // If still loading or no plans, show loading state
+    if (pricingLoading || !enrichedPlans) {
+        return (
+            <div className="min-h-screen bg-slate-50 py-12 px-4 sm:px-6 lg:px-8">
+                <div className="max-w-7xl mx-auto">
+                    <div className="text-center mb-12">
+                        <h2 className="text-3xl font-extrabold text-slate-900 sm:text-4xl">
+                            Loading pricing...
+                        </h2>
+                    </div>
+                    <div className="grid grid-cols-1 gap-8 md:grid-cols-3">
+                        {[1, 2, 3].map((i) => (
+                            <div key={i} className="bg-white rounded-2xl shadow-xl p-8 animate-pulse">
+                                <div className="h-6 bg-slate-200 rounded w-1/2 mb-4"></div>
+                                <div className="h-4 bg-slate-200 rounded w-3/4 mb-6"></div>
+                                <div className="h-10 bg-slate-200 rounded w-1/3 mb-6"></div>
+                                <div className="space-y-3 mb-8">
+                                    <div className="h-4 bg-slate-200 rounded"></div>
+                                    <div className="h-4 bg-slate-200 rounded"></div>
+                                    <div className="h-4 bg-slate-200 rounded"></div>
+                                </div>
+                                <div className="h-10 bg-slate-200 rounded"></div>
+                            </div>
+                        ))}
+                    </div>
+                </div>
+            </div>
+        );
+    }
+
     const plans = [
         {
-            ...PLANS.free,
-            monthlyPrice: PLANS.free.price.monthly,
-            yearlyPrice: PLANS.free.price.yearly,
+            ...enrichedPlans.free,
+            monthlyPrice: enrichedPlans.free.price?.monthly || '$0',
+            yearlyPrice: enrichedPlans.free.price?.yearly || '$0',
             period: '/mo',
-            current: user.plan === 'free' || !user.plan,
+            current: user?.plan === 'free' || (user && !user.plan),
             priceId: null
         },
         {
-            ...PLANS.pro,
-            monthlyPrice: PLANS.pro.price.monthly,
-            yearlyPrice: PLANS.pro.price.yearly,
+            ...enrichedPlans.pro,
+            monthlyPrice: enrichedPlans.pro.price?.monthly || '$10',
+            yearlyPrice: enrichedPlans.pro.price?.yearly || '$100',
             period: billingCycle === 'monthly' ? '/mo' : '/yr',
-            current: user.plan === 'pro',
-            priceId: priceIds['pro_plan']
+            current: user?.plan === 'pro',
+            priceId: enrichedPlans.pro.priceIds?.[billingCycle] || null
         },
         {
-            ...PLANS.business,
-            monthlyPrice: PLANS.business.price.monthly,
-            yearlyPrice: PLANS.business.price.yearly,
+            ...enrichedPlans.business,
+            monthlyPrice: enrichedPlans.business.price?.monthly || '$50',
+            yearlyPrice: enrichedPlans.business.price?.yearly || '$500',
             period: billingCycle === 'monthly' ? '/mo' : '/yr',
-            current: user.plan === 'business',
-            priceId: priceIds['corporate_plan']
+            current: user?.plan === 'business',
+            priceId: enrichedPlans.business.priceIds?.[billingCycle] || null
         }
     ];
 
@@ -147,8 +155,20 @@ export const PricingPage: React.FC<PricingPageProps> = ({ user, onBack }) => {
                             </ul>
 
                             <button
-                                onClick={() => plan.priceId && handleUpgrade(plan.priceId)}
-                                disabled={plan.current || !plan.priceId || !!loadingPriceId}
+                                onClick={() => {
+                                    if (!user) {
+                                        // If no user, redirect to login/signup (handled by parent or just back to auth)
+                                        // For now, we'll just call onBack which (in App.tsx) might go to auth if we change it
+                                        // Or better, we should accept an onLogin prop?
+                                        // Let's assume onBack goes to Landing/Auth or we can trigger a login flow.
+                                        // Actually, let's just use window.location or a prop.
+                                        // For this fix, let's assume the user needs to log in.
+                                        onBack(); // Temporary: goes back. Ideally should go to /auth?mode=signup
+                                    } else if (plan.priceId) {
+                                        handleUpgrade(plan.priceId);
+                                    }
+                                }}
+                                disabled={plan.current || (!!user && !plan.priceId) || !!loadingPriceId}
                                 className={`w-full py-3 px-4 rounded-lg font-semibold transition-colors flex items-center justify-center ${plan.current
                                     ? 'bg-slate-100 text-slate-400 cursor-default'
                                     : 'bg-indigo-600 text-white hover:bg-indigo-700'
@@ -158,6 +178,8 @@ export const PricingPage: React.FC<PricingPageProps> = ({ user, onBack }) => {
                                     <Loader2 className="w-5 h-5 animate-spin" />
                                 ) : plan.current ? (
                                     'Current Plan'
+                                ) : !user ? (
+                                    'Get Started'
                                 ) : (
                                     'Upgrade'
                                 )}

@@ -34,11 +34,14 @@ export const PDF_WORKER_URL = `https://aistudiocdn.com/pdfjs-dist@4.4.168/build/
 
 export const SAMPLE_PROJECT_ID = 'sample-project';
 
-export const PLANS = {
+
+// Plan metadata (everything except pricing, which comes from Stripe)
+export const PLAN_METADATA = {
   free: {
     id: 'free',
     name: 'Free',
     description: 'Perfect for getting started',
+    stripeProductId: null, // Free plan has no Stripe product
     limits: {
       totalProjects: 10,
       ownedProjects: 1,
@@ -46,13 +49,14 @@ export const PLANS = {
       collaborators: 0,
       aiAnalysis: 5
     },
-    features: ['1 Project', '50MB Storage', 'Community Support', '5 AI Analyses/mo'],
-    price: { monthly: '$0', yearly: '$0' }
+    features: ['1 Project', '50MB Storage', 'Community Support', '5 AI Analyses/mo']
+    // price will be added at runtime from Stripe (always $0 for free)
   },
   pro: {
     id: 'pro',
     name: 'Pro',
     description: 'For professional designers',
+    stripeProductId: 'pro_plan', // Maps to Stripe product
     limits: {
       totalProjects: Infinity,
       ownedProjects: Infinity,
@@ -67,13 +71,14 @@ export const PLANS = {
       collaborators: 0, // Trial users cannot invite
       aiAnalysis: Infinity
     },
-    features: ['Unlimited Projects', '10GB Storage', 'Unlimited Collaborators', 'Unlimited AI Analysis', 'Priority Support'],
-    price: { monthly: '$10', yearly: '$100' }
+    features: ['Unlimited Projects', '10GB Storage', 'Unlimited Collaborators', 'Unlimited AI Analysis', 'Priority Support']
+    // price will be added at runtime from Stripe
   },
   business: {
     id: 'business',
     name: 'Corporate',
     description: 'For teams and agencies',
+    stripeProductId: 'corporate_plan', // Maps to Stripe product
     limits: {
       totalProjects: Infinity,
       ownedProjects: Infinity,
@@ -81,21 +86,26 @@ export const PLANS = {
       collaborators: Infinity,
       aiAnalysis: Infinity
     },
-    features: ['Everything in Pro', '100GB Storage', 'Dedicated Support', 'SSO (Coming Soon)', 'Audit Logs'],
-    price: { monthly: '$50', yearly: '$500' }
+    features: ['Everything in Pro', '100GB Storage', 'Dedicated Support', 'SSO (Coming Soon)', 'Audit Logs']
+    // price will be added at runtime from Stripe
   }
 };
 
+// For backward compatibility, export PLANS as PLAN_METADATA
+// This will be removed once all components are updated
+export const PLANS = PLAN_METADATA;
+
+
 export const PLAN_LIMITS = {
-  free: PLANS.free.limits,
-  pro: PLANS.pro.limits,
-  business: PLANS.business.limits
+  free: PLAN_METADATA.free.limits,
+  pro: PLAN_METADATA.pro.limits,
+  business: PLAN_METADATA.business.limits
 };
 
 // Get effective limits based on plan and subscription status
 export const getEffectiveLimits = (plan: 'free' | 'pro' | 'business', subscriptionStatus?: string) => {
   if (plan === 'pro' && subscriptionStatus === 'trialing') {
-    return PLANS.pro.trialLimits;
+    return PLAN_METADATA.pro.trialLimits;
   }
   return PLAN_LIMITS[plan];
 };
@@ -103,34 +113,27 @@ export const getEffectiveLimits = (plan: 'free' | 'pro' | 'business', subscripti
 export const GEMINI_MODEL_FLASH = 'gemini-2.5-flash';
 export const GEMINI_MODEL_PRO = 'gemini-3-pro-preview';
 
-export const PRICING_PLANS: PricingPlan[] = [
-  {
-    id: 'free',
-    name: 'Starter',
-    price: '$0',
-    period: 'forever',
-    targetRole: UserRole.HOMEOWNER,
-    features: [
-      '1 Owned Project',
-      'Up to 10 Total Projects',
-      'Unlimited Comments',
-      'Basic Collaboration',
-      'Standard Support'
-    ]
-  },
-  {
-    id: 'pro',
-    name: 'Pro Subscription',
-    price: '$10',
-    period: '/month',
-    targetRole: UserRole.DESIGNER,
-    popular: true,
-    features: [
-      'Unlimited Projects',
-      'AI Design Analysis',
-      'AI Feedback Summaries',
-      'Version History',
-      'Priority Support'
-    ]
-  }
-];
+
+// Helper function to derive checkout pricing from PLAN_METADATA
+// NOTE: This will be deprecated once we fetch pricing from Stripe at runtime
+export const getPricingPlansForCheckout = (): PricingPlan[] => {
+  return [
+    {
+      id: PLAN_METADATA.free.id,
+      name: 'Starter',
+      price: '$0', // Hardcoded for now, will be replaced with Stripe pricing
+      period: 'forever',
+      targetRole: UserRole.HOMEOWNER,
+      features: PLAN_METADATA.free.features
+    },
+    {
+      id: PLAN_METADATA.pro.id,
+      name: 'Pro Subscription',
+      price: '$10', // Hardcoded for now, will be replaced with Stripe pricing
+      period: '/month',
+      targetRole: UserRole.DESIGNER,
+      popular: true,
+      features: PLAN_METADATA.pro.features
+    }
+  ];
+};

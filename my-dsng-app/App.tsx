@@ -4,7 +4,7 @@ import { ImageWorkspace } from './components/ImageWorkspace';
 import { CollaborationPanel } from './components/CollaborationPanel';
 import { LandingPage } from './components/LandingPage';
 import { AuthPage } from './components/AuthPage';
-import { CheckoutPage } from './components/CheckoutPage';
+
 import { Dashboard } from './components/Dashboard';
 import { Button } from './components/ui/Button';
 import { PricingPage } from './components/PricingPage';
@@ -25,6 +25,8 @@ import * as authService from './services/authService';
 import { getPDFObjectURL, revokePDFObjectURL } from './utils/pdfUtils';
 import { getProjectRole, getProjectRoleDisplay, getCommentAudience, canSeeComment } from './utils/projectRoleHelper';
 import { getCategories, getVersionsByCategory, getNextCategoryVersion, DEFAULT_CATEGORY, migrateVersionsToCategories } from './utils/categoryHelpers';
+import { fetchStripePricing, enrichPlansWithPricing } from './services/pricingService';
+import { PLAN_METADATA } from './constants';
 
 import { AdminPage } from './components/AdminPage';
 import { useAdmin } from './contexts/AdminContext';
@@ -83,10 +85,20 @@ const App: React.FC = () => {
   // Invite Details State
   const [inviteDetails, setInviteDetails] = useState<{ inviterName?: string; projectName?: string; role?: 'guest' | 'pro' } | null>(null);
 
+
+
   // Workspace State
   const [pageNumber, setPageNumber] = useState(1);
   const [pdfScale, _setPdfScale] = useState(1.0);
   const isUserZooming = useRef(false);
+
+  // Onboarding State
+  const [onboardingStep, setOnboardingStep] = useState(0);
+
+  // Pricing State (enriched with Stripe data)
+  const [enrichedPlans, setEnrichedPlans] = useState<any>(null);
+  const [pricingLoading, setPricingLoading] = useState(true);
+  const [pricingError, setPricingError] = useState<string | null>(null);
 
   const setPdfScale = (newScale: number | ((prev: number) => number)) => {
     isUserZooming.current = true;
@@ -95,7 +107,29 @@ const App: React.FC = () => {
 
   // --- Effects ---
 
-  // 0. Handle Shared Link and Referral Code
+  // 0. Fetch Stripe Pricing on Mount
+  useEffect(() => {
+    const loadPricing = async () => {
+      try {
+        setPricingLoading(true);
+        const stripePricing = await fetchStripePricing();
+        const enriched = enrichPlansWithPricing(PLAN_METADATA, stripePricing);
+        setEnrichedPlans(enriched);
+        setPricingError(null);
+      } catch (error) {
+        console.error('Failed to load pricing:', error);
+        setPricingError('Failed to load pricing. Please refresh the page.');
+        // Fallback: use metadata without pricing
+        setEnrichedPlans(PLAN_METADATA);
+      } finally {
+        setPricingLoading(false);
+      }
+    };
+
+    loadPricing();
+  }, []);
+
+  // 1. Handle Shared Link and Referral Code
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
     const projectId = params.get('project');
@@ -1207,6 +1241,8 @@ const App: React.FC = () => {
     // Show regular landing page
     return (
       <LandingPage
+        enrichedPlans={enrichedPlans}
+        pricingLoading={pricingLoading}
         onGetStarted={() => {
           setAuthMode('register');
           setView('auth');
@@ -1235,12 +1271,13 @@ const App: React.FC = () => {
     );
   }
 
-  if (view === 'checkout' && currentUser) {
+  if (view === 'checkout') {
     return (
-      <CheckoutPage
-        userRole={currentUser.role}
-        onSuccess={handleCheckoutSuccess}
-        onBack={() => setView('auth')}
+      <PricingPage
+        enrichedPlans={enrichedPlans}
+        pricingLoading={pricingLoading}
+        user={currentUser}
+        onBack={() => currentUser ? setView('dashboard') : setView('landing')}
       />
     );
   }
@@ -1322,6 +1359,8 @@ const App: React.FC = () => {
   if (view === 'pricing' && currentUser) {
     return (
       <PricingPage
+        enrichedPlans={enrichedPlans}
+        pricingLoading={pricingLoading}
         user={currentUser}
         onBack={() => setView('dashboard')}
       />
@@ -1338,8 +1377,7 @@ const App: React.FC = () => {
     );
   }
 
-  // Onboarding Logic
-  const [onboardingStep, setOnboardingStep] = useState(0);
+  // Onboarding Logic (handlers)
   const showOnboarding = currentUser && !currentUser.hasCompletedOnboarding && view === 'workspace';
 
   const handleOnboardingNext = async () => {
