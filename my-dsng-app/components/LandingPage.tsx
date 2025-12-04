@@ -2,6 +2,8 @@ import React, { useState } from 'react';
 import { Button } from './ui/Button';
 import { UserRole } from '../types';
 import { CheckCircle, ArrowRight, Layout, Users, ShieldCheck, Sparkles, Menu, X, MessageSquare, Share2, FileText, UserPlus } from 'lucide-react';
+import { useTranslation } from 'react-i18next';
+import { LanguageSwitcher } from './LanguageSwitcher';
 
 interface LandingPageProps {
   onGetStarted: () => void;
@@ -12,6 +14,7 @@ interface LandingPageProps {
 export const LandingPage: React.FC<LandingPageProps> = ({ onGetStarted, onLogin, onPricingClick }) => {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [activeTab, setActiveTab] = useState<'client' | 'pro'>('client');
+  const { t } = useTranslation();
 
   return (
     <div className="min-h-screen bg-white flex flex-col font-sans text-slate-900">
@@ -24,16 +27,18 @@ export const LandingPage: React.FC<LandingPageProps> = ({ onGetStarted, onLogin,
             </div>
 
             <div className="hidden md:flex items-center gap-8">
-              <a href="#features" className="text-sm font-medium text-slate-600 hover:text-indigo-600 transition-colors">Features</a>
-              <a href="#how-it-works" className="text-sm font-medium text-slate-600 hover:text-indigo-600 transition-colors">How it Works</a>
-              <button onClick={onPricingClick} className="text-sm font-medium text-slate-600 hover:text-indigo-600 transition-colors">Pricing</button>
+              <a href="#features" className="text-sm font-medium text-slate-600 hover:text-indigo-600 transition-colors">{t('nav.features')}</a>
+              <a href="#how-it-works" className="text-sm font-medium text-slate-600 hover:text-indigo-600 transition-colors">{t('nav.how_it_works')}</a>
+              <button onClick={onPricingClick} className="text-sm font-medium text-slate-600 hover:text-indigo-600 transition-colors">{t('nav.pricing')}</button>
               <div className="flex items-center gap-4 ml-4">
-                <button onClick={onLogin} className="text-sm font-semibold text-slate-900 hover:text-indigo-600">Log in</button>
-                <Button onClick={onGetStarted} size="sm">Get Started</Button>
+                <LanguageSwitcher />
+                <button onClick={onLogin} className="text-sm font-semibold text-slate-900 hover:text-indigo-600">{t('nav.login')}</button>
+                <Button onClick={onGetStarted} size="sm">{t('nav.get_started')}</Button>
               </div>
             </div>
 
-            <div className="md:hidden">
+            <div className="md:hidden flex items-center gap-4">
+              <LanguageSwitcher />
               <button onClick={() => setMobileMenuOpen(!mobileMenuOpen)} className="text-slate-600">
                 {mobileMenuOpen ? <X /> : <Menu />}
               </button>
@@ -48,18 +53,18 @@ export const LandingPage: React.FC<LandingPageProps> = ({ onGetStarted, onLogin,
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
           <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-indigo-50 text-indigo-700 text-xs font-semibold uppercase tracking-wide mb-6">
             <Sparkles className="w-3 h-3" />
-            Now with Gemini 2.5 AI Analysis
+            {t('hero.new_feature')}
           </div>
           <h1 className="text-5xl md:text-7xl font-extrabold text-slate-900 tracking-tight mb-8 leading-tight">
-            Harmonize Your <br className="hidden md:block" />
-            <span className="text-transparent bg-clip-text bg-gradient-to-r from-indigo-600 to-purple-600">Home Design Process</span>
+            {t('hero.title_prefix')} <br className="hidden md:block" />
+            <span className="text-transparent bg-clip-text bg-gradient-to-r from-indigo-600 to-purple-600">{t('hero.title_suffix')}</span>
           </h1>
           <p className="text-xl text-slate-600 max-w-2xl mx-auto mb-10 leading-relaxed">
-            Stop the email chaos. Revyze connects homeowners and designers on one intelligent platform where feedback is visual, contextual, and crystal clear.
+            {t('hero.subtitle')}
           </p>
           <div className="flex flex-col sm:flex-row items-center justify-center gap-4">
             <Button onClick={onGetStarted} size="lg" className="w-full sm:w-auto shadow-lg shadow-indigo-500/20">
-              Start Your Project
+              {t('hero.cta')}
               <ArrowRight className="ml-2 w-4 h-4" />
             </Button>
           </div>
@@ -90,28 +95,28 @@ export const LandingPage: React.FC<LandingPageProps> = ({ onGetStarted, onLogin,
       <section id="how-it-works" className="py-24 bg-white">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="text-center mb-16">
-            <h2 className="text-3xl font-bold text-slate-900 mb-4">How it Works</h2>
-            <p className="text-lg text-slate-600 max-w-2xl mx-auto">Whether you're a homeowner or a pro, Revyze simplifies the feedback loop.</p>
+            <h2 className="text-3xl font-bold text-slate-900 mb-4">{t('how_it_works.title')}</h2>
+            <p className="text-lg text-slate-600 max-w-2xl mx-auto">{t('how_it_works.subtitle')}</p>
 
             {/* Toggle */}
             <div className="mt-8 inline-flex bg-slate-100 p-1 rounded-full">
               <button
                 onClick={() => setActiveTab('client')}
                 className={`px-6 py-2 rounded-full text-sm font-medium transition-all ${activeTab === 'client'
-                    ? 'bg-white text-indigo-600 shadow-sm'
-                    : 'text-slate-500 hover:text-slate-900'
+                  ? 'bg-white text-indigo-600 shadow-sm'
+                  : 'text-slate-500 hover:text-slate-900'
                   }`}
               >
-                Client Led
+                {t('how_it_works.client_led')}
               </button>
               <button
                 onClick={() => setActiveTab('pro')}
                 className={`px-6 py-2 rounded-full text-sm font-medium transition-all ${activeTab === 'pro'
-                    ? 'bg-white text-indigo-600 shadow-sm'
-                    : 'text-slate-500 hover:text-slate-900'
+                  ? 'bg-white text-indigo-600 shadow-sm'
+                  : 'text-slate-500 hover:text-slate-900'
                   }`}
               >
-                Pro Led
+                {t('how_it_works.pro_led')}
               </button>
             </div>
           </div>
@@ -128,8 +133,8 @@ export const LandingPage: React.FC<LandingPageProps> = ({ onGetStarted, onLogin,
                         <FileText className="w-5 h-5" />
                       </div>
                       <div>
-                        <h4 className="font-semibold text-slate-900">Upload Plans</h4>
-                        <p className="text-sm text-slate-600 mt-1">Take the PDF your architect sent and upload it to your project.</p>
+                        <h4 className="font-semibold text-slate-900">{t('how_it_works.client.upload_title')}</h4>
+                        <p className="text-sm text-slate-600 mt-1">{t('how_it_works.client.upload_desc')}</p>
                       </div>
                     </div>
                     <div className="flex items-start gap-4 p-4 bg-slate-50 rounded-xl border border-slate-100">
@@ -137,8 +142,8 @@ export const LandingPage: React.FC<LandingPageProps> = ({ onGetStarted, onLogin,
                         <MessageSquare className="w-5 h-5" />
                       </div>
                       <div>
-                        <h4 className="font-semibold text-slate-900">Comment Away</h4>
-                        <p className="text-sm text-slate-600 mt-1">Pin comments exactly where you want changes. "Move this wall", "Enlarge this window".</p>
+                        <h4 className="font-semibold text-slate-900">{t('how_it_works.client.comment_title')}</h4>
+                        <p className="text-sm text-slate-600 mt-1">{t('how_it_works.client.comment_desc')}</p>
                       </div>
                     </div>
                     <div className="flex items-start gap-4 p-4 bg-slate-50 rounded-xl border border-slate-100">
@@ -146,8 +151,8 @@ export const LandingPage: React.FC<LandingPageProps> = ({ onGetStarted, onLogin,
                         <Share2 className="w-5 h-5" />
                       </div>
                       <div>
-                        <h4 className="font-semibold text-slate-900">Gather Feedback</h4>
-                        <p className="text-sm text-slate-600 mt-1">Invite friends and family to weigh in on your dream home.</p>
+                        <h4 className="font-semibold text-slate-900">{t('how_it_works.client.share_title')}</h4>
+                        <p className="text-sm text-slate-600 mt-1">{t('how_it_works.client.share_desc')}</p>
                       </div>
                     </div>
                   </div>
@@ -158,8 +163,8 @@ export const LandingPage: React.FC<LandingPageProps> = ({ onGetStarted, onLogin,
                         <UserPlus className="w-5 h-5" />
                       </div>
                       <div>
-                        <h4 className="font-semibold text-slate-900">Invite Clients</h4>
-                        <p className="text-sm text-slate-600 mt-1">Upload your project and invite your client to Revyze for a structured feedback session.</p>
+                        <h4 className="font-semibold text-slate-900">{t('how_it_works.pro.invite_title')}</h4>
+                        <p className="text-sm text-slate-600 mt-1">{t('how_it_works.pro.invite_desc')}</p>
                       </div>
                     </div>
                     <div className="flex items-start gap-4 p-4 bg-slate-50 rounded-xl border border-slate-100">
@@ -167,8 +172,8 @@ export const LandingPage: React.FC<LandingPageProps> = ({ onGetStarted, onLogin,
                         <Users className="w-5 h-5" />
                       </div>
                       <div>
-                        <h4 className="font-semibold text-slate-900">Collaborate with Peers</h4>
-                        <p className="text-sm text-slate-600 mt-1">Invite your design team, architects, and contractors to align on technical details.</p>
+                        <h4 className="font-semibold text-slate-900">{t('how_it_works.pro.collab_title')}</h4>
+                        <p className="text-sm text-slate-600 mt-1">{t('how_it_works.pro.collab_desc')}</p>
                       </div>
                     </div>
                     <div className="flex items-start gap-4 p-4 bg-slate-50 rounded-xl border border-slate-100">
@@ -176,8 +181,8 @@ export const LandingPage: React.FC<LandingPageProps> = ({ onGetStarted, onLogin,
                         <CheckCircle className="w-5 h-5" />
                       </div>
                       <div>
-                        <h4 className="font-semibold text-slate-900">Resolve Faster</h4>
-                        <p className="text-sm text-slate-600 mt-1">Turn feedback into tasks and mark them resolved as you update the plans.</p>
+                        <h4 className="font-semibold text-slate-900">{t('how_it_works.pro.resolve_title')}</h4>
+                        <p className="text-sm text-slate-600 mt-1">{t('how_it_works.pro.resolve_desc')}</p>
                       </div>
                     </div>
                   </div>
@@ -188,42 +193,42 @@ export const LandingPage: React.FC<LandingPageProps> = ({ onGetStarted, onLogin,
             {/* Content Side */}
             <div>
               <h3 className="text-2xl font-bold text-slate-900 mb-6">
-                {activeTab === 'client' ? 'For Homeowners' : 'For Professionals'}
+                {activeTab === 'client' ? t('how_it_works.client.section_title') : t('how_it_works.pro.section_title')}
               </h3>
               <div className="space-y-8">
                 {activeTab === 'client' ? (
                   <>
                     <div>
-                      <h4 className="text-lg font-semibold text-slate-900 mb-2">Take Control of Your Project</h4>
+                      <h4 className="text-lg font-semibold text-slate-900 mb-2">{t('how_it_works.client.step1_title')}</h4>
                       <p className="text-slate-600 leading-relaxed">
-                        A home owner wishes to communicate feedback to their pro design and architect team. They take the PDF that their team provided them with and they comment away directly on the plan.
+                        {t('how_it_works.client.step1_desc')}
                       </p>
                     </div>
                     <div>
-                      <h4 className="text-lg font-semibold text-slate-900 mb-2">Involve Your Circle</h4>
+                      <h4 className="text-lg font-semibold text-slate-900 mb-2">{t('how_it_works.client.step2_title')}</h4>
                       <p className="text-slate-600 leading-relaxed">
-                        Home owners can invite their friends and family to gather their feedback on their project. Get second opinions from the people who matter most.
+                        {t('how_it_works.client.step2_desc')}
                       </p>
                     </div>
                   </>
                 ) : (
                   <>
                     <div>
-                      <h4 className="text-lg font-semibold text-slate-900 mb-2">Streamline Client Reviews</h4>
+                      <h4 className="text-lg font-semibold text-slate-900 mb-2">{t('how_it_works.pro.step1_title')}</h4>
                       <p className="text-slate-600 leading-relaxed">
-                        A pro wishes to obtain feedback from their client. They upload the PDF about the project and they invite their client to Revyze for feedback. No more confusing email threads.
+                        {t('how_it_works.pro.step1_desc')}
                       </p>
                     </div>
                     <div>
-                      <h4 className="text-lg font-semibold text-slate-900 mb-2">Team Alignment</h4>
+                      <h4 className="text-lg font-semibold text-slate-900 mb-2">{t('how_it_works.pro.step2_title')}</h4>
                       <p className="text-slate-600 leading-relaxed">
-                        Pros can invite their peers, designers, and architect teams to gather their feedback on their project. Ensure everyone is building from the same vision.
+                        {t('how_it_works.pro.step2_desc')}
                       </p>
                     </div>
                   </>
                 )}
                 <Button onClick={onGetStarted} variant="outline" className="mt-4">
-                  {activeTab === 'client' ? 'Start as Homeowner' : 'Start as Professional'}
+                  {activeTab === 'client' ? t('how_it_works.client.cta') : t('how_it_works.pro.cta')}
                 </Button>
               </div>
             </div>
@@ -235,25 +240,25 @@ export const LandingPage: React.FC<LandingPageProps> = ({ onGetStarted, onLogin,
       <section id="features" className="py-24 bg-slate-50">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="text-center mb-16">
-            <h2 className="text-3xl font-bold text-slate-900 mb-4">Why Revyze?</h2>
-            <p className="text-lg text-slate-600 max-w-2xl mx-auto">We bridge the gap between technical drawings and living spaces.</p>
+            <h2 className="text-3xl font-bold text-slate-900 mb-4">{t('features.title')}</h2>
+            <p className="text-lg text-slate-600 max-w-2xl mx-auto">{t('features.subtitle')}</p>
           </div>
           <div className="grid md:grid-cols-3 gap-8">
             {[
               {
                 icon: <CheckCircle className="w-6 h-6 text-indigo-600" />,
-                title: "Contextual Feedback",
-                description: "Pin comments directly on the floor plan. No more 'top left corner' confusion."
+                title: t('features.f1_title'),
+                description: t('features.f1_desc')
               },
               {
                 icon: <Users className="w-6 h-6 text-purple-600" />,
-                title: "Seamless Collaboration",
-                description: "Invite designers, contractors, and family members to review the same version."
+                title: t('features.f2_title'),
+                description: t('features.f2_desc')
               },
               {
                 icon: <ShieldCheck className="w-6 h-6 text-emerald-600" />,
-                title: "Version Control",
-                description: "Keep track of every revision. Never build from an outdated PDF again."
+                title: t('features.f3_title'),
+                description: t('features.f3_desc')
               }
             ].map((feature, i) => (
               <div key={i} className="bg-white p-8 rounded-2xl border border-slate-100 shadow-sm hover:shadow-md transition-shadow">

@@ -1,0 +1,60 @@
+{
+    "nav": {
+        "features": "Features",
+        "how_it_works": "How it Works",
+        "pricing": "Pricing",
+        "login": "Log in",
+        "get_started": "Get Started"
+    },
+    "hero": {
+        "new_feature": "Now with Gemini 2.5 AI Analysis",
+        "title_prefix": "Harmonize Your",
+        "title_suffix": "Home Design Process",
+        "subtitle": "Stop the email chaos. Revyze connects homeowners and designers on one intelligent platform where feedback is visual, contextual, and crystal clear.",
+        "cta": "Start Your Project"
+    },
+    "how_it_works": {
+        "title": "How it Works",
+        "subtitle": "Whether you're a homeowner or a pro, Revyze simplifies the feedback loop.",
+        "client_led": "Client Led",
+        "pro_led": "Pro Led",
+        "client": {
+            "upload_title": "Upload Plans",
+            "upload_desc": "Take the PDF your architect sent and upload it to your project.",
+            "comment_title": "Comment Away",
+            "comment_desc": "Pin comments exactly where you want changes. \"Move this wall\", \"Enlarge this window\".",
+            "share_title": "Gather Feedback",
+            "share_desc": "Invite friends and family to weigh in on your dream home.",
+            "section_title": "For Homeowners",
+            "step1_title": "Take Control of Your Project",
+            "step1_desc": "A home owner wishes to communicate feedback to their pro design and architect team. They take the PDF that their team provided them with and they comment away directly on the plan.",
+            "step2_title": "Involve Your Circle",
+            "step2_desc": "Home owners can invite their friends and family to gather their feedback on their project. Get second opinions from the people who matter most.",
+            "cta": "Start as Homeowner"
+        },
+        "pro": {
+            "invite_title": "Invite Clients",
+            "invite_desc": "Upload your project and invite your client to Revyze for a structured feedback session.",
+            "collab_title": "Collaborate with Peers",
+            "collab_desc": "Invite your design team, architects, and contractors to align on technical details.",
+            "resolve_title": "Resolve Faster",
+            "resolve_desc": "Turn feedback into tasks and mark them resolved as you update the plans.",
+            "section_title": "For Professionals",
+            "step1_title": "Streamline Client Reviews",
+            "step1_desc": "A pro wishes to obtain feedback from their client. They upload the PDF about the project and they invite their client to Revyze for feedback. No more confusing email threads.",
+            "step2_title": "Team Alignment",
+            "step2_desc": "Pros can invite their peers, designers, and architect teams to gather their feedback on their project. Ensure everyone is building from the same vision.",
+            "cta": "Start as Professional"
+        }
+    },
+    "features": {
+        "title": "Why Revyze?",
+        "subtitle": "We bridge the gap between technical drawings and living spaces.",
+        "f1_title": "Contextual Feedback",
+        "f1_desc": "Pin comments directly on the floor plan. No more 'top left corner' confusion.",
+        "f2_title": "Seamless Collaboration",
+        "f2_desc": "Invite designers, contractors, and family members to review the same version.",
+        "f3_title": "Version Control",
+        "f3_desc": "Keep track of every revision. Never build from an outdated PDF again."
+    }
+}

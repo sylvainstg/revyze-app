@@ -1,0 +1,60 @@
+{
+    "nav": {
+        "features": "Fonctionnalités",
+        "how_it_works": "Comment ça marche",
+        "pricing": "Tarifs",
+        "login": "Connexion",
+        "get_started": "Commencer"
+    },
+    "hero": {
+        "new_feature": "Maintenant avec l'analyse IA Gemini 2.5",
+        "title_prefix": "Harmonisez votre",
+        "title_suffix": "Processus de Conception",
+        "subtitle": "Arrêtez le chaos des emails. Revyze connecte les propriétaires et les designers sur une plateforme intelligente où les retours sont visuels, contextuels et clairs comme de l'eau de roche.",
+        "cta": "Démarrez votre projet"
+    },
+    "how_it_works": {
+        "title": "Comment ça marche",
+        "subtitle": "Que vous soyez propriétaire ou professionnel, Revyze simplifie la boucle de rétroaction.",
+        "client_led": "Par le Client",
+        "pro_led": "Par le Pro",
+        "client": {
+            "upload_title": "Télécharger les plans",
+            "upload_desc": "Prenez le PDF envoyé par votre architecte et téléchargez-le sur votre projet.",
+            "comment_title": "Commentez librement",
+            "comment_desc": "Épinglez des commentaires exactement là où vous voulez des changements. \"Déplacez ce mur\", \"Agrandissez cette fenêtre\".",
+            "share_title": "Recueillir des avis",
+            "share_desc": "Invitez vos amis et votre famille à donner leur avis sur la maison de vos rêves.",
+            "section_title": "Pour les Propriétaires",
+            "step1_title": "Prenez le contrôle de votre projet",
+            "step1_desc": "Un propriétaire souhaite communiquer ses retours à son équipe de conception et d'architecture. Il prend le PDF fourni par son équipe et commente directement sur le plan.",
+            "step2_title": "Impliquez votre entourage",
+            "step2_desc": "Les propriétaires peuvent inviter leurs amis et leur famille à donner leur avis sur leur projet. Obtenez un deuxième avis des personnes qui comptent le plus.",
+            "cta": "Commencer comme Propriétaire"
+        },
+        "pro": {
+            "invite_title": "Inviter des clients",
+            "invite_desc": "Téléchargez votre projet et invitez votre client sur Revyze pour une session de feedback structurée.",
+            "collab_title": "Collaborer avec des pairs",
+            "collab_desc": "Invitez votre équipe de conception, architectes et entrepreneurs pour s'aligner sur les détails techniques.",
+            "resolve_title": "Résoudre plus vite",
+            "resolve_desc": "Transformez les retours en tâches et marquez-les comme résolues au fur et à mesure que vous mettez à jour les plans.",
+            "section_title": "Pour les Professionnels",
+            "step1_title": "Rationaliser les revues clients",
+            "step1_desc": "Un professionnel souhaite obtenir des retours de son client. Il télécharge le PDF du projet et invite son client sur Revyze pour des retours. Plus de fils d'emails confus.",
+            "step2_title": "Alignement de l'équipe",
+            "step2_desc": "Les pros peuvent inviter leurs pairs, designers et équipes d'architectes à donner leur avis sur leur projet. Assurez-vous que tout le monde construit à partir de la même vision.",
+            "cta": "Commencer comme Professionnel"
+        }
+    },
+    "features": {
+        "title": "Pourquoi Revyze ?",
+        "subtitle": "Nous comblons le fossé entre les dessins techniques et les espaces de vie.",
+        "f1_title": "Feedback Contextuel",
+        "f1_desc": "Épinglez des commentaires directement sur le plan d'étage. Plus de confusion 'coin supérieur gauche'.",
+        "f2_title": "Collaboration Fluide",
+        "f2_desc": "Invitez designers, entrepreneurs et membres de la famille à revoir la même version.",
+        "f3_title": "Contrôle de Version",
+        "f3_desc": "Gardez une trace de chaque révision. Ne construisez plus jamais à partir d'un PDF obsolète."
+    }
+}
