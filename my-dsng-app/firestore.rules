@@ -40,5 +40,17 @@ service cloud.firestore {
       allow read: if isAuthenticated();
       allow write: if isAuthenticated() && request.resource.data.userId == request.auth.uid;
     }
+
+    // User Activity collection - Admins can read/write, users can write their own
+    match /user_activity/{activityId} {
+      allow read: if isAdmin();
+      allow write: if isAuthenticated();
+    }
+
+    // Analytics Daily Stats collection - Admins only
+    match /analytics_daily_stats/{statsId} {
+      allow read: if isAdmin();
+      allow write: if isAdmin();
+    }
   }
 }

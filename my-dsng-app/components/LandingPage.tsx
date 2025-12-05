@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { Button } from './ui/Button';
-import { UserRole } from '../types';
+import { User, UserRole } from '../types';
 import { CheckCircle, ArrowRight, Layout, Users, ShieldCheck, Sparkles, Menu, X, MessageSquare, Share2, FileText, UserPlus, Check } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { LanguageSwitcher } from './LanguageSwitcher';
@@ -8,12 +8,13 @@ import { LanguageSwitcher } from './LanguageSwitcher';
 interface LandingPageProps {
   enrichedPlans: any | null;
   pricingLoading: boolean;
+  currentUser: User | null;
   onGetStarted: () => void;
   onLogin: () => void;
   onPricingClick: () => void;
 }
 
-export const LandingPage: React.FC<LandingPageProps> = ({ enrichedPlans, pricingLoading, onGetStarted, onLogin, onPricingClick }) => {
+export const LandingPage: React.FC<LandingPageProps> = ({ enrichedPlans, pricingLoading, currentUser, onGetStarted, onLogin, onPricingClick }) => {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [activeTab, setActiveTab] = useState<'client' | 'pro'>('client');
   const { t } = useTranslation();
@@ -25,7 +26,9 @@ export const LandingPage: React.FC<LandingPageProps> = ({ enrichedPlans, pricing
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex justify-between items-center h-16">
             <div className="flex items-center gap-2">
-              <img src="/revyze-logo.png" alt="Revyze" className="h-16 w-auto object-contain" />
+              <a href="/" className="flex items-center">
+                <img src="/revyze-logo.png" alt="Revyze" className="h-16 w-auto object-contain" />
+              </a>
             </div>
 
             <div className="hidden md:flex items-center gap-8">
@@ -34,8 +37,12 @@ export const LandingPage: React.FC<LandingPageProps> = ({ enrichedPlans, pricing
               <button onClick={onPricingClick} className="text-sm font-medium text-slate-600 hover:text-indigo-600 transition-colors">{t('nav.pricing')}</button>
               <div className="flex items-center gap-4 ml-4">
                 <LanguageSwitcher />
-                <button onClick={onLogin} className="text-sm font-semibold text-slate-900 hover:text-indigo-600">{t('nav.login')}</button>
-                <Button onClick={onGetStarted} size="sm">{t('nav.get_started')}</Button>
+                {!currentUser && (
+                  <button onClick={onLogin} className="text-sm font-semibold text-slate-900 hover:text-indigo-600">
+                    {t('nav.login')}
+                  </button>
+                )}
+                <Button onClick={onGetStarted} size="sm">{currentUser ? 'Dashboard' : t('nav.get_started')}</Button>
               </div>
             </div>
 

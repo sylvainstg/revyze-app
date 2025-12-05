@@ -16,6 +16,7 @@ interface DashboardProps {
   onImportProject: (file: File) => void;
   onOpenProject: (projectId: string) => void;
   onShareProject: (project: Project) => void;
+  onGoToLanding: () => void;
   onLogout: () => void;
   onUpgrade: () => void;
   onDeleteProject: (project: Project) => void;
@@ -30,6 +31,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
   onImportProject,
   onOpenProject,
   onShareProject,
+  onGoToLanding,
   onLogout,
   onUpgrade,
   onDeleteProject,
@@ -85,7 +87,9 @@ export const Dashboard: React.FC<DashboardProps> = ({
         <div className="mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex justify-between items-center h-16">
             <div className="flex items-center gap-3">
-              <img src="/revyze-logo.png" alt="Revyze" className="h-16 w-auto object-contain" />
+              <button onClick={onGoToLanding} className="hover:opacity-80 transition-opacity">
+                <img src="/revyze-logo.png" alt="Revyze" className="h-16 w-auto object-contain" />
+              </button>
               <h1 className="text-2xl font-bold text-slate-900">Dashboard</h1>
             </div>
 

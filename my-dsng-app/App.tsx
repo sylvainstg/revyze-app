@@ -221,9 +221,9 @@ const App: React.FC = () => {
       if (!isGuest || user) {
         setCurrentUser(user);
         setAuthLoading(false);
-        if (user && view === 'landing') {
-          setView('dashboard');
-        } else if (!user && !isGuest && view !== 'landing' && view !== 'auth') {
+        // Don't auto-redirect logged-in users from landing page
+        // Let them view the marketing content if they want
+        if (!user && !isGuest && view !== 'landing' && view !== 'auth') {
           setView('landing');
         }
       }
@@ -1250,13 +1250,22 @@ const App: React.FC = () => {
       <LandingPage
         enrichedPlans={enrichedPlans}
         pricingLoading={pricingLoading}
+        currentUser={currentUser}
         onGetStarted={() => {
-          setAuthMode('register');
-          setView('auth');
+          if (currentUser) {
+            setView('dashboard');
+          } else {
+            setAuthMode('register');
+            setView('auth');
+          }
         }}
         onLogin={() => {
-          setAuthMode('login');
-          setView('auth');
+          if (currentUser) {
+            setView('dashboard');
+          } else {
+            setAuthMode('login');
+            setView('auth');
+          }
         }}
         onPricingClick={() => setView('checkout')}
       />
@@ -1318,6 +1327,7 @@ const App: React.FC = () => {
           onImportProject={handleImportProject}
           onOpenProject={handleOpenProject}
           onShareProject={handleShareClick}
+          onGoToLanding={() => setView('landing')}
           onLogout={() => {
             authService.logoutUser();
             // View change handled by effect
@@ -1436,7 +1446,9 @@ const App: React.FC = () => {
           {/* Header */}
           <header className="h-16 bg-white border-b border-slate-200 px-6 flex items-center justify-between shrink-0 z-30" style={{ transform: 'none' }}>
             <div className="flex items-center gap-4">
-              <img src="/revyze-logo.png" alt="Revyze" className="h-16 w-auto object-contain" />
+              <button onClick={() => setView('landing')} className="hover:opacity-80 transition-opacity">
+                <img src="/revyze-logo.png" alt="Revyze" className="h-16 w-auto object-contain" />
+              </button>
               <button onClick={() => setView('dashboard')} className="text-slate-500 hover:text-slate-800">
                 <ArrowLeft className="w-5 h-5" />
               </button>

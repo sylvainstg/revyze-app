@@ -8,6 +8,12 @@ import { Input } from './ui/Input';
 import { Shield, Search, Filter, Trash2, ArrowLeft, BarChart3, Users, Eye, UserPlus, Check, AlertCircle, Calendar, CreditCard, Receipt, Gift } from 'lucide-react';
 import { FeatureVoteAnalytics } from './FeatureVoteAnalytics';
 import { ReferralManagement } from './ReferralManagement';
+import { getUserActivity, ActivityLog } from '../services/analyticsService';
+import { EngagementDashboard } from './EngagementDashboard';
+
+const formatEventName = (name: string) => {
+    return name.split('_').map(word => word.charAt(0).toUpperCase() + word.slice(1)).join(' ');
+};
 
 interface AdminPageProps {
     onBack: () => void;
@@ -36,6 +42,33 @@ export const AdminPage: React.FC<AdminPageProps> = ({ onBack, currentUser }) => 
     const [showPaymentHistoryModal, setShowPaymentHistoryModal] = useState(false);
     const [paymentHistoryUser, setPaymentHistoryUser] = useState<User | null>(null);
     const [showReferralManagement, setShowReferralManagement] = useState(false);
+
+    // Activity Logs State
+    const [activityLogs, setActivityLogs] = useState<ActivityLog[]>([]);
+    const [loadingActivity, setLoadingActivity] = useState(false);
+
+    // Engagement Dashboard State
+    const [showEngagementDashboard, setShowEngagementDashboard] = useState(false);
+
+    useEffect(() => {
+        if (selectedUser) {
+            fetchUserActivity(selectedUser.id);
+        } else {
+            setActivityLogs([]);
+        }
+    }, [selectedUser]);
+
+    const fetchUserActivity = async (userId: string) => {
+        setLoadingActivity(true);
+        try {
+            const logs = await getUserActivity(userId);
+            setActivityLogs(logs);
+        } catch (error) {
+            console.error("Failed to fetch activity logs:", error);
+        } finally {
+            setLoadingActivity(false);
+        }
+    };
 
     useEffect(() => {
         fetchUsers();
@@ -180,6 +213,14 @@ export const AdminPage: React.FC<AdminPageProps> = ({ onBack, currentUser }) => 
                             </div>
                         </div>
                         <div className="flex items-center gap-4">
+                            <Button
+                                variant="secondary"
+                                size="sm"
+                                onClick={() => setShowEngagementDashboard(true)}
+                                icon={<BarChart3 className="w-4 h-4" />}
+                            >
+                                Engagement
+                            </Button>
                             <Button
                                 variant="secondary"
                                 size="sm"
@@ -525,6 +566,44 @@ export const AdminPage: React.FC<AdminPageProps> = ({ onBack, currentUser }) => 
                                     </p>
                                 </div>
 
+
+
+                                <div>
+                                    <h4 className="font-semibold text-slate-900 mb-2">Activity Timeline</h4>
+                                    <div className="bg-slate-50 p-4 rounded-lg border border-slate-200 max-h-60 overflow-y-auto">
+                                        {loadingActivity ? (
+                                            <div className="flex justify-center py-4">
+                                                <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-indigo-600"></div>
+                                            </div>
+                                        ) : activityLogs.length === 0 ? (
+                                            <p className="text-sm text-slate-500 text-center py-2">No recent activity recorded.</p>
+                                        ) : (
+                                            <div className="space-y-3">
+                                                {activityLogs.map((log) => (
+                                                    <div key={log.id} className="flex gap-3 text-sm">
+                                                        <div className="flex-shrink-0 mt-1">
+                                                            <div className="w-2 h-2 rounded-full bg-indigo-400"></div>
+                                                        </div>
+                                                        <div>
+                                                            <p className="text-slate-900 font-medium">
+                                                                {formatEventName(log.eventName)}
+                                                            </p>
+                                                            <p className="text-xs text-slate-500">
+                                                                {new Date(log.timestamp).toLocaleString()}
+                                                            </p>
+                                                            {log.metadata && Object.keys(log.metadata).length > 0 && (
+                                                                <div className="mt-1 text-xs text-slate-600 bg-white p-2 rounded border border-slate-100">
+                                                                    {JSON.stringify(log.metadata, null, 2)}
+                                                                </div>
+                                                            )}
+                                                        </div>
+                                                    </div>
+                                                ))}
+                                            </div>
+                                        )}
+                                    </div>
+                                </div>
+
                                 {/* Placeholder for Network Graph */}
                                 <div>
                                     <h4 className="font-semibold text-slate-900 mb-2">Network Size</h4>
@@ -629,6 +708,13 @@ export const AdminPage: React.FC<AdminPageProps> = ({ onBack, currentUser }) => 
             {showReferralManagement && (
                 <div className="fixed inset-0 z-50 bg-white overflow-auto">
                     <ReferralManagement onClose={() => setShowReferralManagement(false)} />
+                </div>
+            )}
+
+            {/* Engagement Dashboard Modal */}
+            {showEngagementDashboard && (
+                <div className="fixed inset-0 z-50 bg-white overflow-auto">
+                    <EngagementDashboard onBack={() => setShowEngagementDashboard(false)} />
                 </div>
             )}
         </div >

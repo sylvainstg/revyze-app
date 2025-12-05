@@ -58,6 +58,10 @@ export const registerUser = async (
     }
 };
 
+import { logEvent } from './analyticsService';
+
+// ... existing imports
+
 export const loginUser = async (email: string, password: string): Promise<{ success: boolean; user?: User; message?: string }> => {
     try {
         const userCredential = await signInWithEmailAndPassword(auth, email, password);
@@ -74,6 +78,9 @@ export const loginUser = async (email: string, password: string): Promise<{ succ
                 lastLogin: Date.now()
             };
             await updateDoc(doc(db, USERS_COLLECTION, firebaseUser.uid), updates);
+
+            // Log analytics event
+            logEvent(firebaseUser.uid, 'login', { email: userData.email, role: userData.role });
 
             return { success: true, user: { ...userData, ...updates } };
         } else {
@@ -94,6 +101,7 @@ export const loginUser = async (email: string, password: string): Promise<{ succ
 
             try {
                 await setDoc(doc(db, USERS_COLLECTION, newUser.id), newUser);
+                logEvent(newUser.id, 'login', { email: newUser.email, role: newUser.role, isNewProfile: true });
                 return { success: true, user: newUser };
             } catch (e) {
                 console.error("Failed to create missing profile:", e);
@@ -107,6 +115,9 @@ export const loginUser = async (email: string, password: string): Promise<{ succ
 };
 
 export const logoutUser = async (): Promise<void> => {
+    if (auth.currentUser) {
+        logEvent(auth.currentUser.uid, 'logout');
+    }
     await signOut(auth);
 };
 
