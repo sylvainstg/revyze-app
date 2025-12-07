@@ -8,9 +8,10 @@ import { getAnalyticsStats, generateMockAnalyticsData, DailyAnalyticsStats } fro
 
 interface EngagementDashboardProps {
     onBack: () => void;
+    onOpenCampaigns?: () => void;
 }
 
-export const EngagementDashboard: React.FC<EngagementDashboardProps> = ({ onBack }) => {
+export const EngagementDashboard: React.FC<EngagementDashboardProps> = ({ onBack, onOpenCampaigns }) => {
     const [dateRange, setDateRange] = useState<'7d' | '28d' | '90d'>('28d');
     const [loading, setLoading] = useState(true);
     const [data, setData] = useState<DailyAnalyticsStats[]>([]);
@@ -89,6 +90,19 @@ export const EngagementDashboard: React.FC<EngagementDashboardProps> = ({ onBack
                         <div className="flex items-center gap-3">
                             <Button variant="ghost" size="sm" onClick={handleGenerateData} title="Generate Mock Data">
                                 <RefreshCw className="w-4 h-4 text-slate-400" />
+                            </Button>
+                            <Button
+                                variant="secondary"
+                                size="sm"
+                                onClick={() => {
+                                    if (onOpenCampaigns) {
+                                        onOpenCampaigns();
+                                    } else {
+                                        onBack();
+                                    }
+                                }}
+                            >
+                                Manage Campaigns
                             </Button>
 
                             <div className="flex bg-slate-100 rounded-lg p-1">

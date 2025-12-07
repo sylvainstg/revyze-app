@@ -1,5 +1,6 @@
 import { db } from '../firebaseConfig';
 import { collection, addDoc, query, where, orderBy, limit, getDocs, Timestamp } from 'firebase/firestore';
+import { updateUserEngagementScore } from './analyticsAggregationService';
 
 export interface ActivityLog {
     id?: string;
@@ -11,6 +12,16 @@ export interface ActivityLog {
 }
 
 const COLLECTION_NAME = 'user_activity';
+
+const SCORE_UPDATE_EVENTS = [
+    'login',
+    'create_project',
+    'upload_version',
+    'comment',
+    'invite_user',
+    'share_project',
+    'feedback_campaign_answered'
+];
 
 /**
  * Logs a user activity event to Firestore.
@@ -27,6 +38,19 @@ export const logEvent = async (userId: string, eventName: string, metadata: any 
             timestamp: Date.now(),
             createdAt: Timestamp.now()
         });
+
+        // Trigger engagement score update for key events via Cloud Function
+        if (SCORE_UPDATE_EVENTS.includes(eventName)) {
+            // Import functions dynamically to avoid circular dependencies
+            import('../firebaseConfig').then(({ functions }) => {
+                import('firebase/functions').then(({ httpsCallable }) => {
+                    const updateScore = httpsCallable(functions, 'updateEngagementScore');
+                    updateScore({}).catch(err =>
+                        console.error('Failed to update engagement score:', err)
+                    );
+                });
+            });
+        }
     } catch (error) {
         console.error('Error logging event:', error);
         // We don't want analytics errors to break the app flow, so we just log it

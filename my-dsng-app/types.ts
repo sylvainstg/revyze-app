@@ -17,9 +17,12 @@ export interface User {
   // Engagement Metrics
   loginCount?: number;
   lastLogin?: number;
+  previousLogin?: number; // Timestamp of the login before the current one
   shareCountGuest?: number;
   shareCountPro?: number;
   projectCount?: number;
+  engagementScore?: number; // 0-100 score
+  createdAt?: number; // Account creation timestamp
   // Referral Program
   referralCode?: string;
   referredBy?: string;

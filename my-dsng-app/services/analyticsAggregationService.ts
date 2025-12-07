@@ -139,10 +139,38 @@ export const aggregateDailyStats = async (date: Date): Promise<DailyAnalyticsSta
  * Formula: (Logins * 1) + (View * 0.5) + (Comment * 5) + (Upload * 10) + (Invite * 20)
  */
 export const updateUserEngagementScore = async (userId: string) => {
-    // Fetch last 28 days of activity
-    const endDate = new Date();
+    // 1. Fetch User Profile for historical counts
+    const userRef = doc(db, USERS_COLLECTION, userId);
+    const userSnap = await getDoc(userRef);
+
+    if (!userSnap.exists()) return 0;
+
+    const userData = userSnap.data() as User;
+
+    // Base score from User Profile counters (Historical Data)
+    let score = 0;
+    const loginPoints = (userData.loginCount || 0) * 2;
+    const projectPoints = (userData.projectCount || 0) * 10;
+    const sharePoints = ((userData.shareCountGuest || 0) + (userData.shareCountPro || 0)) * 20;
+
+    score += loginPoints;
+    score += projectPoints;
+    score += sharePoints;
+
+    console.log(`[Engagement] User ${userId}:`, {
+        loginCount: userData.loginCount,
+        loginPoints,
+        projectCount: userData.projectCount,
+        projectPoints,
+        shareCount: (userData.shareCountGuest || 0) + (userData.shareCountPro || 0),
+        sharePoints,
+        baseScore: score
+    });
+
+    // 2. Fetch recent activity for granular events NOT in profile (Comments, Uploads, Campaign Answers)
+    // We look at the last 90 days for these "active" metrics to keep the score somewhat fresh
     const startDate = new Date();
-    startDate.setDate(startDate.getDate() - 28);
+    startDate.setDate(startDate.getDate() - 90);
 
     const q = query(
         collection(db, ACTIVITY_COLLECTION),
@@ -151,39 +179,62 @@ export const updateUserEngagementScore = async (userId: string) => {
     );
 
     const snapshot = await getDocs(q);
-    let rawScore = 0;
     const uniqueCollaborators = new Set<string>();
+    let activityPoints = 0;
 
     snapshot.forEach(doc => {
         const data = doc.data();
         const event = data.eventName;
 
-        if (event === 'login') rawScore += 1;
-        else if (event === 'view_project') rawScore += 0.5;
-        else if (event === 'comment') rawScore += 5;
-        else if (event === 'upload_version') rawScore += 10;
-        else if (event === 'create_project') rawScore += 10;
-        else if (event === 'invite_user' || event === 'share_project') rawScore += 20;
+        // Only count events that are NOT already tracked in User Profile counters
+        if (event === 'comment') {
+            score += 5;
+            activityPoints += 5;
+        } else if (event === 'upload_version') {
+            score += 10;
+            activityPoints += 10;
+        } else if (event === 'feedback_campaign_answered') {
+            score += 15;
+            activityPoints += 15;
+        }
 
-        // Track collaborators if available in metadata
+        // Note: We skip 'login', 'create_project', 'invite_user' here because they are covered by 
+        // loginCount, projectCount, and shareCount in the profile.
+
+        // Track collaborators
         if (data.metadata && data.metadata.collaboratorId) {
             uniqueCollaborators.add(data.metadata.collaboratorId);
         }
     });
 
-    // Normalize (assuming max raw score of 500 for a power user)
-    const MAX_RAW_SCORE = 500;
-    const finalScore = Math.min(100, Math.round((rawScore / MAX_RAW_SCORE) * 100));
+    console.log(`[Engagement] Activity points: ${activityPoints}, Total raw score: ${score}`);
+
+    // Normalize (assuming max raw score of 300 for a power user)
+    // We cap it at 100 for the UI
+    const MAX_RAW_SCORE = 300;  // Reduced from 1000 to 300
+    const finalScore = Math.min(100, Math.round((score / MAX_RAW_SCORE) * 100));
+
+    console.log(`[Engagement] Final score: ${finalScore} (${score}/${MAX_RAW_SCORE})`);
 
     // Update User Doc
-    const userRef = doc(db, USERS_COLLECTION, userId);
     await setDoc(userRef, {
         engagementScore: finalScore,
-        lifetime_collaborators: uniqueCollaborators.size, // This is just 28d window for now, ideally lifetime
+        lifetime_collaborators: uniqueCollaborators.size,
         lastEngagementCalc: Date.now()
     }, { merge: true });
 
     return finalScore;
+};
+
+/**
+ * Recalculates engagement scores for ALL users.
+ * Useful for backfilling or fixing data.
+ */
+export const recalculateAllUserScores = async () => {
+    const usersSnap = await getDocs(collection(db, USERS_COLLECTION));
+    const promises = usersSnap.docs.map(doc => updateUserEngagementScore(doc.id));
+    await Promise.all(promises);
+    return usersSnap.size;
 };
 
 /**

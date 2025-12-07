@@ -218,6 +218,7 @@ export const ReferralManagement: React.FC<Props> = ({ onClose }) => {
                                     onChange={(e) => setEditingFeature({ ...editingFeature, id: e.target.value })}
                                     placeholder="e.g., premium-export"
                                     disabled={!!editingFeature.createdAt}
+                                    className="bg-white text-slate-900"
                                 />
                                 <p className="text-xs text-slate-500 mt-1">
                                     Unique identifier (cannot be changed after creation)
@@ -231,6 +232,7 @@ export const ReferralManagement: React.FC<Props> = ({ onClose }) => {
                                     value={editingFeature.featureName || ''}
                                     onChange={(e) => setEditingFeature({ ...editingFeature, featureName: e.target.value })}
                                     placeholder="e.g., Premium Export"
+                                    className="bg-white text-slate-900"
                                 />
                             </div>
                             <div>
@@ -241,6 +243,7 @@ export const ReferralManagement: React.FC<Props> = ({ onClose }) => {
                                     value={editingFeature.description || ''}
                                     onChange={(e) => setEditingFeature({ ...editingFeature, description: e.target.value })}
                                     placeholder="Brief description of the feature"
+                                    className="bg-white text-slate-900"
                                 />
                             </div>
                             <div>
@@ -252,6 +255,7 @@ export const ReferralManagement: React.FC<Props> = ({ onClose }) => {
                                     value={editingFeature.tokenCost || 0}
                                     onChange={(e) => setEditingFeature({ ...editingFeature, tokenCost: parseInt(e.target.value) || 0 })}
                                     min="0"
+                                    className="bg-white text-slate-900"
                                 />
                             </div>
                             <div className="flex items-center gap-2">

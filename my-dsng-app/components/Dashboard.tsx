@@ -1,7 +1,7 @@
 import React, { useState, useRef } from 'react';
 import { Project, User, UserRole } from '../types';
 import { Button } from './ui/Button';
-import { Plus, Search, FileText, Clock, FolderOpen, LogOut, Share2, Users, Upload, MessageSquare, Trash2, Shield, Gift } from 'lucide-react';
+import { Plus, Search, FileText, Clock, FolderOpen, LogOut, Share2, Users, Upload, MessageSquare, Trash2, Shield, Gift, Play } from 'lucide-react';
 import { ReferralDashboard } from './ReferralDashboard';
 import { PLANS } from '../constants';
 import { getProjectRole, canSeeComment } from '../utils/projectRoleHelper';
@@ -22,6 +22,7 @@ interface DashboardProps {
   onDeleteProject: (project: Project) => void;
   onOpenAdmin: () => void;
   onOpenCemetery: () => void;
+  onRelaunchOnboarding: () => void;
 }
 
 export const Dashboard: React.FC<DashboardProps> = ({
@@ -36,7 +37,8 @@ export const Dashboard: React.FC<DashboardProps> = ({
   onUpgrade,
   onDeleteProject,
   onOpenAdmin,
-  onOpenCemetery
+  onOpenCemetery,
+  onRelaunchOnboarding
 }) => {
   const [search, setSearch] = useState('');
   const [isEditProfileOpen, setIsEditProfileOpen] = useState(false);
@@ -460,6 +462,25 @@ export const Dashboard: React.FC<DashboardProps> = ({
                   </div>
                 </div>
               )}
+
+              {/* Preferences Section */}
+              <div className="pt-4 border-t border-slate-100">
+                <h3 className="text-sm font-medium text-slate-900 mb-3">Preferences</h3>
+                <Button
+                  variant="secondary"
+                  size="sm"
+                  className="w-full justify-start"
+                  onClick={() => {
+                    if (confirm('Are you sure you want to relaunch the onboarding tour?')) {
+                      onRelaunchOnboarding();
+                      setIsEditProfileOpen(false);
+                    }
+                  }}
+                  icon={<Play className="w-4 h-4" />}
+                >
+                  Relaunch Onboarding Tour
+                </Button>
+              </div>
 
               <div className="flex justify-end gap-3 pt-2 border-t border-slate-100">
                 <Button variant="secondary" onClick={() => setIsEditProfileOpen(false)}>Cancel</Button>

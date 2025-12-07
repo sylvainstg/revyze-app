@@ -75,7 +75,8 @@ export const loginUser = async (email: string, password: string): Promise<{ succ
             // Update login stats
             const updates = {
                 loginCount: (userData.loginCount || 0) + 1,
-                lastLogin: Date.now()
+                lastLogin: Date.now(),
+                previousLogin: userData.lastLogin || 0 // Capture previous login
             };
             await updateDoc(doc(db, USERS_COLLECTION, firebaseUser.uid), updates);
 

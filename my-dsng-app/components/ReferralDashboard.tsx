@@ -21,9 +21,7 @@ export const ReferralDashboard: React.FC<Props> = ({ currentUser }) => {
     const loadReferralData = async () => {
         setLoading(true);
         try {
-            const code = await getUserReferralCode();
-            setReferralCode(code);
-
+            // Only load stats on mount, defer code generation
             const referralStats = await getReferralStats();
             setStats(referralStats);
         } catch (error) {
@@ -33,14 +31,30 @@ export const ReferralDashboard: React.FC<Props> = ({ currentUser }) => {
         }
     };
 
-    const getReferralLink = () => {
+    const ensureReferralCode = async () => {
+        if (!referralCode) {
+            try {
+                const code = await getUserReferralCode();
+                setReferralCode(code);
+                return code;
+            } catch (error) {
+                console.error('Error getting referral code:', error);
+                throw error;
+            }
+        }
+        return referralCode;
+    };
+
+    const getReferralLink = (code?: string) => {
         const baseUrl = window.location.origin;
-        return `${baseUrl}/?ref=${referralCode}`;
+        const codeToUse = code || referralCode || 'loading';
+        return `${baseUrl}/?ref=${codeToUse}`;
     };
 
     const handleCopyLink = async () => {
         try {
-            await navigator.clipboard.writeText(getReferralLink());
+            const code = await ensureReferralCode();
+            await navigator.clipboard.writeText(getReferralLink(code));
             setCopied(true);
             setTimeout(() => setCopied(false), 2000);
         } catch (error) {
@@ -49,22 +63,29 @@ export const ReferralDashboard: React.FC<Props> = ({ currentUser }) => {
     };
 
     const handleShare = async () => {
-        const link = getReferralLink();
-        const text = `Join me on DesignSync! Use my referral link to get started: ${link}`;
+        try {
+            const code = await ensureReferralCode();
+            const link = getReferralLink(code);
+            const text = `Join me on DesignSync! Use my referral link to get started: ${link}`;
 
-        if (navigator.share) {
-            try {
-                await navigator.share({
-                    title: 'Join DesignSync',
-                    text: text,
-                    url: link,
-                });
-            } catch (error) {
-                console.error('Error sharing:', error);
+            if (navigator.share) {
+                try {
+                    await navigator.share({
+                        title: 'Join DesignSync',
+                        text: text,
+                        url: link,
+                    });
+                } catch (error) {
+                    console.error('Error sharing:', error);
+                }
+            } else {
+                // Fallback: copy to clipboard
+                await navigator.clipboard.writeText(link);
+                setCopied(true);
+                setTimeout(() => setCopied(false), 2000);
             }
-        } else {
-            // Fallback: copy to clipboard
-            handleCopyLink();
+        } catch (error) {
+            console.error('Failed to share:', error);
         }
     };
 
@@ -129,7 +150,7 @@ export const ReferralDashboard: React.FC<Props> = ({ currentUser }) => {
                 <div className="flex gap-2 mb-3">
                     <input
                         type="text"
-                        value={getReferralLink()}
+                        value={referralCode ? getReferralLink() : 'Click Copy to generate your link...'}
                         readOnly
                         className="flex-1 px-3 py-2 bg-slate-50 border border-slate-200 rounded text-slate-700 font-mono text-xs"
                     />
@@ -142,12 +163,20 @@ export const ReferralDashboard: React.FC<Props> = ({ currentUser }) => {
                 </div>
 
                 <div className="bg-indigo-50 rounded p-3 border border-indigo-100">
-                    <p className="text-xs text-indigo-900">
-                        <strong>Code:</strong> <span className="font-mono font-bold">{referralCode}</span>
-                    </p>
-                    <p className="text-xs text-indigo-700 mt-1">
-                        Share this link. When friends subscribe to a paid plan, you earn 100 tokens!
-                    </p>
+                    {referralCode ? (
+                        <>
+                            <p className="text-xs text-indigo-900">
+                                <strong>Code:</strong> <span className="font-mono font-bold">{referralCode}</span>
+                            </p>
+                            <p className="text-xs text-indigo-700 mt-1">
+                                Share this link. When friends subscribe to a paid plan, you earn 100 tokens!
+                            </p>
+                        </>
+                    ) : (
+                        <p className="text-xs text-indigo-700">
+                            Click "Copy" or "Share" to generate your unique referral link. When friends subscribe to a paid plan, you earn 100 tokens!
+                        </p>
+                    )}
                 </div>
             </div>
 

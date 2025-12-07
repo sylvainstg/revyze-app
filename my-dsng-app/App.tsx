@@ -39,6 +39,8 @@ import { CategorySelector } from './components/CategorySelector';
 import { EditVersionModal } from './components/EditVersionModal';
 import { EnhancedDeleteDialog } from './components/EnhancedDeleteDialog';
 import { CemeteryView } from './components/CemeteryView';
+import { FeedbackModal } from './components/FeedbackModal';
+import { useFeedbackCampaign } from './hooks/useFeedbackCampaign';
 
 
 const App: React.FC = () => {
@@ -99,6 +101,9 @@ const App: React.FC = () => {
   const [enrichedPlans, setEnrichedPlans] = useState<any>(null);
   const [pricingLoading, setPricingLoading] = useState(true);
   const [pricingError, setPricingError] = useState<string | null>(null);
+
+  // Feedback Campaign
+  const { campaign: feedbackCampaign, submitAnswer: submitFeedbackAnswer, dismiss: dismissFeedback } = useFeedbackCampaign(currentUser);
 
   const setPdfScale = (newScale: number | ((prev: number) => number)) => {
     isUserZooming.current = true;
@@ -518,6 +523,26 @@ const App: React.FC = () => {
 
     await updateProjectState(updatedProject);
     setToast({ message: `Page ${page} set as default for ${activeCategory}`, type: 'success' });
+  };
+
+  const handleRelaunchOnboarding = async () => {
+    if (!currentUser) return;
+
+    try {
+      // Update DB
+      await authService.updateUserProfile(currentUser.id, { hasCompletedOnboarding: false });
+
+      // Update local state
+      setCurrentUser({ ...currentUser, hasCompletedOnboarding: false });
+
+      // Redirect
+      setView('onboarding');
+
+      setToast({ message: 'Onboarding relaunched!', type: 'success' });
+    } catch (error) {
+      console.error('Error relaunching onboarding:', error);
+      setToast({ message: 'Failed to relaunch onboarding', type: 'error' });
+    }
   };
 
   // --- Actions ---
@@ -1336,6 +1361,7 @@ const App: React.FC = () => {
           onDeleteProject={handleDeleteProject}
           onOpenAdmin={() => setView('admin')}
           onOpenCemetery={() => setView('cemetery')}
+          onRelaunchOnboarding={handleRelaunchOnboarding}
         />
         <ShareModal
           isOpen={isShareModalOpen}
@@ -1736,6 +1762,15 @@ const App: React.FC = () => {
             totalSteps={ONBOARDING_STEPS.length}
             onNext={handleOnboardingNext}
             onSkip={handleOnboardingSkip}
+          />
+        )}
+
+        {/* Feedback Campaign Modal */}
+        {feedbackCampaign && (
+          <FeedbackModal
+            campaign={feedbackCampaign}
+            onSubmit={submitFeedbackAnswer}
+            onDismiss={dismissFeedback}
           />
         )}
 

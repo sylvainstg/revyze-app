@@ -1,5 +1,13 @@
 {
   "projects": {
     "default": "dsng-app"
+  },
+  "targets": {},
+  "etags": {
+    "dsng-app": {
+      "extensionInstances": {
+        "firestore-send-email": "233f80a382b01907817a5a96dbc87cd85fe2b87466340f2ac8556c5a99486963"
+      }
+    }
   }
 }

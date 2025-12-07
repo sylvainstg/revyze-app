@@ -252,6 +252,7 @@ export const updateFeatureCost = functions.https.onCall(async (data, context) =>
 /**
  * Get all feature costs (public endpoint)
  */
+
 export const getFeatureCosts = functions.region('us-central1').https.onCall(async (data, context) => {
     try {
         const featuresSnapshot = await admin.firestore().collection("featureCosts").get();
@@ -576,3 +577,24 @@ export const fixCategoryHttp = functions.https.onRequest(async (req, res) => {
         res.status(500).send({ error: error.message });
     }
 });
+
+// ========== CAMPAIGN MANAGER FUNCTIONS ==========
+
+// Email follow-up functions
+export { onCampaignShown, processEmailFollowUps } from './campaigns/emailFollowUp';
+
+// Campaign CRUD API
+export {
+    createCampaign,
+    listCampaigns,
+    updateCampaign,
+    getCampaignAnalyticsEndpoint,
+    getSegmentStats,
+    initSampleCampaign,
+    listSampleCampaigns,
+    listSampleAdmins,
+    getUserCampaignHistory
+} from './campaigns/api';
+
+// Engagement Score Functions
+export { updateEngagementScore, recalculateAllEngagementScores } from './engagement/engagementScore';
