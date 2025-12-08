@@ -1,7 +1,32 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { Info, Users, Clock, Shield, UserCheck, Zap } from 'lucide-react';
+import { httpsCallable } from 'firebase/functions';
+import { functions } from '../../firebaseConfig';
 
 export const CampaignDocumentation: React.FC = () => {
+    const [segmentLoading, setSegmentLoading] = useState<Record<string, boolean>>({});
+    const [segmentUsers, setSegmentUsers] = useState<Record<string, { totalCount: number; sample: Array<{ id: string; name?: string; email?: string; plan?: string }> }>>({});
+    const fetchSegment = async (segment: string, limit: number = 50) => {
+        setSegmentLoading(prev => ({ ...prev, [segment]: true }));
+        try {
+            const getSegmentStatsFunc = httpsCallable(functions, 'getSegmentStats');
+            const result = await getSegmentStatsFunc({ segmentType: segment, limit });
+            const data = result.data as any;
+            setSegmentUsers(prev => ({
+                ...prev,
+                [segment]: {
+                    totalCount: data.totalCount || 0,
+                    sample: data.sampleUsers || []
+                }
+            }));
+        } catch (err) {
+            console.error('Failed to fetch segment stats', err);
+            setSegmentUsers(prev => ({ ...prev, [segment]: { totalCount: 0, sample: [] } }));
+        } finally {
+            setSegmentLoading(prev => ({ ...prev, [segment]: false }));
+        }
+    };
+
     return (
         <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
             <div className="p-6 border-b border-slate-100 bg-slate-50">
@@ -23,6 +48,54 @@ export const CampaignDocumentation: React.FC = () => {
                     <div className="grid gap-4 md:grid-cols-2">
                         <div className="p-4 rounded-lg border border-slate-200 bg-slate-50">
                             <div className="flex items-center gap-2 mb-2">
+                                <Zap className="w-4 h-4 text-indigo-500" />
+                                <span className="font-semibold text-slate-900">Giving Up Almost</span>
+                                <code className="text-xs bg-slate-200 px-1.5 py-0.5 rounded text-slate-600">segment: giving_up_almost</code>
+                            </div>
+                            <p className="text-sm text-slate-600 mb-2">
+                                New-ish free users on their 2nd+ session who poked around but returned slowly or had a very short last session.
+                            </p>
+                            <ul className="text-xs text-slate-500 list-disc list-inside space-y-1">
+                                <li>Account age: ≤ 30 days</li>
+                                <li>Plan: free, loginCount ≥ 2</li>
+                                <li>Short last session (&lt; 3m) OR return after &gt; 2 days</li>
+                                <li>Some engagement: ≥2 actions (project/comment/share/pan/zoom)</li>
+                            </ul>
+                            <div className="flex items-center gap-3 mt-3">
+                                <button
+                                    onClick={() => fetchSegment('giving_up_almost', 50)}
+                                    className="text-xs font-semibold text-indigo-600 bg-indigo-50 px-3 py-1 rounded border border-indigo-200 hover:bg-indigo-100"
+                                    disabled={segmentLoading['giving_up_almost']}
+                                >
+                                    {segmentLoading['giving_up_almost'] ? 'Loading…' : 'View users'}
+                                </button>
+                                {segmentUsers['giving_up_almost'] && (
+                                    <span className="text-[11px] text-slate-500">
+                                        {segmentUsers['giving_up_almost'].totalCount} users
+                                    </span>
+                                )}
+                            </div>
+                            {segmentUsers['giving_up_almost'] && (
+                                <div className="mt-2 bg-white border border-slate-200 rounded p-2 text-xs text-slate-700">
+                                    <div className="flex justify-between">
+                                        <span>Total:</span>
+                                        <span className="font-semibold">{segmentUsers['giving_up_almost'].totalCount}</span>
+                                    </div>
+                                    {segmentUsers['giving_up_almost'].sample.length > 0 && (
+                                        <ul className="mt-1 max-h-32 overflow-y-auto space-y-1">
+                                            {segmentUsers['giving_up_almost'].sample.map((u) => (
+                                                <li key={u.id} className="flex justify-between">
+                                                    <span>{u.name || u.email}</span>
+                                                    <span className="text-slate-400">{u.plan}</span>
+                                                </li>
+                                            ))}
+                                        </ul>
+                                    )}
+                                </div>
+                            )}
+                        </div>
+                        <div className="p-4 rounded-lg border border-slate-200 bg-slate-50">
+                            <div className="flex items-center gap-2 mb-2">
                                 <Zap className="w-4 h-4 text-amber-500" />
                                 <span className="font-semibold text-slate-900">Power Users</span>
                                 <code className="text-xs bg-slate-200 px-1.5 py-0.5 rounded text-slate-600">power_users</code>
@@ -32,6 +105,38 @@ export const CampaignDocumentation: React.FC = () => {
                                 <li>Plan: <strong>Pro</strong> or <strong>Business</strong></li>
                                 <li>Engagement Score: <strong>≥ 70</strong></li>
                             </ul>
+                            <div className="flex items-center gap-3 mt-3">
+                                <button
+                                    onClick={() => fetchSegment('power_users', 50)}
+                                    className="text-xs font-semibold text-indigo-600 bg-indigo-50 px-3 py-1 rounded border border-indigo-200 hover:bg-indigo-100"
+                                    disabled={segmentLoading['power_users']}
+                                >
+                                    {segmentLoading['power_users'] ? 'Loading…' : 'View users'}
+                                </button>
+                                {segmentUsers['power_users'] && (
+                                    <span className="text-[11px] text-slate-500">
+                                        {segmentUsers['power_users'].totalCount} users
+                                    </span>
+                                )}
+                            </div>
+                            {segmentUsers['power_users'] && (
+                                <div className="mt-2 bg-white border border-slate-200 rounded p-2 text-xs text-slate-700">
+                                    <div className="flex justify-between">
+                                        <span>Total:</span>
+                                        <span className="font-semibold">{segmentUsers['power_users'].totalCount}</span>
+                                    </div>
+                                    {segmentUsers['power_users'].sample.length > 0 && (
+                                        <ul className="mt-1 max-h-32 overflow-y-auto space-y-1">
+                                            {segmentUsers['power_users'].sample.map((u) => (
+                                                <li key={u.id} className="flex justify-between">
+                                                    <span>{u.name || u.email}</span>
+                                                    <span className="text-slate-400">{u.plan}</span>
+                                                </li>
+                                            ))}
+                                        </ul>
+                                    )}
+                                </div>
+                            )}
                         </div>
 
                         <div className="p-4 rounded-lg border border-slate-200 bg-slate-50">
@@ -46,6 +151,38 @@ export const CampaignDocumentation: React.FC = () => {
                                 <li><strong>OR</strong> Inactive &gt; 30 days</li>
                                 <li><strong>OR</strong> Engagement Score &lt; 40</li>
                             </ul>
+                            <div className="flex items-center gap-3 mt-3">
+                                <button
+                                    onClick={() => fetchSegment('at_risk_pros', 50)}
+                                    className="text-xs font-semibold text-indigo-600 bg-indigo-50 px-3 py-1 rounded border border-indigo-200 hover:bg-indigo-100"
+                                    disabled={segmentLoading['at_risk_pros']}
+                                >
+                                    {segmentLoading['at_risk_pros'] ? 'Loading…' : 'View users'}
+                                </button>
+                                {segmentUsers['at_risk_pros'] && (
+                                    <span className="text-[11px] text-slate-500">
+                                        {segmentUsers['at_risk_pros'].totalCount} users
+                                    </span>
+                                )}
+                            </div>
+                            {segmentUsers['at_risk_pros'] && (
+                                <div className="mt-2 bg-white border border-slate-200 rounded p-2 text-xs text-slate-700">
+                                    <div className="flex justify-between">
+                                        <span>Total:</span>
+                                        <span className="font-semibold">{segmentUsers['at_risk_pros'].totalCount}</span>
+                                    </div>
+                                    {segmentUsers['at_risk_pros'].sample.length > 0 && (
+                                        <ul className="mt-1 max-h-32 overflow-y-auto space-y-1">
+                                            {segmentUsers['at_risk_pros'].sample.map((u) => (
+                                                <li key={u.id} className="flex justify-between">
+                                                    <span>{u.name || u.email}</span>
+                                                    <span className="text-slate-400">{u.plan}</span>
+                                                </li>
+                                            ))}
+                                        </ul>
+                                    )}
+                                </div>
+                            )}
                         </div>
 
                         <div className="p-4 rounded-lg border border-slate-200 bg-slate-50">
@@ -59,6 +196,38 @@ export const CampaignDocumentation: React.FC = () => {
                                 <li>Account Age: <strong>≤ 7 days</strong></li>
                                 <li>Project Count: <strong>0</strong></li>
                             </ul>
+                            <div className="flex items-center gap-3 mt-3">
+                                <button
+                                    onClick={() => fetchSegment('new_users', 50)}
+                                    className="text-xs font-semibold text-indigo-600 bg-indigo-50 px-3 py-1 rounded border border-indigo-200 hover:bg-indigo-100"
+                                    disabled={segmentLoading['new_users']}
+                                >
+                                    {segmentLoading['new_users'] ? 'Loading…' : 'View users'}
+                                </button>
+                                {segmentUsers['new_users'] && (
+                                    <span className="text-[11px] text-slate-500">
+                                        {segmentUsers['new_users'].totalCount} users
+                                    </span>
+                                )}
+                            </div>
+                            {segmentUsers['new_users'] && (
+                                <div className="mt-2 bg-white border border-slate-200 rounded p-2 text-xs text-slate-700">
+                                    <div className="flex justify-between">
+                                        <span>Total:</span>
+                                        <span className="font-semibold">{segmentUsers['new_users'].totalCount}</span>
+                                    </div>
+                                    {segmentUsers['new_users'].sample.length > 0 && (
+                                        <ul className="mt-1 max-h-32 overflow-y-auto space-y-1">
+                                            {segmentUsers['new_users'].sample.map((u) => (
+                                                <li key={u.id} className="flex justify-between">
+                                                    <span>{u.name || u.email}</span>
+                                                    <span className="text-slate-400">{u.plan}</span>
+                                                </li>
+                                            ))}
+                                        </ul>
+                                    )}
+                                </div>
+                            )}
                         </div>
 
                         <div className="p-4 rounded-lg border border-slate-200 bg-slate-50">
@@ -72,6 +241,38 @@ export const CampaignDocumentation: React.FC = () => {
                                 <li>Current Session: <strong>Active now</strong> (&lt; 24h)</li>
                                 <li>Previous Login: <strong>&gt; 30 days ago</strong></li>
                             </ul>
+                            <div className="flex items-center gap-3 mt-3">
+                                <button
+                                    onClick={() => fetchSegment('returning_inactive_users', 50)}
+                                    className="text-xs font-semibold text-indigo-600 bg-indigo-50 px-3 py-1 rounded border border-indigo-200 hover:bg-indigo-100"
+                                    disabled={segmentLoading['returning_inactive_users']}
+                                >
+                                    {segmentLoading['returning_inactive_users'] ? 'Loading…' : 'View users'}
+                                </button>
+                                {segmentUsers['returning_inactive_users'] && (
+                                    <span className="text-[11px] text-slate-500">
+                                        {segmentUsers['returning_inactive_users'].totalCount} users
+                                    </span>
+                                )}
+                            </div>
+                            {segmentUsers['returning_inactive_users'] && (
+                                <div className="mt-2 bg-white border border-slate-200 rounded p-2 text-xs text-slate-700">
+                                    <div className="flex justify-between">
+                                        <span>Total:</span>
+                                        <span className="font-semibold">{segmentUsers['returning_inactive_users'].totalCount}</span>
+                                    </div>
+                                    {segmentUsers['returning_inactive_users'].sample.length > 0 && (
+                                        <ul className="mt-1 max-h-32 overflow-y-auto space-y-1">
+                                            {segmentUsers['returning_inactive_users'].sample.map((u) => (
+                                                <li key={u.id} className="flex justify-between">
+                                                    <span>{u.name || u.email}</span>
+                                                    <span className="text-slate-400">{u.plan}</span>
+                                                </li>
+                                            ))}
+                                        </ul>
+                                    )}
+                                </div>
+                            )}
                         </div>
                     </div>
                 </section>

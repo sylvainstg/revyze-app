@@ -13,6 +13,10 @@ import { getUserActivity, ActivityLog } from '../services/analyticsService';
 import { EngagementDashboard } from './EngagementDashboard';
 import { CampaignManager } from './admin/CampaignManager';
 import { CampaignDocumentation } from './admin/CampaignDocumentation';
+import { getAnalyticsStats } from '../services/analyticsAggregationService';
+import { getAdminReferralData } from '../services/referralService';
+import { httpsCallable } from 'firebase/functions';
+import { functions } from '../firebaseConfig';
 
 const formatEventName = (name: string) => {
     return name.split('_').map(word => word.charAt(0).toUpperCase() + word.slice(1)).join(' ');
@@ -56,6 +60,20 @@ export const AdminPage: React.FC<AdminPageProps> = ({ onBack, currentUser }) => 
 
     // Engagement Dashboard State
     const [showEngagementDashboard, setShowEngagementDashboard] = useState(false);
+    const [engagementLoading, setEngagementLoading] = useState(false);
+    const [engagementKpis, setEngagementKpis] = useState<{ mau: number; dau: number; stickiness: number; liveness: number; spark: { date: string; dau: number; }[] } | null>(null);
+    const [campaignsSummary, setCampaignsSummary] = useState<{ id: string; name: string; responses: number; impressions: number; }[]>([]);
+    const [loadingCampaigns, setLoadingCampaigns] = useState(false);
+
+    // Referral summary
+    const [referralLoading, setReferralLoading] = useState(false);
+    const [referralSummary, setReferralSummary] = useState<{
+        totalTokens: number;
+        redeemedTokens: number;
+        pendingReferrals: number;
+        totalReferrals: number;
+        recentTransactions: Array<{ id: string; description: string; amount: number; type: string; timestamp: number; }>;
+    } | null>(null);
 
     const tabs: { id: AdminTab; label: string; description: string; icon: React.ComponentType<{ className?: string }> }[] = [
         { id: 'users', label: 'Users', description: 'Directory & permissions', icon: Users },
@@ -86,6 +104,16 @@ export const AdminPage: React.FC<AdminPageProps> = ({ onBack, currentUser }) => 
     useEffect(() => {
         fetchUsers();
     }, []);
+
+    useEffect(() => {
+        if (!currentUser?.isAdmin) return;
+        if (activeTab === 'engagement') {
+            loadEngagementKpis();
+            loadCampaignSummary();
+        } else if (activeTab === 'referrals') {
+            loadReferralSummary();
+        }
+    }, [activeTab, currentUser]);
 
     const fetchUsers = async () => {
         setLoading(true);
@@ -159,6 +187,92 @@ export const AdminPage: React.FC<AdminPageProps> = ({ onBack, currentUser }) => 
 
     const conversionRate = stats.total > 0 ? ((stats.pro / stats.total) * 100).toFixed(1) : '0.0';
 
+    const loadEngagementKpis = async () => {
+        setEngagementLoading(true);
+        try {
+            const data = await getAnalyticsStats(28);
+            if (!data || data.length === 0) {
+                setEngagementKpis(null);
+                return;
+            }
+            const ordered = [...data].sort((a, b) => a.timestamp - b.timestamp);
+            const latest = ordered[ordered.length - 1];
+            const mau = latest.mau || 0;
+            const dau = latest.dau || 0;
+            const stickiness = mau > 0 ? Math.round((dau / mau) * 100) : 0;
+            const liveness = Math.min(100, Math.round(((latest.new_projects || 0) + (latest.new_comments || 0) + (latest.new_invites || 0)) * 1.5));
+            const spark = ordered.slice(-14).map(s => ({ date: s.date.slice(5), dau: s.dau }));
+            setEngagementKpis({ mau, dau, stickiness, liveness, spark });
+        } catch (err) {
+            console.error('Failed to load engagement KPIs', err);
+            setEngagementKpis(null);
+        } finally {
+            setEngagementLoading(false);
+        }
+    };
+
+    const loadCampaignSummary = async () => {
+        setLoadingCampaigns(true);
+        try {
+            const listCampaigns = httpsCallable(functions, 'listCampaigns');
+            const res = await listCampaigns({});
+            const data = res.data as any;
+            const items = (data?.campaigns || []).map((c: any) => ({
+                id: c.id,
+                name: c.name || 'Untitled',
+                responses: c.analytics?.responses || 0,
+                impressions: c.analytics?.impressions || 0
+            }));
+            setCampaignsSummary(items.slice(0, 5));
+        } catch (err) {
+            console.error('Failed to load campaigns summary', err);
+            setCampaignsSummary([]);
+        } finally {
+            setLoadingCampaigns(false);
+        }
+    };
+
+    const loadReferralSummary = async () => {
+        setReferralLoading(true);
+        try {
+            const data = await getAdminReferralData();
+            const referrals = data?.referrals || [];
+            const transactions = data?.transactions || [];
+
+            const totalTokens = transactions
+                .filter((t: any) => t.type === 'earned')
+                .reduce((sum: number, t: any) => sum + (t.amount || 0), 0);
+
+            const redeemedTokens = transactions
+                .filter((t: any) => t.type === 'redeemed')
+                .reduce((sum: number, t: any) => sum + (t.amount || 0), 0);
+
+            const pendingReferrals = referrals.filter((r: any) => r.status === 'pending').length;
+            const totalReferrals = referrals.length;
+
+            const recentTransactions = transactions.slice(0, 5).map((t: any) => ({
+                id: t.id,
+                description: t.description,
+                amount: t.amount,
+                type: t.type,
+                timestamp: t.timestamp
+            }));
+
+            setReferralSummary({
+                totalTokens,
+                redeemedTokens,
+                pendingReferrals,
+                totalReferrals,
+                recentTransactions
+            });
+        } catch (err) {
+            console.error('Failed to load referral summary', err);
+            setReferralSummary(null);
+        } finally {
+            setReferralLoading(false);
+        }
+    };
+
     // Filter users
     const filteredUsers = users.filter(user => {
         const matchesSearch =
@@ -206,8 +320,19 @@ export const AdminPage: React.FC<AdminPageProps> = ({ onBack, currentUser }) => 
         { month: 'Apr', users: Math.floor(stats.total * 0.7) },
         { month: 'May', users: stats.total },
     ];
+    const maxSparkDau = engagementKpis?.spark?.length ? Math.max(...engagementKpis.spark.map(s => s.dau || 1)) : 1;
 
     return (
+        !currentUser.isAdmin ? (
+            <div className="min-h-screen bg-slate-50 flex items-center justify-center px-4">
+                <div className="bg-white shadow-sm border border-slate-200 rounded-xl p-6 max-w-md w-full text-center space-y-3">
+                    <div className="mx-auto w-10 h-10 rounded-full bg-amber-100 text-amber-600 flex items-center justify-center font-bold">!</div>
+                    <h2 className="text-lg font-bold text-slate-900">Admin access required</h2>
+                    <p className="text-sm text-slate-600">You need admin permissions to view this area.</p>
+                    <Button variant="secondary" onClick={onBack}>Go back</Button>
+                </div>
+            </div>
+        ) : (
         <div className="min-h-screen bg-slate-50">
             {/* Header */}
             <header className="bg-white border-b border-slate-200 sticky top-0 z-10">
@@ -371,22 +496,23 @@ export const AdminPage: React.FC<AdminPageProps> = ({ onBack, currentUser }) => 
                                                     <th className="px-6 py-3 cursor-pointer hover:text-indigo-600" onClick={() => handleSort('name')}>User</th>
                                                     <th className="px-6 py-3 cursor-pointer hover:text-indigo-600" onClick={() => handleSort('role')}>Role</th>
                                                     <th className="px-6 py-3 cursor-pointer hover:text-indigo-600" onClick={() => handleSort('plan')}>Plan</th>
-                                                    <th className="px-6 py-3 cursor-pointer hover:text-indigo-600" onClick={() => handleSort('subscriptionStatus')}>Status</th>
-                                                    <th className="px-6 py-3 cursor-pointer hover:text-indigo-600" onClick={() => handleSort('loginCount')}>Logins</th>
-                                                    <th className="px-6 py-3 cursor-pointer hover:text-indigo-600" onClick={() => handleSort('projectCount')}>Projects</th>
-                                                    <th className="px-6 py-3 text-right">Actions</th>
-                                                </tr>
-                                            </thead>
-                                            <tbody className="divide-y divide-slate-100">
-                                                {loading ? (
-                                                    <tr><td colSpan={7} className="p-8 text-center text-slate-500">Loading users...</td></tr>
-                                                ) : sortedUsers.length === 0 ? (
-                                                    <tr><td colSpan={7} className="p-8 text-center text-slate-500">No users found matching your filters.</td></tr>
-                                                ) : sortedUsers.map(user => (
-                                                    <tr key={user.id} className="hover:bg-slate-50/50 transition-colors cursor-pointer" onClick={() => setSelectedUser(user)}>
-                                                        <td className="px-6 py-4">
-                                                            <div className="flex items-center gap-3">
-                                                                <div className={`w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold text-white ${user.role === UserRole.DESIGNER ? 'bg-purple-600' : 'bg-blue-600'}`}>
+                                            <th className="px-6 py-3 cursor-pointer hover:text-indigo-600" onClick={() => handleSort('subscriptionStatus')}>Status</th>
+                                            <th className="px-6 py-3 cursor-pointer hover:text-indigo-600" onClick={() => handleSort('loginCount')}>Logins</th>
+                                            <th className="px-6 py-3 cursor-pointer hover:text-indigo-600" onClick={() => handleSort('projectCount')}>Projects</th>
+                                            <th className="px-6 py-3 cursor-pointer hover:text-indigo-600" onClick={() => handleSort('engagementScore' as keyof User)}>Engagement</th>
+                                            <th className="px-6 py-3 text-right">Actions</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody className="divide-y divide-slate-100">
+                                        {loading ? (
+                                            <tr><td colSpan={8} className="p-8 text-center text-slate-500">Loading users...</td></tr>
+                                        ) : sortedUsers.length === 0 ? (
+                                            <tr><td colSpan={8} className="p-8 text-center text-slate-500">No users found matching your filters.</td></tr>
+                                        ) : sortedUsers.map(user => (
+                                            <tr key={user.id} className="hover:bg-slate-50/50 transition-colors cursor-pointer" onClick={() => setSelectedUser(user)}>
+                                                <td className="px-6 py-4">
+                                                    <div className="flex items-center gap-3">
+                                                        <div className={`w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold text-white ${user.role === UserRole.DESIGNER ? 'bg-purple-600' : 'bg-blue-600'}`}>
                                                                     {user.name.charAt(0)}
                                                                 </div>
                                                                 <div>
@@ -409,13 +535,14 @@ export const AdminPage: React.FC<AdminPageProps> = ({ onBack, currentUser }) => 
                                                                 }`}>
                                                                 {user.subscriptionStatus || 'None'}
                                                             </span>
-                                                        </td>
-                                                        <td className="px-6 py-4 text-slate-600">{user.loginCount || 0}</td>
-                                                        <td className="px-6 py-4 text-slate-600">{user.projectCount || 0}</td>
-                                                        <td className="px-6 py-4 text-right" onClick={(e) => e.stopPropagation()}>
-                                                            <div className="flex items-center justify-end gap-2">
-                                                                <button
-                                                                    onClick={(e) => {
+                                                </td>
+                                                <td className="px-6 py-4 text-slate-600">{user.loginCount || 0}</td>
+                                                <td className="px-6 py-4 text-slate-600">{user.projectCount || 0}</td>
+                                                <td className="px-6 py-4 text-slate-600">{typeof user.engagementScore === 'number' ? user.engagementScore : '—'}</td>
+                                                <td className="px-6 py-4 text-right" onClick={(e) => e.stopPropagation()}>
+                                                    <div className="flex items-center justify-end gap-2">
+                                                        <button
+                                                            onClick={(e) => {
                                                                         e.stopPropagation();
                                                                         handleViewPaymentHistory(user);
                                                                     }}
@@ -582,21 +709,79 @@ export const AdminPage: React.FC<AdminPageProps> = ({ onBack, currentUser }) => 
                                     </Button>
                                 </div>
                             </div>
-                            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mt-4">
+                            <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mt-4">
                                 <div className="p-4 rounded-lg border border-slate-200 bg-slate-50">
-                                    <div className="text-xs text-slate-500">Active this month</div>
-                                    <div className="text-2xl font-bold text-slate-900">{stats.activeThisMonth}</div>
-                                    <p className="text-xs text-slate-500 mt-1">Recent sessions across the product</p>
+                                    <div className="text-xs text-slate-500">MAU</div>
+                                    <div className="text-2xl font-bold text-slate-900">
+                                        {engagementLoading ? '—' : (engagementKpis?.mau?.toLocaleString() || '—')}
+                                    </div>
+                                    <p className="text-xs text-slate-500 mt-1">Monthly active users</p>
                                 </div>
                                 <div className="p-4 rounded-lg border border-slate-200 bg-slate-50">
-                                    <div className="text-xs text-slate-500">Subscribers</div>
-                                    <div className="text-2xl font-bold text-slate-900">{stats.pro}</div>
-                                    <p className="text-xs text-slate-500 mt-1">Conversion rate {conversionRate}%</p>
+                                    <div className="text-xs text-slate-500">DAU</div>
+                                    <div className="text-2xl font-bold text-slate-900">
+                                        {engagementLoading ? '—' : (engagementKpis?.dau?.toLocaleString() || '—')}
+                                    </div>
+                                    <p className="text-xs text-slate-500 mt-1">Daily active users</p>
                                 </div>
                                 <div className="p-4 rounded-lg border border-slate-200 bg-slate-50">
-                                    <div className="text-xs text-slate-500">Admins</div>
-                                    <div className="text-2xl font-bold text-slate-900">{stats.admins}</div>
-                                    <p className="text-xs text-slate-500 mt-1">Team members with elevated access</p>
+                                    <div className="text-xs text-slate-500">Stickiness</div>
+                                    <div className="text-2xl font-bold text-slate-900">
+                                        {engagementLoading ? '—' : `${engagementKpis?.stickiness ?? 0}%`}
+                                    </div>
+                                    <p className="text-xs text-slate-500 mt-1">DAU / MAU</p>
+                                </div>
+                                <div className="p-4 rounded-lg border border-slate-200 bg-slate-50">
+                                    <div className="text-xs text-slate-500">Liveness</div>
+                                    <div className="text-2xl font-bold text-slate-900">
+                                        {engagementLoading ? '—' : `${engagementKpis?.liveness ?? 0}%`}
+                                    </div>
+                                    <p className="text-xs text-slate-500 mt-1">Recent activity velocity</p>
+                                </div>
+                            </div>
+                            <div className="mt-4 grid grid-cols-1 lg:grid-cols-3 gap-4">
+                                <div className="lg:col-span-2 p-4 rounded-lg border border-slate-200 bg-white">
+                                    <div className="flex items-center justify-between mb-3">
+                                        <div>
+                                            <div className="text-sm font-semibold text-slate-900">Activity trend</div>
+                                            <p className="text-xs text-slate-500">Last 14 days DAU</p>
+                                        </div>
+                                        {engagementLoading && <div className="text-xs text-slate-400">Loading…</div>}
+                                    </div>
+                                        <div className="flex items-end gap-2 h-32">
+                                            {(engagementKpis?.spark || []).map(point => (
+                                                <div key={point.date} className="flex-1 flex flex-col items-center">
+                                                    <div
+                                                        className="w-full rounded-t bg-indigo-200"
+                                                    style={{ height: `${engagementKpis && engagementKpis.dau > 0 ? Math.max(8, (point.dau / maxSparkDau) * 100) : 10}%`, minHeight: '8px' }}
+                                                    ></div>
+                                                    <span className="text-[10px] text-slate-400 mt-1">{point.date}</span>
+                                                </div>
+                                            ))}
+                                            {!engagementKpis && !engagementLoading && (
+                                            <div className="text-sm text-slate-500">No analytics yet. Open dashboard to generate mock data.</div>
+                                        )}
+                                    </div>
+                                </div>
+                                <div className="p-4 rounded-lg border border-slate-200 bg-white space-y-3">
+                                    <div className="flex items-center justify-between">
+                                        <div>
+                                            <div className="text-sm font-semibold text-slate-900">Active campaigns</div>
+                                            <p className="text-xs text-slate-500">Top 5 by recency</p>
+                                        </div>
+                                        {loadingCampaigns && <span className="text-[10px] text-slate-400">Loading…</span>}
+                                    </div>
+                                    <div className="space-y-2">
+                                        {campaignsSummary.length === 0 && !loadingCampaigns && (
+                                            <div className="text-sm text-slate-500">No campaigns found.</div>
+                                        )}
+                                        {campaignsSummary.map(c => (
+                                            <div key={c.id} className="p-3 rounded border border-slate-200 bg-slate-50">
+                                                <div className="font-medium text-slate-900 text-sm">{c.name}</div>
+                                                <div className="text-xs text-slate-600 mt-1">Responses: {c.responses} • Impressions: {c.impressions}</div>
+                                            </div>
+                                        ))}
+                                    </div>
                                 </div>
                             </div>
                         </div>
@@ -627,6 +812,55 @@ export const AdminPage: React.FC<AdminPageProps> = ({ onBack, currentUser }) => 
                                 The dashboard below shows what members see, while the manager updates token rules.
                             </div>
                         </div>
+
+                        <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+                            <div className="p-4 rounded-lg border border-slate-200 bg-slate-50">
+                                <div className="text-xs text-slate-500">Total tokens issued</div>
+                                <div className="text-2xl font-bold text-slate-900">
+                                    {referralLoading ? '—' : referralSummary?.totalTokens ?? 0}
+                                </div>
+                            </div>
+                            <div className="p-4 rounded-lg border border-slate-200 bg-slate-50">
+                                <div className="text-xs text-slate-500">Tokens redeemed</div>
+                                <div className="text-2xl font-bold text-slate-900">
+                                    {referralLoading ? '—' : referralSummary?.redeemedTokens ?? 0}
+                                </div>
+                            </div>
+                            <div className="p-4 rounded-lg border border-slate-200 bg-slate-50">
+                                <div className="text-xs text-slate-500">Pending referrals</div>
+                                <div className="text-2xl font-bold text-slate-900">
+                                    {referralLoading ? '—' : referralSummary?.pendingReferrals ?? 0}
+                                </div>
+                            </div>
+                            <div className="p-4 rounded-lg border border-slate-200 bg-slate-50">
+                                <div className="text-xs text-slate-500">Total referrals</div>
+                                <div className="text-2xl font-bold text-slate-900">
+                                    {referralLoading ? '—' : referralSummary?.totalReferrals ?? 0}
+                                </div>
+                            </div>
+                        </div>
+
+                        {referralSummary && referralSummary.recentTransactions.length > 0 && (
+                            <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-4">
+                                <div className="flex items-center justify-between mb-3">
+                                    <div className="text-sm font-semibold text-slate-900">Recent transactions</div>
+                                    {referralLoading && <span className="text-[10px] text-slate-400">Loading…</span>}
+                                </div>
+                                <div className="divide-y divide-slate-100">
+                                    {referralSummary.recentTransactions.map((t) => (
+                                        <div key={t.id} className="py-2 flex items-center justify-between text-sm">
+                                            <div>
+                                                <div className="font-medium text-slate-900">{t.description || t.type}</div>
+                                                <div className="text-xs text-slate-500">{new Date(t.timestamp).toLocaleDateString()}</div>
+                                            </div>
+                                            <div className={`font-semibold ${t.type === 'redeemed' ? 'text-red-600' : 'text-green-600'}`}>
+                                                {t.type === 'redeemed' ? '-' : '+'}{t.amount}
+                                            </div>
+                                        </div>
+                                    ))}
+                                </div>
+                            </div>
+                        )}
 
                         <ReferralDashboard currentUser={currentUser} />
                     </div>
@@ -847,5 +1081,6 @@ export const AdminPage: React.FC<AdminPageProps> = ({ onBack, currentUser }) => 
                 </div>
             )}
         </div >
+        )
     );
 };

@@ -9,6 +9,18 @@ interface CampaignManagerProps {
     onBack: () => void;
 }
 
+const getSegmentLabel = (campaign: any): string => {
+    // Prefer explicit fields from the document
+    const explicit = campaign.segmentType || campaign?.segmentQuery?.value || campaign?.segment || campaign?.segmentName;
+    if (explicit) return explicit;
+
+    // Known campaign fallbacks by name/question so legacy docs still show meaningful segment
+    const name = (campaign.name || campaign.title || campaign.question || '').toLowerCase();
+    if (name.includes('giving up almost')) return 'giving_up_almost';
+
+    return '—';
+};
+
 export const CampaignManager: React.FC<CampaignManagerProps> = ({ onBack }) => {
     const [campaigns, setCampaigns] = useState<(FeedbackCampaign & { analytics?: CampaignAnalytics })[]>([]);
     const [loading, setLoading] = useState(true);
@@ -48,8 +60,6 @@ export const CampaignManager: React.FC<CampaignManagerProps> = ({ onBack }) => {
         }
     };
 
-    const [segmentStats, setSegmentStats] = useState<Record<string, any>>({});
-    const [loadingStats, setLoadingStats] = useState<Record<string, boolean>>({});
     const [showAnalytics, setShowAnalytics] = useState(false);
     const [analyticsData, setAnalyticsData] = useState<{
         segmentDistribution: Array<{ segment: string; count: number; percentage: number }>;
@@ -63,20 +73,8 @@ export const CampaignManager: React.FC<CampaignManagerProps> = ({ onBack }) => {
             answerRate: number;
         }>;
     } | null>(null);
-
-    const handleCheckAudience = async (campaignId: string, segmentType: string) => {
-        setLoadingStats(prev => ({ ...prev, [campaignId]: true }));
-        try {
-            const getSegmentStatsFunc = httpsCallable(functions, 'getSegmentStats');
-            const result = await getSegmentStatsFunc({ segmentType });
-            setSegmentStats(prev => ({ ...prev, [campaignId]: result.data }));
-        } catch (error) {
-            console.error('Error fetching segment stats:', error);
-            alert('Failed to fetch audience stats');
-        } finally {
-            setLoadingStats(prev => ({ ...prev, [campaignId]: false }));
-        }
-    };
+    const [segmentLoading, setSegmentLoading] = useState<Record<string, boolean>>({});
+    const [segmentUsers, setSegmentUsers] = useState<Record<string, { total: number; users: Array<{ id: string; name?: string; email?: string; plan?: string }> }>>({});
 
     const loadCampaignAnalytics = async () => {
         try {
@@ -88,7 +86,7 @@ export const CampaignManager: React.FC<CampaignManagerProps> = ({ onBack }) => {
             const users = usersSnap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
 
             // Calculate segment distribution
-            const segments = ['power_users', 'at_risk_pros', 'returning_inactive_users', 'new_users'];
+            const segments = ['giving_up_almost', 'power_users', 'at_risk_pros', 'returning_inactive_users', 'new_users'];
             const segmentCounts: Record<string, number> = {};
 
             users.forEach((user: any) => {
@@ -96,8 +94,22 @@ export const CampaignManager: React.FC<CampaignManagerProps> = ({ onBack }) => {
                 const plan = user.plan || 'free';
                 const accountAge = Date.now() - (user.createdAt || Date.now());
                 const daysSinceCreation = accountAge / (1000 * 60 * 60 * 24);
+                const loginCount = user.loginCount || 0;
+                const lastLogin = user.lastLogin || 0;
+                const lastSessionDuration = user.lastSessionDuration || 0;
+                const totalActions = (user.projectCount || 0) + (user.commentCount || 0) + (user.shareCountGuest || 0) + (user.shareCountPro || 0);
+                const slowReturn = lastLogin > 0 ? (Date.now() - lastLogin) > 2 * 24 * 60 * 60 * 1000 : false;
+                const shortSession = lastSessionDuration > 0 ? lastSessionDuration < 3 * 60 * 1000 : false;
 
-                if (score >= 70 && plan !== 'free') {
+                if (
+                    plan === 'free' &&
+                    loginCount >= 2 &&
+                    daysSinceCreation <= 30 &&
+                    (slowReturn || shortSession) &&
+                    totalActions >= 2
+                ) {
+                    segmentCounts['giving_up_almost'] = (segmentCounts['giving_up_almost'] || 0) + 1;
+                } else if (score >= 70 && plan !== 'free') {
                     segmentCounts['power_users'] = (segmentCounts['power_users'] || 0) + 1;
                 } else if (plan !== 'free' && score < 40) {
                     segmentCounts['at_risk_pros'] = (segmentCounts['at_risk_pros'] || 0) + 1;
@@ -134,7 +146,7 @@ export const CampaignManager: React.FC<CampaignManagerProps> = ({ onBack }) => {
 
                 return {
                     campaignId: campaign.id,
-                    name: campaign.title || 'Untitled',
+                    name: campaign.name || campaign.title || campaign.question || 'Untitled',
                     shown,
                     dismissed,
                     answered,
@@ -149,6 +161,27 @@ export const CampaignManager: React.FC<CampaignManagerProps> = ({ onBack }) => {
             });
         } catch (error) {
             console.error('Error loading analytics:', error);
+        }
+    };
+
+    const fetchSegmentUsers = async (segment: string) => {
+        setSegmentLoading(prev => ({ ...prev, [segment]: true }));
+        try {
+            const getSegmentStats = httpsCallable(functions, 'getSegmentStats');
+            const res = await getSegmentStats({ segmentType: segment, limit: 50 });
+            const data = res.data as any;
+            setSegmentUsers(prev => ({
+                ...prev,
+                [segment]: {
+                    total: data?.totalCount || 0,
+                    users: data?.sampleUsers || []
+                }
+            }));
+        } catch (err) {
+            console.error('Error fetching segment users', err);
+            setSegmentUsers(prev => ({ ...prev, [segment]: { total: 0, users: [] } }));
+        } finally {
+            setSegmentLoading(prev => ({ ...prev, [segment]: false }));
         }
     };
 
@@ -208,18 +241,27 @@ export const CampaignManager: React.FC<CampaignManagerProps> = ({ onBack }) => {
                             </div>
 
                             {/* Segment Definitions Info Box */}
-                            <div className="bg-blue-50 border-b border-blue-100 p-4">
-                                <details className="group">
-                                    <summary className="cursor-pointer text-sm font-medium text-blue-900 flex items-center gap-2">
-                                        <span>ℹ️ Segment Definitions & Triggers</span>
-                                        <span className="text-xs text-blue-600 group-open:hidden">(click to expand)</span>
-                                    </summary>
-                                    <div className="mt-4 space-y-3 text-sm text-blue-900">
-                                        <div className="bg-white rounded-lg p-3 border border-blue-200">
-                                            <div className="font-semibold text-blue-900 mb-1">🚀 Power Users</div>
-                                            <div className="text-blue-800 text-xs">
-                                                <strong>Criteria:</strong> Engagement Score ≥ 70 AND Paid Plan (Pro/Business)<br />
-                                                <strong>Trigger:</strong> High engagement + active subscription<br />
+                                    <div className="bg-blue-50 border-b border-blue-100 p-4">
+                                        <details className="group">
+                                            <summary className="cursor-pointer text-sm font-medium text-blue-900 flex items-center gap-2">
+                                                <span>ℹ️ Segment Definitions & Triggers</span>
+                                                <span className="text-xs text-blue-600 group-open:hidden">(click to expand)</span>
+                                            </summary>
+                                            <div className="mt-4 space-y-3 text-sm text-blue-900">
+                                                <div className="bg-white rounded-lg p-3 border border-blue-200">
+                                                    <div className="font-semibold text-blue-900 mb-1">🤔 Giving Up Almost</div>
+                                                    <div className="text-blue-800 text-xs">
+                                                        <strong>Criteria:</strong> Free users, 2+ logins, account &le; 30 days, short last session (&lt;3m) or slow return (&gt;2d), some actions<br />
+                                                        <strong>Trigger:</strong> Early exploration with signs of drop-off<br />
+                                                        <strong>Campaign Goal:</strong> Ask “What almost made you give up already?” and course-correct fast
+                                                    </div>
+                                                </div>
+
+                                                <div className="bg-white rounded-lg p-3 border border-blue-200">
+                                                    <div className="font-semibold text-blue-900 mb-1">🚀 Power Users</div>
+                                                    <div className="text-blue-800 text-xs">
+                                                        <strong>Criteria:</strong> Engagement Score ≥ 70 AND Paid Plan (Pro/Business)<br />
+                                                        <strong>Trigger:</strong> High engagement + active subscription<br />
                                                 <strong>Campaign Goal:</strong> Retention, upsell features, gather feedback
                                             </div>
                                         </div>
@@ -271,6 +313,7 @@ export const CampaignManager: React.FC<CampaignManagerProps> = ({ onBack }) => {
                                             <th className="px-6 py-3 text-right">User Count</th>
                                             <th className="px-6 py-3 text-right">Percentage</th>
                                             <th className="px-6 py-3 text-left">Visual</th>
+                                            <th className="px-6 py-3 text-left">Actions</th>
                                         </tr>
                                     </thead>
                                     <tbody className="divide-y divide-slate-100">
@@ -288,6 +331,34 @@ export const CampaignManager: React.FC<CampaignManagerProps> = ({ onBack }) => {
                                                             style={{ width: `${seg.percentage}%` }}
                                                         ></div>
                                                     </div>
+                                                </td>
+                                                <td className="px-6 py-4">
+                                                    <Button
+                                                        variant="ghost"
+                                                        size="sm"
+                                                        onClick={() => fetchSegmentUsers(seg.segment)}
+                                                        disabled={!!segmentLoading[seg.segment]}
+                                                    >
+                                                        {segmentLoading[seg.segment] ? 'Loading…' : 'View users'}
+                                                    </Button>
+                                                    {segmentUsers[seg.segment] && (
+                                                        <div className="mt-2 text-xs text-slate-700 bg-slate-50 rounded p-2 border border-slate-200 max-h-32 overflow-y-auto">
+                                                            <div className="flex justify-between mb-1">
+                                                                <span>Total</span>
+                                                                <span className="font-semibold">{segmentUsers[seg.segment].total}</span>
+                                                            </div>
+                                                            {segmentUsers[seg.segment].users.length > 0 && (
+                                                                <ul className="space-y-1">
+                                                                    {segmentUsers[seg.segment].users.map((u) => (
+                                                                        <li key={u.id} className="flex justify-between">
+                                                                            <span>{u.name || u.email}</span>
+                                                                            <span className="text-slate-400">{u.plan}</span>
+                                                                        </li>
+                                                                    ))}
+                                                                </ul>
+                                                            )}
+                                                        </div>
+                                                    )}
                                                 </td>
                                             </tr>
                                         ))}
@@ -387,7 +458,7 @@ export const CampaignManager: React.FC<CampaignManagerProps> = ({ onBack }) => {
                                     <div className="flex justify-between items-start mb-4">
                                         <div className="flex-1">
                                             <div className="flex items-center gap-3 mb-2">
-                                                <h3 className="text-lg font-bold text-slate-900">{campaign.name}</h3>
+                                                <h3 className="text-lg font-bold text-slate-900">{campaign.name || campaign.title || campaign.question || 'Untitled'}</h3>
                                                 <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${campaign.status === 'active' ? 'bg-green-100 text-green-800' :
                                                     campaign.status === 'paused' ? 'bg-yellow-100 text-yellow-800' :
                                                         campaign.status === 'completed' ? 'bg-slate-100 text-slate-800' :
@@ -401,9 +472,9 @@ export const CampaignManager: React.FC<CampaignManagerProps> = ({ onBack }) => {
                                             </div>
                                             <p className="text-sm text-slate-600 mb-3">{campaign.question}</p>
                                             <div className="flex gap-4 text-xs text-slate-500">
-                                                <span>Segment: <strong className="text-slate-700">{campaign.segmentType}</strong></span>
-                                                <span>Frequency: <strong className="text-slate-700">{campaign.frequencyCapDays}d</strong></span>
-                                                <span>Email Follow-up: <strong className="text-slate-700">{campaign.emailFollowUpHours}h</strong></span>
+                                                <span>Segment: <strong className="text-slate-700">{getSegmentLabel(campaign)}</strong></span>
+                                                <span>Frequency: <strong className="text-slate-700">{campaign.frequencyCapDays ?? '—'}d</strong></span>
+                                                <span>Email Follow-up: <strong className="text-slate-700">{(campaign as any).emailFollowUpHours ?? (campaign as any).emailFallbackAfterHours ?? '—'}h</strong></span>
                                             </div>
                                         </div>
                                         <div className="flex gap-2">
@@ -446,47 +517,6 @@ export const CampaignManager: React.FC<CampaignManagerProps> = ({ onBack }) => {
                                             </div>
                                         </div>
                                     )}
-
-                                    {/* Targeting Info */}
-                                    <div className="mt-4 pt-4 border-t border-slate-100">
-                                        <div className="flex items-center justify-between">
-                                            <h4 className="text-sm font-semibold text-slate-700">Target Audience</h4>
-                                            <Button
-                                                variant="ghost"
-                                                size="sm"
-                                                onClick={() => handleCheckAudience(campaign.id, campaign.segmentType)}
-                                                disabled={loadingStats[campaign.id]}
-                                            >
-                                                {loadingStats[campaign.id] ? (
-                                                    <div className="animate-spin rounded-full h-3 w-3 border-b-2 border-slate-600"></div>
-                                                ) : (
-                                                    <span className="text-xs text-indigo-600">Check Audience Size</span>
-                                                )}
-                                            </Button>
-                                        </div>
-
-                                        {segmentStats[campaign.id] && (
-                                            <div className="mt-2 bg-slate-50 rounded-lg p-3">
-                                                <div className="flex justify-between items-center mb-2">
-                                                    <span className="text-sm text-slate-600">Total Users:</span>
-                                                    <span className="text-sm font-bold text-slate-900">{segmentStats[campaign.id].totalCount}</span>
-                                                </div>
-                                                {segmentStats[campaign.id].sampleUsers.length > 0 && (
-                                                    <div>
-                                                        <p className="text-xs text-slate-500 mb-1">Sample Users:</p>
-                                                        <ul className="space-y-1">
-                                                            {segmentStats[campaign.id].sampleUsers.map((u: any) => (
-                                                                <li key={u.id} className="text-xs text-slate-700 flex justify-between">
-                                                                    <span>{u.name || u.email}</span>
-                                                                    <span className="text-slate-400">{u.plan}</span>
-                                                                </li>
-                                                            ))}
-                                                        </ul>
-                                                    </div>
-                                                )}
-                                            </div>
-                                        )}
-                                    </div>
 
                                     {/* A/B Variants */}
                                     {campaign.variants && campaign.variants.length > 0 && campaign.analytics?.variantPerformance && (

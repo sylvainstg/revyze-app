@@ -59,6 +59,12 @@ service cloud.firestore {
       allow create, update, delete: if isAdmin();
     }
 
+    // Feedback answers (write from Cloud Functions only)
+    match /feedback_answers/{answerId} {
+      allow read: if isAdmin();
+      allow write: if false;
+    }
+
     // Campaign Attribution collection
     match /campaign_attribution/{attrId} {
       allow read: if isAdmin() || 

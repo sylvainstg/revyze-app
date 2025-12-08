@@ -41,7 +41,9 @@ export const registerUser = async (
             lastLogin: Date.now(),
             shareCountGuest: 0,
             shareCountPro: 0,
-            projectCount: 0
+            projectCount: 0,
+            commentCount: 0,
+            lastSessionDuration: 0
         };
 
         // Save user profile to Firestore

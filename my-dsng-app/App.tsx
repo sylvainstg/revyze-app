@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { PDFWorkspace } from './components/PDFWorkspace';
 import { ImageWorkspace } from './components/ImageWorkspace';
 import { CollaborationPanel } from './components/CollaborationPanel';
@@ -19,7 +19,7 @@ import { v4 as uuidv4 } from 'uuid';
 import { ShareModal } from './components/ShareModal';
 import { CreateProjectModal } from './components/CreateProjectModal';
 import * as storageService from './services/storageService';
-import { storage } from './firebaseConfig';
+import { db, storage } from './firebaseConfig';
 import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 import * as authService from './services/authService';
 import { getPDFObjectURL, revokePDFObjectURL } from './utils/pdfUtils';
@@ -40,7 +40,8 @@ import { EditVersionModal } from './components/EditVersionModal';
 import { EnhancedDeleteDialog } from './components/EnhancedDeleteDialog';
 import { CemeteryView } from './components/CemeteryView';
 import { FeedbackModal } from './components/FeedbackModal';
-import { useFeedbackCampaign } from './hooks/useFeedbackCampaign';
+import { useFeedback } from './hooks/useFeedback';
+import { doc, updateDoc, increment } from 'firebase/firestore';
 
 
 const App: React.FC = () => {
@@ -103,7 +104,32 @@ const App: React.FC = () => {
   const [pricingError, setPricingError] = useState<string | null>(null);
 
   // Feedback Campaign
-  const { campaign: feedbackCampaign, submitAnswer: submitFeedbackAnswer, dismiss: dismissFeedback } = useFeedbackCampaign(currentUser);
+  const { campaign: feedbackCampaign, submit: submitFeedbackAnswer, dismiss: dismissFeedback } = useFeedback(!!currentUser && !authLoading);
+  const sessionStartRef = useRef<number | null>(null);
+
+  const recordSessionDuration = useCallback(async () => {
+    if (!currentUser || !sessionStartRef.current) return;
+    const duration = Date.now() - sessionStartRef.current;
+    sessionStartRef.current = Date.now(); // reset so we don't double count
+    try {
+      await updateDoc(doc(db, 'users', currentUser.id), {
+        lastSessionDuration: duration
+      });
+    } catch (err) {
+      console.error('Failed to update session duration', err);
+    }
+  }, [currentUser]);
+
+  const incrementUserField = useCallback(async (field: string, amount: number = 1) => {
+    if (!currentUser) return;
+    try {
+      await updateDoc(doc(db, 'users', currentUser.id), {
+        [field]: increment(amount)
+      });
+    } catch (err) {
+      console.error(`Failed to increment ${field}`, err);
+    }
+  }, [currentUser]);
 
   const setPdfScale = (newScale: number | ((prev: number) => number)) => {
     isUserZooming.current = true;
@@ -228,13 +254,44 @@ const App: React.FC = () => {
         setAuthLoading(false);
         // Don't auto-redirect logged-in users from landing page
         // Let them view the marketing content if they want
-        if (!user && !isGuest && view !== 'landing' && view !== 'auth') {
-          setView('landing');
+        if (!user && !isGuest) {
+          setActiveProjectId(null);
+          setProjects([]);
+          if (view !== 'landing' && view !== 'auth') {
+            setView('landing');
+          }
         }
       }
     });
     return () => unsubscribe();
   }, [isGuest, view]);
+
+  // 1b. Track session duration (lightweight)
+  useEffect(() => {
+    if (!currentUser) return;
+
+    if (!sessionStartRef.current) {
+      sessionStartRef.current = Date.now();
+    }
+
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'hidden') {
+        recordSessionDuration();
+      }
+    };
+    const handleBeforeUnload = () => {
+      recordSessionDuration();
+    };
+
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+    window.addEventListener('beforeunload', handleBeforeUnload);
+
+    return () => {
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+      window.removeEventListener('beforeunload', handleBeforeUnload);
+      recordSessionDuration();
+    };
+  }, [currentUser, recordSessionDuration]);
 
   // 2. Load Projects when User changes
   useEffect(() => {
@@ -271,7 +328,7 @@ const App: React.FC = () => {
 
   // 3. Subscribe to active project changes (Realtime Updates)
   useEffect(() => {
-    if (!activeProjectId) return;
+    if (!activeProjectId || !currentUser || isGuest) return;
 
     const unsubscribe = storageService.subscribeToProject(activeProjectId, (updatedProject) => {
       console.log('[Realtime Listener] Received update for project:', updatedProject.id);
@@ -322,7 +379,7 @@ const App: React.FC = () => {
     });
 
     return () => unsubscribe();
-  }, [activeProjectId]);
+  }, [activeProjectId, currentUser, isGuest]);
 
 
   // 3. Scroll to top whenever view changes
@@ -1125,6 +1182,7 @@ const App: React.FC = () => {
 
     await updateProjectState(updatedProject);
     setActiveCommentId(newComment.id);
+    incrementUserField('commentCount');
   };
 
   const handleReplyComment = async (commentId: string, text: string) => {
@@ -1156,6 +1214,7 @@ const App: React.FC = () => {
     };
 
     await updateProjectState(updatedProject);
+    incrementUserField('commentCount');
   };
 
   const handleResolveComment = async (id: string) => {

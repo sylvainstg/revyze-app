@@ -211,6 +211,7 @@ export const getSegmentStats = functions.https.onCall(async (data, context) => {
         }
 
         const segmentType = data.segmentType;
+        const limitParam = Math.min(Math.max(data.limit || 25, 1), 200);
         if (!segmentType) {
             throw new functions.https.HttpsError('invalid-argument', 'Segment type required');
         }
@@ -235,6 +236,9 @@ export const getSegmentStats = functions.https.onCall(async (data, context) => {
             // Note: createdAt is stored as a number (timestamp) in User interface
             query = query.where('createdAt', '>=', sevenDaysAgo)
                 .where('projectCount', '==', 0);
+        } else if (segmentType === 'giving_up_almost') {
+            // Lightweight filter; most logic applied post-query
+            query = query.where('plan', '==', 'free');
         } else if (segmentType === 'all') {
             // No filter
         } else {
@@ -262,10 +266,26 @@ export const getSegmentStats = functions.https.onCall(async (data, context) => {
                 // User logged in recently (within 1 day) AND their previous login was more than 30 days ago
                 return daysSinceLastLogin < 1 && daysSincePreviousLogin > 30;
             });
+        } else if (segmentType === 'giving_up_almost') {
+            users = users.filter(user => {
+                const createdAt = user.createdAt || 0;
+                const loginCount = user.loginCount || 0;
+                const lastLogin = user.lastLogin || 0;
+                const lastSessionDuration = user.lastSessionDuration || 0;
+                const totalActions = (user.projectCount || 0) + (user.commentCount || 0) + (user.shareCountGuest || 0) + (user.shareCountPro || 0);
+
+                const isNewish = createdAt > 0 ? (now - createdAt) <= 30 * 24 * 60 * 60 * 1000 : true;
+                const hasReturned = loginCount >= 2;
+                const slowReturn = lastLogin > 0 ? (now - lastLogin) > 2 * 24 * 60 * 60 * 1000 : false;
+                const shortSession = lastSessionDuration > 0 ? lastSessionDuration < 180000 : false; // <3m
+                const someEngagement = totalActions >= 2;
+
+                return isNewish && hasReturned && (slowReturn || shortSession) && someEngagement;
+            });
         }
 
         const totalCount = users.length;
-        const sampleUsers = users.slice(0, 5).map(user => ({
+        const sampleUsers = users.slice(0, limitParam).map(user => ({
             id: user.id,
             name: user.name,
             email: user.email,

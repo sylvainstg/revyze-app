@@ -21,8 +21,10 @@ export interface User {
   shareCountGuest?: number;
   shareCountPro?: number;
   projectCount?: number;
+  commentCount?: number;
   engagementScore?: number; // 0-100 score
   createdAt?: number; // Account creation timestamp
+  lastSessionDuration?: number; // ms
   // Referral Program
   referralCode?: string;
   referredBy?: string;

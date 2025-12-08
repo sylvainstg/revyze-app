@@ -596,5 +596,15 @@ export {
     getUserCampaignHistory
 } from './campaigns/api';
 
+// Feedback API (callable)
+export {
+    feedbackActive,
+    feedbackAnswer,
+    adminListFeedbackCampaigns,
+    adminCreateFeedbackCampaign,
+    adminUpdateFeedbackCampaign,
+    sendFeedbackEmailFallbacks
+} from './feedback';
+
 // Engagement Score Functions
 export { updateEngagementScore, recalculateAllEngagementScores } from './engagement/engagementScore';
