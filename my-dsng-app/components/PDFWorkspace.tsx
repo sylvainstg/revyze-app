@@ -322,51 +322,51 @@ useEffect(() => {
           {/* Page Navigation Toolbar - Moved here */}
           {!loadError && (
             <div className="flex items-center gap-4">
-              {numPages && numPages > 1 && (
-                <div id="page-navigation" className="flex items-center gap-2">
-                  <button
-                    disabled={pageNumber <= 1}
-                    onClick={() => setPageNumber(prev => prev - 1)}
-                    className="px-3 py-1 bg-white border border-slate-200 rounded-full text-slate-700 hover:bg-slate-50 hover:text-indigo-600 disabled:opacity-50 disabled:hover:bg-white disabled:hover:text-slate-700 transition-all shadow-sm text-sm font-medium"
-                  >
-                    Previous
-                  </button>
-                  <span className="text-sm text-slate-600 font-medium whitespace-nowrap">Page {pageNumber} of {numPages}</span>
-                  <button
-                    disabled={pageNumber >= numPages}
-                    onClick={() => setPageNumber(prev => prev + 1)}
-                    className="px-3 py-1 bg-white border border-slate-200 rounded-full text-slate-700 hover:bg-slate-50 hover:text-indigo-600 disabled:opacity-50 disabled:hover:bg-white disabled:hover:text-slate-700 transition-all shadow-sm text-sm font-medium"
-                  >
-                    Next
-                  </button>
-                </div>
-              )}
+              <div id="page-navigation" className="flex items-center gap-2">
+                <button
+                  disabled={!numPages || pageNumber <= 1}
+                  onClick={() => setPageNumber(prev => prev - 1)}
+                  className="px-3 py-1 bg-indigo-100 border border-indigo-400 rounded-full text-indigo-800 hover:bg-indigo-200 hover:text-indigo-900 disabled:opacity-50 disabled:hover:bg-indigo-100 disabled:hover:text-indigo-700 transition-all shadow text-sm font-medium"
+                >
+                  Previous
+                </button>
+                <span className="text-sm text-slate-600 font-medium whitespace-nowrap">
+                  Page {numPages ? pageNumber : '—'}{numPages ? ` of ${numPages}` : ''}
+                </span>
+                <button
+                  disabled={!numPages || pageNumber >= numPages}
+                  onClick={() => setPageNumber(prev => prev + 1)}
+                  className="px-3 py-1 bg-indigo-100 border border-indigo-400 rounded-full text-indigo-800 hover:bg-indigo-200 hover:text-indigo-900 disabled:opacity-50 disabled:hover:bg-indigo-100 disabled:hover:text-indigo-700 transition-all shadow text-sm font-medium"
+                >
+                  Next
+                </button>
+              </div>
 
               {/* Zoom Controls */}
-              <div id="zoom-controls" className="flex items-center gap-2 border-l border-slate-300 pl-4">
+              <div id="zoom-controls" className="flex items-center gap-2 border-l border-indigo-200 pl-4">
                 <button
                   onClick={() => setScale(prev => Math.max(0.5, prev - 0.1))}
-                  className="p-2 bg-white border border-slate-200 rounded-full text-slate-700 hover:bg-slate-50 hover:text-indigo-600 transition-all shadow-sm"
+                  className="p-2 bg-indigo-100 border border-indigo-400 rounded-full text-indigo-800 hover:bg-indigo-200 hover:text-indigo-900 transition-all shadow"
                   title="Zoom out"
                 >
-                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <svg className="w-4 h-4 text-indigo-800" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0zM13 10H7" />
                   </svg>
                 </button>
                 <button
                   onClick={() => setScale(prev => Math.min(5, prev + 0.1))}
-                  className="p-2 bg-white border border-slate-200 rounded-full text-slate-700 hover:bg-slate-50 hover:text-indigo-600 transition-all shadow-sm"
+                  className="p-2 bg-indigo-100 border border-indigo-400 rounded-full text-indigo-800 hover:bg-indigo-200 hover:text-indigo-900 transition-all shadow"
                   title="Zoom in"
                 >
-                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <svg className="w-4 h-4 text-indigo-800" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0zM10 7v3m0 0v3m0-3h3m-3 0H7" />
                   </svg>
                 </button>
               </div>
 
               {/* Plan Preferences Menu */}
-              <div id="plan-preferences" className="relative group border-l border-slate-300 pl-4">
-                <button className="px-3 py-1 bg-white border border-slate-200 rounded-full text-slate-700 hover:bg-slate-50 hover:text-indigo-600 transition-all shadow-sm text-sm font-medium flex items-center gap-1">
+              <div id="plan-preferences" className="relative group border-l border-indigo-200 pl-4">
+                <button className="px-3 py-1 bg-indigo-100 border border-indigo-400 rounded-full text-indigo-800 hover:bg-indigo-200 hover:text-indigo-900 transition-all shadow text-sm font-medium flex items-center gap-1">
                   Plan Preferences
                   <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
@@ -374,7 +374,7 @@ useEffect(() => {
                 </button>
 
                 {/* Dropdown Menu */}
-                <div className="fixed bg-white border border-slate-200 rounded-lg shadow-2xl py-1 min-w-[200px] opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200" style={{ zIndex: 99999, marginTop: '0.5rem' }}>
+                <div className="fixed bg-white border border-indigo-200 rounded-lg shadow-2xl py-1 min-w-[200px] opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200" style={{ zIndex: 99999, marginTop: '0.5rem' }}>
                   <button
                     onClick={() => {
                       if (onSetDefaultPage) {
@@ -388,7 +388,7 @@ useEffect(() => {
                       : 'text-slate-700 hover:bg-indigo-50 hover:text-indigo-600'
                       }`}
                   >
-                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <svg className="w-4 h-4 text-indigo-700" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
                     </svg>
                     {defaultPageSet ? 'Default page set!' : isDefaultPage ? 'Default page' : 'Set this page as default'}
@@ -406,7 +406,7 @@ useEffect(() => {
                       : 'text-slate-700 hover:bg-indigo-50 hover:text-indigo-600'
                       }`}
                   >
-                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <svg className="w-4 h-4 text-indigo-700" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z" />
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 13a3 3 0 11-6 0 3 3 0 016 0z" />
                     </svg>

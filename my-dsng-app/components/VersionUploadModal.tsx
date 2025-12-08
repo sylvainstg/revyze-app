@@ -106,65 +106,55 @@ export const VersionUploadModal: React.FC<VersionUploadModalProps> = ({
                         <label className="block text-sm font-medium text-slate-700 mb-3">
                             Document Category
                         </label>
-                        <div className="space-y-2">
-                            {existingCategories.map((category) => (
-                                <label
-                                    key={category}
-                                    className={`flex items-center gap-3 p-3 rounded-lg border-2 cursor-pointer transition-all ${!isNewCategory && selectedCategory === category
-                                        ? 'border-indigo-500 bg-indigo-50'
-                                        : 'border-slate-200 hover:border-indigo-300 hover:bg-slate-50'
-                                        }`}
+                        <div className="space-y-3">
+                            <div className="flex flex-col gap-2">
+                                <label className="text-xs font-semibold text-slate-500 uppercase tracking-wide">
+                                    Select existing
+                                </label>
+                                <select
+                                    disabled={isUploading || isNewCategory}
+                                    value={selectedCategory}
+                                    onChange={(e) => setSelectedCategory(e.target.value)}
+                                    className="w-full px-3 py-2 border border-indigo-300 rounded-lg text-sm text-slate-900 bg-indigo-50 focus:ring-2 focus:ring-indigo-500 focus:border-transparent disabled:opacity-50"
                                 >
+                                    {existingCategories.length === 0 && <option value="">No categories yet</option>}
+                                    {existingCategories.map((category) => (
+                                        <option key={category} value={category}>{category}</option>
+                                    ))}
+                                </select>
+                            </div>
+
+                            <div className={`p-3 rounded-lg border ${isNewCategory ? 'border-indigo-500 bg-indigo-50' : 'border-slate-200'}`}>
+                                <label className="flex items-start gap-2 cursor-pointer">
                                     <input
-                                        type="radio"
-                                        name="category"
-                                        checked={!isNewCategory && selectedCategory === category}
-                                        onChange={() => {
-                                            setSelectedCategory(category);
-                                            setIsNewCategory(false);
+                                        type="checkbox"
+                                        checked={isNewCategory}
+                                        onChange={(e) => {
+                                            setIsNewCategory(e.target.checked);
+                                            if (!e.target.checked && !selectedCategory && existingCategories[0]) {
+                                                setSelectedCategory(existingCategories[0]);
+                                            }
                                         }}
                                         disabled={isUploading}
-                                        className="w-4 h-4 text-indigo-600"
+                                        className="mt-0.5 w-4 h-4 text-indigo-600"
                                     />
-                                    <span className="text-sm font-medium text-slate-900">{category}</span>
-                                    <span className="text-xs text-slate-500">(add to existing)</span>
+                                    <div className="flex-1">
+                                        <span className="text-sm font-medium text-slate-900">Create new category</span>
+                                        <p className="text-xs text-slate-500">Use a fresh category name for this upload.</p>
+                                        {isNewCategory && (
+                                            <input
+                                                type="text"
+                                                value={newCategoryName}
+                                                onChange={(e) => setNewCategoryName(e.target.value)}
+                                                placeholder="e.g., HVAC, Landscaping..."
+                                                disabled={isUploading}
+                                                className="mt-2 w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500 focus:border-transparent bg-white text-slate-900"
+                                                autoFocus
+                                            />
+                                        )}
+                                    </div>
                                 </label>
-                            ))}
-
-                            {/* New Category Option */}
-                            <label
-                                className={`flex items-start gap-3 p-3 rounded-lg border-2 cursor-pointer transition-all ${isNewCategory
-                                    ? 'border-indigo-500 bg-indigo-50'
-                                    : 'border-slate-200 hover:border-indigo-300 hover:bg-slate-50'
-                                    }`}
-                            >
-                                <input
-                                    type="radio"
-                                    name="category"
-                                    checked={isNewCategory}
-                                    onChange={() => setIsNewCategory(true)}
-                                    disabled={isUploading}
-                                    className="w-4 h-4 text-indigo-600 mt-0.5"
-                                />
-                                <div className="flex-1">
-                                    <span className="text-sm font-medium text-slate-900 block mb-2">
-                                        Create new category
-                                    </span>
-                                    {isNewCategory && (
-                                        <input
-                                            type="text"
-                                            value={newCategoryName}
-                                            onChange={(e) => setNewCategoryName(e.target.value)}
-                                            placeholder="e.g., HVAC, Landscaping..."
-                                            disabled={isUploading}
-                                            className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500 focus:border-transparent bg-white text-slate-900"
-                                            onFocus={() => setIsNewCategory(true)}
-                                            autoFocus
-
-                                        />
-                                    )}
-                                </div>
-                            </label>
+                            </div>
                         </div>
                     </div>
 

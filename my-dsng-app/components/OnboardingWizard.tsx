@@ -33,6 +33,7 @@ export const OnboardingWizard: React.FC<OnboardingWizardProps> = ({
 }) => {
     const [currentStep, setCurrentStep] = useState(0);
     const [guestName, setGuestName] = useState('');
+    const contentRef = React.useRef<HTMLDivElement | null>(null);
 
     const steps = [
         {
@@ -233,7 +234,14 @@ export const OnboardingWizard: React.FC<OnboardingWizardProps> = ({
         }
 
         if (currentStep < steps.length - 1) {
-            setCurrentStep(currentStep + 1);
+            setCurrentStep(prev => {
+                const next = Math.min(prev + 1, steps.length - 1);
+                // Reset scroll to top so the modal stays in view
+                if (contentRef.current) {
+                    contentRef.current.scrollTo({ top: 0, behavior: 'smooth' });
+                }
+                return next;
+            });
         } else {
             onComplete(guestName || undefined);
         }
@@ -282,7 +290,7 @@ export const OnboardingWizard: React.FC<OnboardingWizardProps> = ({
                 </div>
 
                 {/* Content */}
-                <div className="flex-1 overflow-y-auto p-6">
+                <div className="flex-1 overflow-y-auto p-6" ref={contentRef}>
                     {currentStepData.content}
                 </div>
 
