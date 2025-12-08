@@ -334,7 +334,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
                                 onShareProject(project);
                               }}
                               className="p-1.5 text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-full transition-colors"
-                              title="Share Project"
+                              title="Invite"
                             >
                               <Share2 className="w-4 h-4" />
                             </button>

@@ -13,6 +13,8 @@ interface ShareModalProps {
   onRevokeAll: () => void;
   onUpdateShareSettings: (projectId: string, settings: ShareSettings) => void;
   onTransferOwnership?: (newOwnerEmail: string) => Promise<void>;
+  onUpgradeRequest: () => void;
+  currentUser: User | null;
   project: Project | null;
 }
 
@@ -24,6 +26,8 @@ export const ShareModal: React.FC<ShareModalProps> = ({
   onRevokeAll,
   onUpdateShareSettings,
   onTransferOwnership,
+  onUpgradeRequest,
+  currentUser,
   project
 }) => {
   const [email, setEmail] = useState('');
@@ -40,6 +44,7 @@ export const ShareModal: React.FC<ShareModalProps> = ({
   const [shareToken, setShareToken] = useState('');
   const [collaboratorDetails, setCollaboratorDetails] = useState<Record<string, User | null>>({});
   const [transferEmail, setTransferEmail] = useState('');
+  const [limitDialog, setLimitDialog] = useState<{ role: 'guest' | 'pro' } | null>(null);
 
   const [confirmation, setConfirmation] = useState<{
     type: 'remove' | 'regenerate';
@@ -138,6 +143,30 @@ export const ShareModal: React.FC<ShareModalProps> = ({
       return;
     }
 
+    // For free plan users, enforce 1 guest and 1 pro invite limit
+    if (currentUser?.plan === 'free') {
+      let guestCount = 0;
+      let proCount = 0;
+      project.collaborators.forEach((collabEmail) => {
+        if (collabEmail === project.ownerEmail) return;
+        const detail = collaboratorDetails[collabEmail];
+        if (detail?.plan === 'pro' || detail?.plan === 'business') {
+          proCount += 1;
+        } else {
+          guestCount += 1;
+        }
+      });
+
+      if (inviteRole === 'guest' && guestCount >= 1) {
+        setLimitDialog({ role: 'guest' });
+        return;
+      }
+      if (inviteRole === 'pro' && proCount >= 1) {
+        setLimitDialog({ role: 'pro' });
+        return;
+      }
+    }
+
     onInvite(email, inviteRole, inviteeName);
     setEmail('');
     setInviteeName('');
@@ -200,11 +229,30 @@ export const ShareModal: React.FC<ShareModalProps> = ({
           </div>
         )}
 
+        {/* Upgrade Prompt for free plan limits */}
+        {limitDialog && (
+          <div className="absolute inset-0 z-20 bg-white/95 backdrop-blur-sm flex flex-col items-center justify-center p-5 text-center animate-in fade-in duration-200">
+            <AlertCircle className="w-8 h-8 text-amber-500 mb-3" />
+            <h4 className="text-base font-bold text-slate-900 mb-2">Invite limit reached</h4>
+            <p className="text-sm text-slate-600 mb-4 max-w-[320px]">
+              Free accounts can invite 1 professional and 1 guest. Upgrade to add more collaborators.
+            </p>
+            <div className="flex gap-2 w-full max-w-[320px]">
+              <Button variant="secondary" className="flex-1" onClick={() => setLimitDialog(null)}>
+                Cancel
+              </Button>
+              <Button className="flex-1" onClick={() => { setLimitDialog(null); onUpgradeRequest(); }}>
+                Upgrade
+              </Button>
+            </div>
+          </div>
+        )}
+
         <div className="p-6 border-b border-slate-100 flex justify-between items-center bg-slate-50/50">
           <div>
             <h3 className="text-lg font-bold text-slate-900 flex items-center gap-2">
               <UserPlus className="w-5 h-5 text-indigo-600" />
-              Share Project
+              Invite to Project
             </h3>
             <p className="text-sm text-slate-500">Invite others to "{project.name}"</p>
           </div>

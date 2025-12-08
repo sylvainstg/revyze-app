@@ -88,7 +88,7 @@ export const PDFWorkspace: React.FC<PDFWorkspaceProps> = ({
   const viewportRef = useRef<HTMLDivElement>(null);
 
   // Update pan offset when initialPanOffset changes (e.g. when category switches)
-  useEffect(() => {
+useEffect(() => {
     setPanOffset(initialPanOffset);
   }, [initialPanOffset]);
 
@@ -115,6 +115,7 @@ export const PDFWorkspace: React.FC<PDFWorkspaceProps> = ({
 
   // Convert Firebase Storage URL to object URL to bypass CORS
   useEffect(() => {
+    setLoadError(null);
     let isMounted = true;
     let currentObjectURL: string | null = null;
 
@@ -440,47 +441,49 @@ export const PDFWorkspace: React.FC<PDFWorkspaceProps> = ({
           onMouseUp={handleMouseUp}
           onMouseLeave={handleMouseUp}
         >
-          <div
-            className="relative transition-transform"
-            ref={pdfWrapperRef}
-            style={{
-              transform: `translate(${panOffset.x}px, ${panOffset.y}px)`,
-              transition: isDragging ? 'none' : 'transform 0.1s ease-out'
-            }}
-          >
-            <Document
-              key={pdfObjectURL} // Force remount when PDF changes to prevent stale access
-              file={pdfObjectURL}
-              onLoadSuccess={onDocumentLoadSuccess}
-              onLoadError={onDocumentLoadError}
-              options={pdfOptions}
-              loading={
-                <div className="w-[600px] h-[800px] flex items-center justify-center bg-white rounded-lg">
-                  <Loader2 className="w-10 h-10 animate-spin text-indigo-500" />
+        <div
+          className="relative transition-transform"
+          ref={pdfWrapperRef}
+          style={{
+            transform: `translate(${panOffset.x}px, ${panOffset.y}px)`,
+            transition: isDragging ? 'none' : 'transform 0.1s ease-out'
+          }}
+        >
+            {!pdfObjectURL && !loadError && (
+              <div className="w-[600px] h-[800px] flex items-center justify-center bg-white rounded-lg">
+                <Loader2 className="w-10 h-10 animate-spin text-indigo-500" />
+              </div>
+            )}
+
+            {loadError && (
+              <div className="w-[600px] h-[800px] flex flex-col items-center justify-center bg-white rounded-lg text-red-500 p-10 text-center">
+                <AlertCircle className="w-10 h-10 mb-4 opacity-50" />
+                <p className="font-semibold mb-2">Failed to load PDF.</p>
+                <p className="text-sm text-slate-500 mb-4">Ensure the file is a valid PDF and try again.</p>
+                <div className="text-xs bg-red-50 p-2 rounded border border-red-100 max-w-md break-all">
+                  <span className="font-bold">Error Details:</span> {loadError.message}
                 </div>
-              }
-              error={
-                <div className="w-[600px] h-[800px] flex flex-col items-center justify-center bg-white rounded-lg text-red-500 p-10 text-center">
-                  <AlertCircle className="w-10 h-10 mb-4 opacity-50" />
-                  <p className="font-semibold mb-2">Failed to load PDF.</p>
-                  <p className="text-sm text-slate-500 mb-4">Ensure the file is a valid PDF and try again.</p>
-                  {loadError && (
-                    <div className="text-xs bg-red-50 p-2 rounded border border-red-100 max-w-md break-all">
-                      <span className="font-bold">Error Details:</span> {loadError.message}
-                    </div>
-                  )}
-                </div>
-              }
-            >
-              <Page
-                pageNumber={pageNumber}
-                scale={scale}
-                renderTextLayer={false}
-                renderAnnotationLayer={false}
-                onClick={handlePdfClick}
-                className="rounded-lg overflow-hidden cursor-crosshair shadow-lg"
-              />
-            </Document>
+              </div>
+            )}
+
+            {pdfObjectURL && !loadError && (
+              <Document
+                key={pdfObjectURL} // Force remount when PDF changes to prevent stale access
+                file={pdfObjectURL}
+                onLoadSuccess={onDocumentLoadSuccess}
+                onLoadError={onDocumentLoadError}
+                options={pdfOptions}
+              >
+                <Page
+                  pageNumber={pageNumber}
+                  scale={scale}
+                  renderTextLayer={false}
+                  renderAnnotationLayer={false}
+                  onClick={handlePdfClick}
+                  className="rounded-lg overflow-hidden cursor-crosshair shadow-lg"
+                />
+              </Document>
+            )}
 
             {/* Existing Comment Pins - Only show if not error */}
             {!loadError && visibleComments.map((comment) => (

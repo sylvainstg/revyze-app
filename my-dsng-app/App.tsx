@@ -13,7 +13,7 @@ import { WelcomeLandingPage } from './components/WelcomeLandingPage';
 import { OnboardingTooltip } from './components/OnboardingTooltip';
 import { ONBOARDING_STEPS } from './constants/onboardingSteps';
 import { UserRole, Comment, Project, ViewState, User, CommentReply, ShareSettings, ProjectVersion } from './types';
-import { Layout, Upload, FileText, Share2, ArrowLeft, ZoomIn, ZoomOut, AlertCircle, Camera } from 'lucide-react';
+import { Layout, Upload, FileText, UserPlus, ArrowLeft, ZoomIn, ZoomOut, AlertCircle, Camera } from 'lucide-react';
 import { SAMPLE_PROJECT_ID, MAX_FILE_SIZE_MB, PLAN_LIMITS, STANDARD_CATEGORIES } from './constants';
 import { v4 as uuidv4 } from 'uuid';
 import { ShareModal } from './components/ShareModal';
@@ -605,13 +605,8 @@ const App: React.FC = () => {
   // --- Actions ---
 
   const handleAuthSuccess = (user: User, isNewUser: boolean) => {
-    // Auth state is handled by the subscription, but we can handle redirection here
-    if (isNewUser) {
-      // New users go to checkout first to select plan
-      setView('checkout');
-    } else {
-      setView('dashboard');
-    }
+    // Auth state is handled by the subscription; always land on dashboard to start free
+    setView('dashboard');
   };
 
   const handleCheckoutSuccess = async (planId: string) => {
@@ -1002,26 +997,6 @@ const App: React.FC = () => {
       return;
     }
 
-    // Check if user can invite collaborators
-    const plan = currentUser.plan || 'free';
-    const status = currentUser.subscriptionStatus;
-
-    // Free users cannot invite
-    if (plan === 'free') {
-      if (confirm('Inviting collaborators requires a Pro subscription. Upgrade now?')) {
-        setView('pricing');
-      }
-      return;
-    }
-
-    // Pro trial users cannot invite - need to upgrade to paid
-    if (plan === 'pro' && status === 'trialing') {
-      if (confirm('Inviting collaborators requires a paid Pro subscription. Your trial gives you full access to experience the product, but you need to upgrade to invite others. Upgrade now?')) {
-        setView('pricing');
-      }
-      return;
-    }
-
     // Optimistic Update
     const optimisticProject = {
       ...projectToShare,
@@ -1377,7 +1352,14 @@ const App: React.FC = () => {
         enrichedPlans={enrichedPlans}
         pricingLoading={pricingLoading}
         user={currentUser}
-        onBack={() => currentUser ? setView('dashboard') : setView('landing')}
+        onBack={() => {
+          if (currentUser) {
+            setView('dashboard');
+          } else {
+            setAuthMode('register');
+            setView('auth');
+          }
+        }}
       />
     );
   }
@@ -1426,6 +1408,8 @@ const App: React.FC = () => {
           isOpen={isShareModalOpen}
           onClose={() => setIsShareModalOpen(false)}
           onInvite={handleInviteUser}
+          onRemoveCollaborator={handleRemoveCollaborator}
+          onRevokeAll={handleRevokeAll}
           onUpdateShareSettings={handleUpdateShareSettings}
           onTransferOwnership={async (newOwnerEmail) => {
             if (!activeProject || !currentUser) return;
@@ -1445,6 +1429,8 @@ const App: React.FC = () => {
               alert('An error occurred during ownership transfer.');
             }
           }}
+          onUpgradeRequest={() => setView('pricing')}
+          currentUser={currentUser}
           project={activeProject}
         />
         <CreateProjectModal
@@ -1562,12 +1548,13 @@ const App: React.FC = () => {
 
               {canShare && activeProject && (
                 <Button
-                  variant="secondary"
+                  variant="primary"
                   size="sm"
-                  icon={<Share2 className="w-4 h-4" />}
+                  className="shadow-sm"
+                  icon={<UserPlus className="w-4 h-4" />}
                   onClick={() => handleShareClick(activeProject)}
                 >
-                  Share
+                  Invite
                 </Button>
               )}
             </div>
@@ -1761,6 +1748,8 @@ const App: React.FC = () => {
             console.log('[ShareModal] onRevokeAll called');
             handleRevokeAll();
           }}
+          onUpgradeRequest={() => setView('pricing')}
+          currentUser={currentUser}
         />
         <CreateProjectModal
           isOpen={isCreateProjectModalOpen}
