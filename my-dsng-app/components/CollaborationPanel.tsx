@@ -20,11 +20,13 @@ interface CollaborationPanelProps {
   currentUserRole: UserRole;
   projectRole: ProjectRole;
   pageNumber: number;
+  onPageChange?: (page: number) => void;
   currentUser: User;
   filter: { active: boolean; resolved: boolean; deleted: boolean };
   onUpdateFilter: (filter: { active: boolean; resolved: boolean; deleted: boolean }) => void;
   isCollapsed?: boolean;
   onToggleCollapse?: (collapsed: boolean) => void;
+  pageCount?: number | null;
 }
 
 export const CollaborationPanel: React.FC<CollaborationPanelProps> = ({
@@ -38,11 +40,13 @@ export const CollaborationPanel: React.FC<CollaborationPanelProps> = ({
   currentUserRole,
   projectRole,
   pageNumber,
+  onPageChange,
   currentUser,
   filter,
   onUpdateFilter,
   isCollapsed: propIsCollapsed,
-  onToggleCollapse
+  onToggleCollapse,
+  pageCount
 }) => {
   const [localIsCollapsed, setLocalIsCollapsed] = useState(false);
 
@@ -86,17 +90,73 @@ export const CollaborationPanel: React.FC<CollaborationPanelProps> = ({
     return a.resolved ? 1 : -1;
   });
 
+  // Page markers for collapsed state (includes pages with zero comments up to max seen/current)
+  const pageMarkers = React.useMemo(() => {
+    const pageCounts: Record<number, number> = {};
+    let maxPage = pageCount || pageNumber;
+
+    comments.forEach((c) => {
+      if (!canSeeComment(c, projectRole)) return;
+      if (c.deleted && !filter.deleted) return;
+      if (c.resolved && !filter.resolved) return;
+      if (!c.resolved && !c.deleted && !filter.active) return;
+      const p = c.pageNumber || 1;
+      pageCounts[p] = (pageCounts[p] || 0) + 1;
+      if (p > maxPage) maxPage = p;
+    });
+
+    const markers: Array<{ page: number; count: number }> = [];
+    const totalPages = Math.max(maxPage, 1);
+    for (let p = 1; p <= totalPages; p++) {
+      markers.push({ page: p, count: pageCounts[p] || 0 });
+    }
+
+    return markers;
+  }, [comments, filter, projectRole, pageNumber, pageCount]);
+
   return (
     <div className={`relative flex flex-col h-full bg-white border-l border-slate-200 shadow-xl z-20 shrink-0 transition-all duration-300 ${isCollapsed ? 'w-12' : 'w-96'}`}>
       {/* Expand Button - only visible when collapsed */}
       {isCollapsed && (
-        <button
-          onClick={() => setIsCollapsed(false)}
-          className="absolute left-2 top-4 bg-white border border-slate-200 rounded-lg p-2 hover:bg-slate-50 transition-colors shadow-md z-30"
-          title="Expand comments"
-        >
-          <ChevronLeft className="w-4 h-4 text-slate-600" />
-        </button>
+        <>
+          <button
+            onClick={() => setIsCollapsed(false)}
+            className="absolute left-2 top-4 bg-white border border-slate-200 rounded-lg p-2 hover:bg-slate-50 transition-colors shadow-md z-30"
+            title="Expand comments"
+          >
+            <ChevronLeft className="w-4 h-4 text-slate-600" />
+          </button>
+          {/* Page markers row */}
+          <div className="flex flex-col items-center justify-start h-full px-1 py-20">
+            <div className="flex flex-col gap-3">
+              {pageMarkers.length === 0 ? (
+                <div className="text-[10px] text-slate-400 rotate-90 whitespace-nowrap">No comments</div>
+              ) : (
+                pageMarkers.map((m) => (
+                  <button
+                    key={m.page}
+                    onClick={() => {
+                      onPageChange?.(m.page);
+                    }}
+                    className={`relative w-10 h-10 rounded-full flex flex-col items-center justify-center text-sm font-bold transition-colors border ${
+                      pageNumber === m.page
+                        ? 'bg-indigo-100 text-indigo-800 border-indigo-300'
+                        : 'bg-slate-100 text-slate-600 border-slate-200 hover:bg-indigo-50 hover:text-indigo-700'
+                    }`}
+                    title={`Page ${m.page} • ${m.count} comment${m.count > 1 ? 's' : ''}`}
+                  >
+                    <span className="block leading-none">{m.page}</span>
+                    {m.count > 0 && (
+                      <span className="absolute -top-1 -right-1 px-1.5 py-[2px] rounded-full text-[9px] bg-indigo-600 text-white shadow-sm border border-white">
+                        {m.count}
+                      </span>
+                    )}
+                  </button>
+                ))
+              )}
+            </div>
+          </div>
+        </>
       )}
 
       {!isCollapsed && (

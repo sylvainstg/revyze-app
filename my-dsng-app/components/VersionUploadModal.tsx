@@ -5,7 +5,7 @@ import { X, Upload, AlertCircle, FileText } from 'lucide-react';
 interface VersionUploadModalProps {
     isOpen: boolean;
     onClose: () => void;
-    onUpload: (file: File, transferComments: boolean, category: string) => Promise<void>;
+    onUpload: (file: File, category: string) => Promise<void>;
     unresolvedCommentsCount: number;
     currentFileName: string;
     existingCategories: string[]; // List of existing categories
@@ -22,7 +22,6 @@ export const VersionUploadModal: React.FC<VersionUploadModalProps> = ({
     activeCategory
 }) => {
     const [selectedFile, setSelectedFile] = useState<File | null>(null);
-    const [transferComments, setTransferComments] = useState(true);
     const [isUploading, setIsUploading] = useState(false);
     const [selectedCategory, setSelectedCategory] = useState<string>(activeCategory || existingCategories[0] || '');
     const [isNewCategory, setIsNewCategory] = useState(false);
@@ -54,10 +53,9 @@ export const VersionUploadModal: React.FC<VersionUploadModalProps> = ({
 
         setIsUploading(true);
         try {
-            await onUpload(selectedFile, transferComments, categoryToUse);
+            await onUpload(selectedFile, categoryToUse);
             onClose();
             setSelectedFile(null);
-            setTransferComments(true);
             setIsNewCategory(false);
             setNewCategoryName('');
         } catch (error) {
@@ -70,7 +68,6 @@ export const VersionUploadModal: React.FC<VersionUploadModalProps> = ({
     const handleClose = () => {
         if (!isUploading) {
             setSelectedFile(null);
-            setTransferComments(true);
             setIsNewCategory(false);
             setNewCategoryName('');
             onClose();
@@ -209,8 +206,7 @@ export const VersionUploadModal: React.FC<VersionUploadModalProps> = ({
                         </div>
                     </div>
 
-                    {/* Transfer Comments Option - Only show if staying in same category */}
-                    {unresolvedCommentsCount > 0 && !isNewCategory && selectedCategory === activeCategory && (
+                    {unresolvedCommentsCount > 0 && (
                         <div className="bg-amber-50 border border-amber-200 rounded-lg p-4">
                             <div className="flex items-start gap-3">
                                 <AlertCircle className="w-5 h-5 text-amber-600 shrink-0 mt-0.5" />
@@ -218,38 +214,15 @@ export const VersionUploadModal: React.FC<VersionUploadModalProps> = ({
                                     <h4 className="font-medium text-amber-900 mb-2">
                                         Unresolved Comments Detected
                                     </h4>
-                                    <p className="text-sm text-amber-800 mb-3">
+                                    <p className="text-sm text-amber-800">
                                         There {unresolvedCommentsCount === 1 ? 'is' : 'are'}{' '}
                                         <strong>{unresolvedCommentsCount}</strong> unresolved comment
                                         {unresolvedCommentsCount === 1 ? '' : 's'} in the current version.
                                     </p>
-                                    <label className="flex items-center gap-2 cursor-pointer">
-                                        <input
-                                            type="checkbox"
-                                            checked={transferComments}
-                                            onChange={(e) => setTransferComments(e.target.checked)}
-                                            disabled={isUploading}
-                                            className="w-4 h-4 text-indigo-600 border-amber-300 rounded focus:ring-indigo-500 cursor-pointer"
-                                        />
-                                        <span className="text-sm font-medium text-amber-900">
-                                            Transfer unresolved comments to new version
-                                        </span>
-                                    </label>
-                                    <p className="text-xs text-amber-700 mt-2 ml-6">
-                                        {transferComments
-                                            ? 'Unresolved comments will be copied to the new version with their original positions.'
-                                            : 'The new version will start with no comments.'}
+                                    <p className="text-xs text-amber-700 mt-2">
+                                        New versions start clean. Turn on “show previous versions” in the viewer to reference older comments.
                                     </p>
                                 </div>
-                            </div>
-                        </div>
-                    )}
-
-                    {unresolvedCommentsCount === 0 && (
-                        <div className="bg-green-50 border border-green-200 rounded-lg p-4 flex items-center gap-3">
-                            <AlertCircle className="w-5 h-5 text-green-600 shrink-0" />
-                            <div className="text-sm text-green-800">
-                                All comments are resolved. The new version will start fresh.
                             </div>
                         </div>
                     )}

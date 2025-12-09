@@ -145,8 +145,8 @@ export const processEmailFollowUps = functions.pubsub
                                 userName: userName || 'there',
                                 question: question,
                                 campaignName: campaign?.name,
-                                answerLink: `${functions.config().app?.url || 'https://revyze.app'}?feedback=${campaignId}`,
-                                unsubscribeLink: `${functions.config().app?.url || 'https://revyze.app'}/unsubscribe`
+                                answerLink: `${functions.config().app?.url || 'https://dsng-app.web.app'}?feedback=${campaignId}`,
+                                unsubscribeLink: `${functions.config().app?.url || 'https://dsng-app.web.app'}/unsubscribe`
                             }
                         }
                     });

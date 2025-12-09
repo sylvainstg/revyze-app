@@ -19,6 +19,7 @@
     }
   ],
   "hosting": {
+    "site": "dsng-app",
     "public": "dist",
     "ignore": [
       "firebase.json",

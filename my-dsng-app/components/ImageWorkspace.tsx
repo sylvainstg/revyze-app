@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect, useMemo } from 'react';
 import { Comment, UserRole } from '../types';
 import { Plus, Loader2, ZoomIn, ZoomOut, Sparkles, X, AlertCircle, Upload } from 'lucide-react';
 import { VersionSelectorDetailed } from './VersionSelector';
@@ -25,6 +25,8 @@ interface ImageWorkspaceProps {
     onPanChange?: (offset: { x: number, y: number }) => void;
     onFocusComment?: (commentId: string) => void;
     canAddComment?: boolean;
+    showPreviousVersionComments?: boolean;
+    onTogglePreviousComments?: (value: boolean) => void;
 }
 
 export const ImageWorkspace: React.FC<ImageWorkspaceProps> = ({
@@ -46,7 +48,9 @@ export const ImageWorkspace: React.FC<ImageWorkspaceProps> = ({
     initialPanOffset = { x: 0, y: 0 },
     onPanChange,
     onFocusComment,
-    canAddComment = true
+    canAddComment = true,
+    showPreviousVersionComments = false,
+    onTogglePreviousComments
 }) => {
     const [isAddingComment, setIsAddingComment] = useState(false);
     const [tempMarker, setTempMarker] = useState<{ x: number; y: number } | null>(null);
@@ -200,16 +204,30 @@ export const ImageWorkspace: React.FC<ImageWorkspaceProps> = ({
         setCommentText('');
     };
 
-    // All comments are visible (images don't have pages)
-    // Filter comments for the current page (images only have one "page") and status
-    const visibleComments = comments.filter(c => {
-        if ((c.pageNumber || 1) !== 1) return false;
+    // Build combined comment list (current + previous versions when enabled)
+    const visibleComments = useMemo(() => {
+        let versionsOrdered = versions ? [...versions].sort((a: any, b: any) => (b.timestamp || 0) - (a.timestamp || 0)) : [];
+        const currentIdx = versionsOrdered.findIndex(v => v.id === currentVersionId);
+        if (currentIdx === -1) {
+            versionsOrdered = versions || [];
+        }
 
-        // Status filters
-        if (c.deleted) return filter.deleted;
-        if (c.resolved) return filter.resolved;
-        return filter.active;
-    });
+        const buckets = showPreviousVersionComments ? versionsOrdered : versionsOrdered.filter(v => v.id === currentVersionId);
+        const collected: Array<{ comment: Comment; distance: number }> = [];
+
+        buckets.forEach((ver, idx) => {
+            const distance = currentIdx >= 0 ? Math.max(0, idx - currentIdx) : Math.max(0, idx);
+            (ver.comments || []).forEach((c: Comment) => {
+                if ((c.pageNumber || 1) !== 1) return;
+                if (c.deleted && !filter.deleted) return;
+                if (c.resolved && !filter.resolved) return;
+                if (!c.resolved && !c.deleted && !filter.active) return;
+                collected.push({ comment: c, distance });
+            });
+        });
+
+        return collected;
+    }, [versions, currentVersionId, showPreviousVersionComments, filter]);
 
     return (
         <div className="flex-1 bg-slate-200/50 flex flex-col h-full">
@@ -229,15 +247,28 @@ export const ImageWorkspace: React.FC<ImageWorkspaceProps> = ({
                             </div>
                         )}
                     </div>
-                    {canUploadVersion && onUploadNewVersion && (
-                        <button
-                            onClick={onUploadNewVersion}
-                            className="flex items-center gap-2 px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition-colors text-sm font-medium"
-                        >
-                            <Upload className="w-4 h-4" />
-                            Upload New Version
-                        </button>
-                    )}
+                    <div className="flex items-center gap-3">
+                        {versions && versions.length > 1 && (
+                            <label className="flex items-center gap-2 text-xs font-medium text-indigo-900 bg-indigo-50 border border-indigo-300 px-3 py-2 rounded-full shadow cursor-pointer">
+                                <input
+                                    type="checkbox"
+                                    checked={!!showPreviousVersionComments}
+                                    onChange={(e) => onTogglePreviousComments?.(e.target.checked)}
+                                    className="w-4 h-4 text-indigo-600 border-indigo-300 bg-white rounded focus:ring-indigo-500"
+                                />
+                                Show previous versions' comments
+                            </label>
+                        )}
+                        {canUploadVersion && onUploadNewVersion && (
+                            <button
+                                onClick={onUploadNewVersion}
+                                className="flex items-center gap-2 px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition-colors text-sm font-medium"
+                            >
+                                <Upload className="w-4 h-4" />
+                                Upload New Version
+                            </button>
+                        )}
+                    </div>
                 </div>
             ) : null}
 
@@ -294,7 +325,9 @@ export const ImageWorkspace: React.FC<ImageWorkspaceProps> = ({
                             />
 
                             {/* Existing Comment Pins */}
-                            {imageLoaded && visibleComments.map((comment) => (
+                            {imageLoaded && visibleComments.map(({ comment, distance }, idx) => {
+                                const fade = Math.max(0.25, 1 - distance * 0.2);
+                                return (
                                 <button
                                     key={comment.id}
                                     onClick={(e) => {
@@ -312,13 +345,13 @@ export const ImageWorkspace: React.FC<ImageWorkspaceProps> = ({
                                                 comment.resolved ? 'bg-slate-400 border-slate-500' :
                                                     comment.author === currentUserRole ? 'bg-indigo-600 border-indigo-200 ring-2 ring-indigo-400' : // Emphasis for own comments
                                                         comment.author === UserRole.DESIGNER ? 'bg-purple-600 border-white' : 'bg-blue-500 border-white'
-                                            } ${activeCommentId === comment.id ? 'ring-4 ring-indigo-300/50 shadow-xl' : ''} `}
+                                            } ${activeCommentId === comment.id ? 'ring-4 ring-indigo-300/50 shadow-xl' : ''} `} style={{ opacity: fade }}
                                     >
                                         {comment.deleted ? (
                                             <X className="w-4 h-4 text-red-500" />
                                         ) : (
                                             <span className="text-white text-xs font-bold">
-                                                {comments.indexOf(comment) + 1}
+                                                {idx + 1}
                                             </span>
                                         )}
 
@@ -333,11 +366,11 @@ export const ImageWorkspace: React.FC<ImageWorkspaceProps> = ({
                                         <div
                                             className={`absolute top-full left-1/2 -ml-1 -mt-1 w-0 h-0 border-l-4 border-l-transparent border-r-4 border-r-transparent border-t-4 ${comment.resolved ? 'border-t-slate-400' :
                                                 comment.author === UserRole.DESIGNER ? 'border-t-purple-600' : 'border-t-indigo-600'
-                                                } `}
+                                                } `} style={{ opacity: fade }}
                                         ></div>
                                     )}
                                 </button>
-                            ))}
+                            );})}
 
                             {/* New Comment Form */}
                             {imageLoaded && tempMarker && (

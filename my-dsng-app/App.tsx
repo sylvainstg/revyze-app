@@ -17,6 +17,7 @@ import { Layout, Upload, FileText, UserPlus, ArrowLeft, ZoomIn, ZoomOut, AlertCi
 import { SAMPLE_PROJECT_ID, MAX_FILE_SIZE_MB, PLAN_LIMITS, STANDARD_CATEGORIES } from './constants';
 import { v4 as uuidv4 } from 'uuid';
 import { ShareModal } from './components/ShareModal';
+import { ProjectSettingsModal } from './components/ProjectSettingsModal';
 import { CreateProjectModal } from './components/CreateProjectModal';
 import * as storageService from './services/storageService';
 import { db, storage } from './firebaseConfig';
@@ -88,12 +89,34 @@ const App: React.FC = () => {
   // Invite Details State
   const [inviteDetails, setInviteDetails] = useState<{ inviterName?: string; projectName?: string; role?: 'guest' | 'pro' } | null>(null);
 
+  // Derived State
+  const activeProject = projects.find(p => p.id === activeProjectId);
+  // Robust version finding: try ID match, fallback to latest
+  const activeVersion = activeProject?.versions.find(v => v.id === activeProject.currentVersionId)
+    || (activeProject?.versions && activeProject.versions.length > 0 ? activeProject.versions[activeProject.versions.length - 1] : undefined);
 
 
   // Workspace State
   const [pageNumber, setPageNumber] = useState(1);
+  const [pageCount, setPageCount] = useState<number | null>(null);
   const [pdfScale, _setPdfScale] = useState(1.0);
   const isUserZooming = useRef(false);
+  const [showPreviousVersionComments, setShowPreviousVersionComments] = useState(false);
+
+  useEffect(() => {
+    // Reset known page count when switching documents/versions
+    setPageCount(null);
+  }, [activeProjectId, activeProject?.currentVersionId, activeCategory]);
+
+  useEffect(() => {
+    if (!activeProject?.currentVersionId) return;
+    const currentVersion = activeProject.versions.find(v => v.id === activeProject.currentVersionId);
+    if (!currentVersion) return;
+    const isPDF = currentVersion.fileName.toLowerCase().endsWith('.pdf');
+    if (!isPDF) {
+      setPageCount(1);
+    }
+  }, [activeProject?.currentVersionId, activeProject?.versions]);
 
   // Onboarding State
   const [onboardingStep, setOnboardingStep] = useState(0);
@@ -388,12 +411,6 @@ const App: React.FC = () => {
   }, [view]);
 
 
-  // Derived State
-  const activeProject = projects.find(p => p.id === activeProjectId);
-  // Robust version finding: try ID match, fallback to latest
-  const activeVersion = activeProject?.versions.find(v => v.id === activeProject.currentVersionId)
-    || (activeProject?.versions && activeProject.versions.length > 0 ? activeProject.versions[activeProject.versions.length - 1] : undefined);
-
   // Save zoom level to Firestore when it changes (debounced)
   // Save zoom level to Firestore when it changes (debounced)
   useEffect(() => {
@@ -533,6 +550,7 @@ const App: React.FC = () => {
     // Show enhanced delete dialog instead of immediate delete
     console.log('[Delete] Setting projectToDelete:', project.name);
     console.log('[Delete] Current view:', view);
+    setProjectSettingsProject(null);
     setProjectToDelete(project);
   };
 
@@ -810,6 +828,7 @@ const App: React.FC = () => {
   const [shareModalProjectId, setShareModalProjectId] = useState<string | null>(null);
   const [isCreateProjectModalOpen, setIsCreateProjectModalOpen] = useState(false);
   const [showVersionUploadModal, setShowVersionUploadModal] = useState(false);
+  const [projectSettingsProject, setProjectSettingsProject] = useState<Project | null>(null);
 
   // Edit Version State
   const [editVersionModalOpen, setEditVersionModalOpen] = useState(false);
@@ -820,8 +839,28 @@ const App: React.FC = () => {
     setIsShareModalOpen(true);
   };
 
+  const handleOpenProjectSettings = (project: Project) => {
+    setProjectSettingsProject(project);
+  };
+
+  const handleOpenInvitesFromSettings = () => {
+    if (!projectSettingsProject) return;
+    setShareModalProjectId(projectSettingsProject.id);
+    setIsShareModalOpen(true);
+    setProjectSettingsProject(null);
+  };
+
+  const handleSaveProjectSettings = async (updates: { name: string; description?: string }) => {
+    if (!projectSettingsProject) return;
+    await storageService.updateProjectPartial(projectSettingsProject.id, updates);
+    setProjects(prev => prev.map(p => p.id === projectSettingsProject.id ? { ...p, ...updates } : p));
+    if (activeProject?.id === projectSettingsProject.id) {
+      setActiveProject({ ...activeProject, ...updates });
+    }
+  };
+
   // Version Management Functions
-  const handleUploadNewVersion = async (file: File, transferComments: boolean, category: string) => {
+  const handleUploadNewVersion = async (file: File, category: string) => {
     if (!activeProject || !currentUser) return;
 
     // Validate file size
@@ -853,22 +892,6 @@ const App: React.FC = () => {
         timestamp: Date.now(),
         comments: []
       };
-
-      // Transfer unresolved comments if requested
-      let commentsToTransfer: Comment[] = [];
-      if (transferComments) {
-        const activeVer = activeProject.versions.find(v => v.id === activeProject.currentVersionId);
-        if (activeVer) {
-          const unresolvedComments = activeVer.comments.filter(c => !c.resolved && !c.deleted);
-          commentsToTransfer = unresolvedComments.map(c => ({
-            ...c,
-            id: uuidv4(), // New IDs for transferred comments
-            timestamp: Date.now(),
-            replies: [] // Don't transfer replies? Or should we? Usually just the issue.
-          }));
-          newVersion.comments = commentsToTransfer;
-        }
-      }
 
       // Update project
       const updatedProject = {
@@ -1400,6 +1423,7 @@ const App: React.FC = () => {
           }}
           onUpgrade={() => setView('pricing')}
           onDeleteProject={handleDeleteProject}
+          onOpenProjectSettings={handleOpenProjectSettings}
           onOpenAdmin={() => setView('admin')}
           onOpenCemetery={() => setView('cemetery')}
           onRelaunchOnboarding={handleRelaunchOnboarding}
@@ -1412,10 +1436,10 @@ const App: React.FC = () => {
           onRevokeAll={handleRevokeAll}
           onUpdateShareSettings={handleUpdateShareSettings}
           onTransferOwnership={async (newOwnerEmail) => {
-            if (!activeProject || !currentUser) return;
+            if (!projectToShare || !currentUser) return;
 
             try {
-              const result = await storageService.transferProjectOwnership(activeProject.id, currentUser.id, newOwnerEmail);
+              const result = await storageService.transferProjectOwnership(projectToShare.id, currentUser.id, newOwnerEmail);
               if (result.success) {
                 alert('Ownership transferred successfully.');
                 setIsShareModalOpen(false);
@@ -1431,7 +1455,7 @@ const App: React.FC = () => {
           }}
           onUpgradeRequest={() => setView('pricing')}
           currentUser={currentUser}
-          project={activeProject}
+          project={projectToShare}
         />
         <CreateProjectModal
           isOpen={isCreateProjectModalOpen}
@@ -1439,6 +1463,18 @@ const App: React.FC = () => {
           onCreate={handleCreateProjectWithData}
           userRole={currentUser?.role}
           userName={currentUser?.name}
+        />
+        <ProjectSettingsModal
+          isOpen={!!projectSettingsProject}
+          project={projectSettingsProject}
+          onClose={() => setProjectSettingsProject(null)}
+          onSave={handleSaveProjectSettings}
+          onOpenInvites={handleOpenInvitesFromSettings}
+          onDelete={() => {
+            if (projectSettingsProject) {
+              handleDeleteProject(projectSettingsProject);
+            }
+          }}
         />
       </>
     );
@@ -1672,6 +1708,9 @@ const App: React.FC = () => {
                     onCaptureThumbnail={handleCaptureThumbnail}
                     onSetDefaultPage={handleSetDefaultPage}
                     isDefaultPage={activeProject.categorySettings?.[activeCategory]?.defaultPage === pageNumber}
+                    showPreviousVersionComments={showPreviousVersionComments}
+                    onTogglePreviousComments={setShowPreviousVersionComments}
+                    onPageCountChange={setPageCount}
                   />
                 ) : (
                   <ImageWorkspace
@@ -1694,6 +1733,8 @@ const App: React.FC = () => {
                     onPanChange={handlePanChange}
                     onFocusComment={handleFocusComment}
                     canAddComment={isLatestVersion}
+                    showPreviousVersionComments={showPreviousVersionComments}
+                    onTogglePreviousComments={setShowPreviousVersionComments}
                   />
                 );
               })()}
@@ -1715,6 +1756,8 @@ const App: React.FC = () => {
               currentUserRole={currentUser.role}
               projectRole={getProjectRole(activeProject, currentUser, isGuest, impersonatedRole)}
               pageNumber={pageNumber}
+              onPageChange={(page) => setPageNumber(page)}
+              pageCount={pageCount}
               currentUser={currentUser}
               filter={commentFilter}
               onUpdateFilter={setCommentFilter}
@@ -1750,6 +1793,18 @@ const App: React.FC = () => {
           }}
           onUpgradeRequest={() => setView('pricing')}
           currentUser={currentUser}
+        />
+        <ProjectSettingsModal
+          isOpen={!!projectSettingsProject}
+          project={projectSettingsProject}
+          onClose={() => setProjectSettingsProject(null)}
+          onSave={handleSaveProjectSettings}
+          onOpenInvites={handleOpenInvitesFromSettings}
+          onDelete={() => {
+            if (projectSettingsProject) {
+              handleDeleteProject(projectSettingsProject);
+            }
+          }}
         />
         <CreateProjectModal
           isOpen={isCreateProjectModalOpen}

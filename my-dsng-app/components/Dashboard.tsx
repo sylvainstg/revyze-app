@@ -1,7 +1,7 @@
 import React, { useState, useRef } from 'react';
 import { Project, User, UserRole } from '../types';
 import { Button } from './ui/Button';
-import { Plus, Search, FileText, Clock, FolderOpen, LogOut, Share2, Users, Upload, MessageSquare, Trash2, Shield, Gift, Play } from 'lucide-react';
+import { Plus, Search, FileText, Clock, FolderOpen, LogOut, Share2, Users, Upload, MessageSquare, Settings, Shield, Gift, Play, Trash2 } from 'lucide-react';
 import { ReferralDashboard } from './ReferralDashboard';
 import { PLANS } from '../constants';
 import { getProjectRole, canSeeComment } from '../utils/projectRoleHelper';
@@ -20,6 +20,7 @@ interface DashboardProps {
   onLogout: () => void;
   onUpgrade: () => void;
   onDeleteProject: (project: Project) => void;
+  onOpenProjectSettings: (project: Project) => void;
   onOpenAdmin: () => void;
   onOpenCemetery: () => void;
   onRelaunchOnboarding: () => void;
@@ -36,6 +37,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
   onLogout,
   onUpgrade,
   onDeleteProject,
+  onOpenProjectSettings,
   onOpenAdmin,
   onOpenCemetery,
   onRelaunchOnboarding
@@ -339,14 +341,15 @@ export const Dashboard: React.FC<DashboardProps> = ({
                               <Share2 className="w-4 h-4" />
                             </button>
                             <button
+                              type="button"
                               onClick={(e) => {
                                 e.stopPropagation();
-                                onDeleteProject(project);
+                                onOpenProjectSettings(project);
                               }}
-                              className="p-1.5 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-full transition-colors"
-                              title="Delete Project"
+                              className="p-1.5 text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-full transition-colors"
+                              title="Project settings"
                             >
-                              <Trash2 className="w-4 h-4" />
+                              <Settings className="w-4 h-4" />
                             </button>
                           </>
                         )}

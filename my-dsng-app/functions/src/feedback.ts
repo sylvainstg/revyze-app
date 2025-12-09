@@ -303,7 +303,7 @@ export const sendFeedbackEmailFallbacks = functions.https.onCall(async (data, co
 
         if (!user.email) return;
 
-        const appUrl = functions.config().app?.url || 'https://revyze.app';
+        const appUrl = functions.config().app?.url || 'https://dsng-app.web.app';
         const answerLink = `${appUrl}?feedback=${campaignId}`;
 
         // Queue email via Firebase Email Extension (mail collection)

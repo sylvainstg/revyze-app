@@ -400,7 +400,7 @@ export const onProjectUpdated = functions.firestore
                         projectName,
                         newVersion.versionNumber,
                         uploaderName,
-                        `https://revyze.app/?project=${projectId}` // Assuming this is the URL structure
+                        `https://dsng-app.web.app/?project=${projectId}`
                     )
                 );
             });
