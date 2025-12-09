@@ -1711,60 +1711,83 @@ const App: React.FC = () => {
                 const latestVersionId = sortedCategoryVersions.length > 0 ? sortedCategoryVersions[0].id : null;
                 const isLatestVersion = activeVersion.id === latestVersionId;
 
-                return isPDF ? (
-                  <PDFWorkspace
-                    fileUrl={activeVersion.fileUrl}
-                    comments={filteredComments}
-                    onAddComment={handleAddComment}
-                    activeCommentId={activeCommentId}
-                    setActiveCommentId={setActiveCommentId}
-                    currentUserRole={currentUser.role}
-                    pageNumber={pageNumber}
-                    setPageNumber={setPageNumber}
-                    scale={pdfScale}
-                    setScale={setPdfScale}
-                    filter={commentFilter}
-                    versions={categoryVersions}
-                    currentVersionId={activeProject.currentVersionId}
-                    onVersionChange={handleChangeVersion}
-                    onUploadNewVersion={() => setShowVersionUploadModal(true)}
-                    canUploadVersion={activeProject.ownerId === currentUser.id}
-                    onEditVersion={activeProject.ownerId === currentUser.id ? handleEditVersionClick : undefined}
-                    initialPanOffset={categoryViewStates[activeCategory]?.panOffset || { x: 0, y: 0 }}
-                    onPanChange={handlePanChange}
-                    onFocusComment={handleFocusComment}
-                    canAddComment={isLatestVersion}
-                    onCaptureThumbnail={handleCaptureThumbnail}
-                    onSetDefaultPage={handleSetDefaultPage}
-                    isDefaultPage={activeProject.categorySettings?.[activeCategory]?.defaultPage === pageNumber}
-                    showPreviousVersionComments={showPreviousVersionComments}
-                    onTogglePreviousComments={setShowPreviousVersionComments}
-                    onPageCountChange={setPageCount}
-                  />
-                ) : (
-                  <ImageWorkspace
-                    fileUrl={activeVersion.fileUrl}
-                    comments={filteredComments}
-                    onAddComment={handleAddComment}
-                    activeCommentId={activeCommentId}
-                    setActiveCommentId={setActiveCommentId}
-                    currentUserRole={currentUser.role}
-                    scale={pdfScale}
-                    setScale={setPdfScale}
-                    filter={commentFilter}
-                    versions={categoryVersions}
-                    currentVersionId={activeProject.currentVersionId}
-                    onVersionChange={handleChangeVersion}
-                    onUploadNewVersion={() => setShowVersionUploadModal(true)}
-                    canUploadVersion={activeProject.ownerId === currentUser.id}
-                    onEditVersion={activeProject.ownerId === currentUser.id ? handleEditVersionClick : undefined}
-                    initialPanOffset={categoryViewStates[activeCategory]?.panOffset || { x: 0, y: 0 }}
-                    onPanChange={handlePanChange}
-                    onFocusComment={handleFocusComment}
-                    canAddComment={isLatestVersion}
-                    showPreviousVersionComments={showPreviousVersionComments}
-                    onTogglePreviousComments={setShowPreviousVersionComments}
-                  />
+                return (
+                  <div className="h-full flex flex-col">
+                    {!isLatestVersion && (
+                      <div className="bg-amber-50 border border-amber-200 text-amber-800 px-4 py-2 flex items-center justify-between text-sm">
+                        <div className="flex items-center gap-2">
+                          <AlertCircle className="w-4 h-4" />
+                          <span>You are viewing an older version. Editing and commenting are disabled.</span>
+                        </div>
+                        {latestVersionId && (
+                          <Button
+                            size="sm"
+                            variant="secondary"
+                            onClick={() => handleChangeVersion(latestVersionId)}
+                          >
+                            Go to latest
+                          </Button>
+                        )}
+                      </div>
+                    )}
+                    <div className="flex-1">
+                      {isPDF ? (
+                        <PDFWorkspace
+                          fileUrl={activeVersion.fileUrl}
+                          comments={filteredComments}
+                          onAddComment={handleAddComment}
+                          activeCommentId={activeCommentId}
+                          setActiveCommentId={setActiveCommentId}
+                          currentUserRole={currentUser.role}
+                          pageNumber={pageNumber}
+                          setPageNumber={setPageNumber}
+                          scale={pdfScale}
+                          setScale={setPdfScale}
+                          filter={commentFilter}
+                          versions={categoryVersions}
+                          currentVersionId={activeProject.currentVersionId}
+                          onVersionChange={handleChangeVersion}
+                          onUploadNewVersion={() => setShowVersionUploadModal(true)}
+                          canUploadVersion={activeProject.ownerId === currentUser.id}
+                          onEditVersion={activeProject.ownerId === currentUser.id ? handleEditVersionClick : undefined}
+                          initialPanOffset={categoryViewStates[activeCategory]?.panOffset || { x: 0, y: 0 }}
+                          onPanChange={handlePanChange}
+                          onFocusComment={handleFocusComment}
+                          canAddComment={isLatestVersion}
+                          onCaptureThumbnail={handleCaptureThumbnail}
+                          onSetDefaultPage={handleSetDefaultPage}
+                          isDefaultPage={activeProject.categorySettings?.[activeCategory]?.defaultPage === pageNumber}
+                          showPreviousVersionComments={showPreviousVersionComments}
+                          onTogglePreviousComments={setShowPreviousVersionComments}
+                          onPageCountChange={setPageCount}
+                        />
+                      ) : (
+                        <ImageWorkspace
+                          fileUrl={activeVersion.fileUrl}
+                          comments={filteredComments}
+                          onAddComment={handleAddComment}
+                          activeCommentId={activeCommentId}
+                          setActiveCommentId={setActiveCommentId}
+                          currentUserRole={currentUser.role}
+                          scale={pdfScale}
+                          setScale={setPdfScale}
+                          filter={commentFilter}
+                          versions={categoryVersions}
+                          currentVersionId={activeProject.currentVersionId}
+                          onVersionChange={handleChangeVersion}
+                          onUploadNewVersion={() => setShowVersionUploadModal(true)}
+                          canUploadVersion={activeProject.ownerId === currentUser.id}
+                          onEditVersion={activeProject.ownerId === currentUser.id ? handleEditVersionClick : undefined}
+                          initialPanOffset={categoryViewStates[activeCategory]?.panOffset || { x: 0, y: 0 }}
+                          onPanChange={handlePanChange}
+                          onFocusComment={handleFocusComment}
+                          canAddComment={isLatestVersion}
+                          showPreviousVersionComments={showPreviousVersionComments}
+                          onTogglePreviousComments={setShowPreviousVersionComments}
+                        />
+                      )}
+                    </div>
+                  </div>
                 );
               })()}
             </div>
