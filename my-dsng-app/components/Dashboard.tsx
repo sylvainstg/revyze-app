@@ -1,19 +1,19 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, Suspense } from 'react';
 import { Project, User, UserRole } from '../types';
 import { Button } from './ui/Button';
 import { Plus, Search, FileText, Clock, FolderOpen, LogOut, Share2, Users, Upload, MessageSquare, Settings, Shield, Gift, Play, Trash2 } from 'lucide-react';
-import { ReferralDashboard } from './ReferralDashboard';
 import { PLANS } from '../constants';
 import { getProjectRole, canSeeComment } from '../utils/projectRoleHelper';
 import { getSubscriptionStatusDisplay } from '../utils/planHelpers';
 import { BarChart3 } from 'lucide-react';
 import { useAdmin } from '../contexts/AdminContext';
 
+const ReferralDashboardLazy = React.lazy(() => import('./ReferralDashboard'));
+
 interface DashboardProps {
   user: User;
   projects: Project[];
   onCreateProject: () => void;
-  onImportProject: (file: File) => void;
   onOpenProject: (projectId: string) => void;
   onShareProject: (project: Project) => void;
   onGoToLanding: () => void;
@@ -30,7 +30,6 @@ export const Dashboard: React.FC<DashboardProps> = ({
   user,
   projects,
   onCreateProject,
-  onImportProject,
   onOpenProject,
   onShareProject,
   onGoToLanding,
@@ -61,6 +60,17 @@ export const Dashboard: React.FC<DashboardProps> = ({
 
   const currentPlan = PLANS[user.plan || 'free'];
   const limits = currentPlan.limits;
+  const ownedProjects = projects.filter(p => p.ownerId === user.id);
+  const totalShares = (user.shareCountGuest || 0) + (user.shareCountPro || 0);
+  const sharedWith = Array.from(new Set(
+    ownedProjects.flatMap(p => p.collaborators || [])
+  )).length;
+  const activityPoints = [
+    user.loginCount || 0,
+    totalShares,
+    user.commentCount || 0,
+    ownedProjects.length
+  ];
 
   const handleUpdateProfile = async () => {
     if (!editName.trim()) return;
@@ -211,26 +221,6 @@ export const Dashboard: React.FC<DashboardProps> = ({
               </div>
             )}
             <div className="flex items-center gap-2">
-              <input
-                type="file"
-                ref={fileInputRef}
-                className="hidden"
-                accept=".designsync,.json,application/pdf,image/png,image/jpeg,image/jpg"
-                onChange={(e) => {
-                  const file = e.target.files?.[0];
-                  if (file) {
-                    onImportProject(file);
-                    e.target.value = ''; // Reset so same file can be selected again
-                  }
-                }}
-              />
-              <Button
-                variant="secondary"
-                onClick={() => fileInputRef.current?.click()}
-                icon={<Upload className="w-4 h-4" />}
-              >
-                Import
-              </Button>
               <Button onClick={onCreateProject} icon={<Plus className="w-4 h-4" />}>
                 New Project
               </Button>
@@ -247,7 +237,6 @@ export const Dashboard: React.FC<DashboardProps> = ({
             <h3 className="text-lg font-medium text-slate-900 mb-1">No projects found</h3>
             <p className="text-slate-500 mb-6">Create a new project or import one to get started.</p>
             <div className="flex items-center justify-center gap-3">
-              <Button variant="secondary" onClick={() => fileInputRef.current?.click()}>Import File</Button>
               <Button onClick={onCreateProject}>Create Project</Button>
             </div>
           </div>
@@ -420,21 +409,81 @@ export const Dashboard: React.FC<DashboardProps> = ({
             <h2 className="text-xl font-bold text-slate-900 mb-4">Account Settings</h2>
             <div className="space-y-6">
               <div>
-                <h3 className="text-sm font-medium text-slate-900 mb-3">Profile</h3>
-                <label className="block text-sm font-medium text-slate-700 mb-1">Full Name</label>
-                <input
-                  type="text"
-                  value={editName}
-                  onChange={(e) => setEditName(e.target.value)}
-                  className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 bg-white text-slate-900"
-                />
-              </div>
+              <h3 className="text-sm font-medium text-slate-900 mb-3">Profile</h3>
+              <label className="block text-sm font-medium text-slate-700 mb-1">Full Name</label>
+              <input
+                type="text"
+                value={editName}
+                onChange={(e) => setEditName(e.target.value)}
+                className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 bg-white text-slate-900"
+              />
+              <label className="block text-sm font-medium text-slate-700 mb-1 mt-4">Email</label>
+              <input
+                type="email"
+                value={user.email}
+                disabled
+                className="w-full px-3 py-2 border border-slate-200 rounded-lg bg-slate-50 text-slate-500 cursor-not-allowed"
+                aria-readonly
+              />
+            </div>
 
-              {/* Subscription Section */}
-              {(currentPlan.id !== 'free' || user.stripeCustomerId) && (
-                <div className="pt-4 border-t border-slate-100">
-                  <h3 className="text-sm font-medium text-slate-900 mb-3">Subscription</h3>
-                  <div className="bg-slate-50 p-4 rounded-lg border border-slate-200">
+            <div className="pt-4 border-t border-slate-100">
+              <h3 className="text-sm font-medium text-slate-900 mb-3">Analytics</h3>
+              <div className="grid grid-cols-2 gap-3 mb-3">
+                <div className="p-3 rounded-lg border border-slate-200 bg-slate-50">
+                  <div className="text-xs text-slate-500">Engagement score</div>
+                  <div className="text-lg font-semibold text-slate-900">{user.engagementScore ?? '—'}</div>
+                </div>
+                <div className="p-3 rounded-lg border border-slate-200 bg-slate-50">
+                  <div className="text-xs text-slate-500">Owned projects</div>
+                  <div className="text-lg font-semibold text-slate-900">{ownedProjects.length}</div>
+                </div>
+                <div className="p-3 rounded-lg border border-slate-200 bg-slate-50">
+                  <div className="text-xs text-slate-500">Shares sent</div>
+                  <div className="text-lg font-semibold text-slate-900">{totalShares}</div>
+                </div>
+                <div className="p-3 rounded-lg border border-slate-200 bg-slate-50">
+                  <div className="text-xs text-slate-500">Shared with</div>
+                  <div className="text-lg font-semibold text-slate-900">{sharedWith}</div>
+                </div>
+                <div className="p-3 rounded-lg border border-slate-200 bg-slate-50">
+                  <div className="text-xs text-slate-500">Comments</div>
+                  <div className="text-lg font-semibold text-slate-900">{user.commentCount ?? 0}</div>
+                </div>
+                <div className="p-3 rounded-lg border border-slate-200 bg-slate-50">
+                  <div className="text-xs text-slate-500">Replies</div>
+                  <div className="text-lg font-semibold text-slate-900">{(user as any).replyCount ?? 0}</div>
+                </div>
+              </div>
+              <div className="bg-white border border-slate-200 rounded-lg p-3">
+                <div className="flex items-center justify-between mb-2">
+                  <div className="text-xs font-medium text-slate-700">Activity (logins • shares • comments • projects)</div>
+                  <div className="text-[10px] text-slate-400">Recent signals</div>
+                </div>
+                <svg viewBox="0 0 120 32" className="w-full h-10 text-indigo-600">
+                  {activityPoints.map((v, i) => {
+                    const height = Math.max(4, Math.min(28, v));
+                    return (
+                      <rect
+                        key={i}
+                        x={i * 28 + 4}
+                        y={32 - height}
+                        width={20}
+                        height={height}
+                        rx={4}
+                        className="fill-indigo-500/80"
+                      />
+                    );
+                  })}
+                </svg>
+              </div>
+            </div>
+
+            {/* Subscription Section */}
+            {(currentPlan.id !== 'free' || user.stripeCustomerId) && (
+              <div className="pt-4 border-t border-slate-100">
+                <h3 className="text-sm font-medium text-slate-900 mb-3">Subscription</h3>
+                <div className="bg-slate-50 p-4 rounded-lg border border-slate-200">
                     <div className="flex justify-between items-center mb-2">
                       <span className="text-sm font-medium text-slate-700">{currentPlan.name}</span>
                       <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${user.subscriptionStatus === 'active' ? 'bg-green-100 text-green-700' : 'bg-yellow-100 text-yellow-700'}`}>
@@ -505,7 +554,9 @@ export const Dashboard: React.FC<DashboardProps> = ({
               </Button>
             </div>
             <div className="p-6">
-              <ReferralDashboard currentUser={user} />
+              <Suspense fallback={<div className="text-sm text-slate-500">Loading referral data…</div>}>
+                <ReferralDashboardLazy currentUser={user} />
+              </Suspense>
             </div>
           </div>
         </div>

@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, Suspense } from 'react';
 import { User, UserRole } from '../types';
 import { getAllUsers, updateAdminStatus } from '../services/storageService';
 import { fetchUserPaymentHistory, PaymentRecord } from '../services/paymentService';
@@ -8,7 +8,6 @@ import { Input } from './ui/Input';
 import { Shield, Search, Trash2, ArrowLeft, BarChart3, Users, Eye, UserPlus, Check, AlertCircle, Calendar, CreditCard, Receipt, Gift, Megaphone } from 'lucide-react';
 import { FeatureVoteAnalytics } from './FeatureVoteAnalytics';
 import { ReferralManagement } from './ReferralManagement';
-import { ReferralDashboard } from './ReferralDashboard';
 import { getUserActivity, ActivityLog } from '../services/analyticsService';
 import { EngagementDashboard } from './EngagementDashboard';
 import { CampaignManager } from './admin/CampaignManager';
@@ -17,6 +16,8 @@ import { getAnalyticsStats } from '../services/analyticsAggregationService';
 import { getAdminReferralData } from '../services/referralService';
 import { httpsCallable } from 'firebase/functions';
 import { functions } from '../firebaseConfig';
+
+const ReferralDashboardLazy = React.lazy(() => import('./ReferralDashboard'));
 
 const formatEventName = (name: string) => {
     return name.split('_').map(word => word.charAt(0).toUpperCase() + word.slice(1)).join(' ');
@@ -36,6 +37,11 @@ export const AdminPage: React.FC<AdminPageProps> = ({ onBack, currentUser }) => 
     const [message, setMessage] = useState<{ text: string; type: 'success' | 'error' } | null>(null);
     const [searchQuery, setSearchQuery] = useState('');
     const [filterRole, setFilterRole] = useState<string>('all');
+    const [filterPlan, setFilterPlan] = useState<string>('all');
+    const [filterStatus, setFilterStatus] = useState<string>('all');
+    const [minLogins, setMinLogins] = useState<string>('');
+    const [minProjects, setMinProjects] = useState<string>('');
+    const [minEngagement, setMinEngagement] = useState<string>('');
     const [activeTab, setActiveTab] = useState<AdminTab>('users');
 
     const { impersonatedRole, setImpersonatedRole } = useAdmin();
@@ -284,7 +290,13 @@ export const AdminPage: React.FC<AdminPageProps> = ({ onBack, currentUser }) => 
             (filterRole === 'pro' && (user.plan === 'pro' || user.plan === 'business')) ||
             (filterRole === 'guest' && (!user.plan || user.plan === 'free'));
 
-        return matchesSearch && matchesRole;
+        const matchesPlan = filterPlan === 'all' || (user.plan || 'free') === filterPlan;
+        const matchesStatus = filterStatus === 'all' || (user.subscriptionStatus || 'none') === filterStatus;
+        const meetsLogins = minLogins ? (user.loginCount || 0) >= Number(minLogins) : true;
+        const meetsProjects = minProjects ? (user.projectCount || 0) >= Number(minProjects) : true;
+        const meetsEngagement = minEngagement ? (user.engagementScore || 0) >= Number(minEngagement) : true;
+
+        return matchesSearch && matchesRole && matchesPlan && matchesStatus && meetsLogins && meetsProjects && meetsEngagement;
     });
 
     const handleSort = (key: keyof User) => {
@@ -465,27 +477,77 @@ export const AdminPage: React.FC<AdminPageProps> = ({ onBack, currentUser }) => 
                                     <div className="p-6 border-b border-slate-100 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
                                         <h3 className="text-lg font-bold text-slate-900">User Directory</h3>
 
-                                        <div className="flex gap-2 w-full sm:w-auto">
-                                            <div className="relative flex-1 sm:flex-initial">
-                                                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-slate-400 w-4 h-4" />
+                                        <div className="flex flex-col gap-3 w-full">
+                                            <div className="flex gap-2 w-full sm:w-auto">
+                                                <div className="relative flex-1 sm:flex-initial">
+                                                    <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-slate-400 w-4 h-4" />
+                                                    <input
+                                                        type="text"
+                                                        placeholder="Search users..."
+                                                        value={searchQuery}
+                                                        onChange={(e) => setSearchQuery(e.target.value)}
+                                                        className="pl-9 pr-4 py-2 text-sm border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 w-full"
+                                                    />
+                                                </div>
+                                                <select
+                                                    value={filterRole}
+                                                    onChange={(e) => setFilterRole(e.target.value)}
+                                                    className="px-3 py-2 text-sm border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 bg-white"
+                                                >
+                                                    <option value="all">All Roles</option>
+                                                    <option value="admin">Admins</option>
+                                                    <option value="pro">Pros</option>
+                                                    <option value="guest">Guests</option>
+                                                </select>
+                                                <select
+                                                    value={filterPlan}
+                                                    onChange={(e) => setFilterPlan(e.target.value)}
+                                                    className="px-3 py-2 text-sm border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 bg-white"
+                                                >
+                                                    <option value="all">All Plans</option>
+                                                    <option value="free">Free</option>
+                                                    <option value="pro">Pro</option>
+                                                    <option value="business">Business</option>
+                                                </select>
+                                                <select
+                                                    value={filterStatus}
+                                                    onChange={(e) => setFilterStatus(e.target.value)}
+                                                    className="px-3 py-2 text-sm border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 bg-white"
+                                                >
+                                                    <option value="all">All Status</option>
+                                                    <option value="active">Active</option>
+                                                    <option value="past_due">Past Due</option>
+                                                    <option value="canceled">Canceled</option>
+                                                    <option value="trialing">Trialing</option>
+                                                    <option value="none">None</option>
+                                                </select>
+                                            </div>
+                                            <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
                                                 <input
-                                                    type="text"
-                                                    placeholder="Search users..."
-                                                    value={searchQuery}
-                                                    onChange={(e) => setSearchQuery(e.target.value)}
-                                                    className="pl-9 pr-4 py-2 text-sm border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 w-full"
+                                                    type="number"
+                                                    min={0}
+                                                    value={minLogins}
+                                                    onChange={(e) => setMinLogins(e.target.value)}
+                                                    placeholder="Min logins"
+                                                    className="px-3 py-2 text-sm border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 bg-white"
+                                                />
+                                                <input
+                                                    type="number"
+                                                    min={0}
+                                                    value={minProjects}
+                                                    onChange={(e) => setMinProjects(e.target.value)}
+                                                    placeholder="Min projects"
+                                                    className="px-3 py-2 text-sm border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 bg-white"
+                                                />
+                                                <input
+                                                    type="number"
+                                                    min={0}
+                                                    value={minEngagement}
+                                                    onChange={(e) => setMinEngagement(e.target.value)}
+                                                    placeholder="Min engagement"
+                                                    className="px-3 py-2 text-sm border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 bg-white"
                                                 />
                                             </div>
-                                            <select
-                                                value={filterRole}
-                                                onChange={(e) => setFilterRole(e.target.value)}
-                                                className="px-3 py-2 text-sm border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 bg-white"
-                                            >
-                                                <option value="all">All Roles</option>
-                                                <option value="admin">Admins</option>
-                                                <option value="pro">Pros</option>
-                                                <option value="guest">Guests</option>
-                                            </select>
                                         </div>
                                     </div>
 
@@ -862,7 +924,9 @@ export const AdminPage: React.FC<AdminPageProps> = ({ onBack, currentUser }) => 
                             </div>
                         )}
 
-                        <ReferralDashboard currentUser={currentUser} />
+                        <Suspense fallback={<div className="text-sm text-slate-500">Loading referral data…</div>}>
+                            <ReferralDashboardLazy currentUser={currentUser} />
+                        </Suspense>
                     </div>
                 )}
             </main>
