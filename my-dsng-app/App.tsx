@@ -465,6 +465,11 @@ const App: React.FC = () => {
 
   const handleCaptureThumbnail = async () => {
     if (!activeProject) return;
+    // Only owners can set the shared thumbnail
+    if (!currentUser || activeProject.ownerId !== currentUser.id) {
+      setToast({ message: 'Only the project owner can set the thumbnail.', type: 'error' });
+      return;
+    }
 
     try {
       // Detect file type

@@ -347,7 +347,7 @@ export const LandingPage: React.FC<LandingPageProps> = ({ enrichedPlans, pricing
                     </li>
                   ))}
                 </ul>
-                <Button onClick={onPricingClick} className="w-full bg-white text-indigo-600 hover:bg-indigo-50">Start Pro Trial</Button>
+                <Button onClick={onPricingClick} className="w-full bg-indigo-600 text-white hover:bg-indigo-700">Start Pro Trial</Button>
               </div>
 
               {/* Corporate Plan */}
