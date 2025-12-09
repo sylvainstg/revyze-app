@@ -78,11 +78,10 @@ export const Dashboard: React.FC<DashboardProps> = ({
 
     try {
       const { updateUserProfile } = await import('../services/authService');
-      const { createPortalSession } = await import('../services/paymentService');
       const success = await updateUserProfile(user.id, { name: editName });
       if (success) {
         setIsEditProfileOpen(false);
-        window.location.reload();
+        // Auth subscription will push the updated user; no full reload needed
       } else {
         alert("Failed to update profile.");
       }
