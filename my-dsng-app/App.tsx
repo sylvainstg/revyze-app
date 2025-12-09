@@ -1022,6 +1022,20 @@ const App: React.FC = () => {
   // Derived project for modal
   const projectToShare = projects.find(p => p.id === shareModalProjectId) || null;
 
+  const getInviterDisplayName = (project: Project | null) => {
+    const candidate = currentUser?.name || '';
+    const isEmail = candidate.includes('@');
+    if (candidate && !isEmail) return candidate;
+
+    const emailSource = currentUser?.email || project?.ownerEmail || '';
+    if (emailSource) {
+      const local = emailSource.split('@')[0];
+      const friendly = local.replace(/[._-]/g, ' ').replace(/\b\w/g, c => c.toUpperCase()).trim();
+      if (friendly) return friendly;
+    }
+    return 'Project Owner';
+  };
+
   const handleInviteUser = async (email: string, role: 'guest' | 'pro', name?: string) => {
     console.log('[handleInviteUser] START - email:', email, 'role:', role, 'name:', name, 'projectToShare:', projectToShare?.id);
     if (!projectToShare) {
@@ -1052,11 +1066,12 @@ const App: React.FC = () => {
       // Send invitation email
       try {
         const sendInvitation = httpsCallable(functions, 'sendInvitationEmail');
+        const inviterDisplayName = getInviterDisplayName(projectToShare);
 
         // Construct base URL parameters
         const params = new URLSearchParams();
         params.append('project', projectToShare.id);
-        params.append('inviterName', currentUser?.name || 'A colleague');
+        params.append('inviterName', inviterDisplayName);
         params.append('projectName', projectToShare.name);
         params.append('role', role);
         if (name) params.append('inviteeName', name);
@@ -1071,7 +1086,7 @@ const App: React.FC = () => {
           email,
           projectName: projectToShare.name,
           url: shareUrl,
-          inviterName: currentUser?.name || 'A colleague',
+          inviterName: inviterDisplayName,
           inviteeName: name
         });
         console.log('[handleInviteUser] Invitation email sent');

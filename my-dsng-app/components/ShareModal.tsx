@@ -1,9 +1,10 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { Button } from './ui/Button';
 import { Input } from './ui/Input';
 import { Project, ShareSettings, User } from '../types';
 import { X, UserPlus, Mail, Link as LinkIcon, Copy, Check, Globe, Lock, AlertCircle } from 'lucide-react';
 import { generateShareToken, getUserByEmail } from '../services/storageService';
+import { format } from 'date-fns';
 
 interface ShareModalProps {
   isOpen: boolean;
@@ -35,6 +36,7 @@ export const ShareModal: React.FC<ShareModalProps> = ({
   const [error, setError] = useState('');
   const [copied, setCopied] = useState(false);
   const [inviteRole, setInviteRole] = useState<'guest' | 'pro'>('guest');
+  const [fromNameOverride, setFromNameOverride] = useState('');
 
   // ... (existing state and effects) ...
 
@@ -92,6 +94,20 @@ export const ShareModal: React.FC<ShareModalProps> = ({
       fetchCollaborators();
     }
   }, [project?.collaborators, isOpen]);
+
+  const fallbackDisplayName = useMemo(() => {
+    const candidate = fromNameOverride || currentUser?.name || '';
+    const isEmail = candidate.includes('@');
+    if (!candidate || isEmail) {
+      if (project?.ownerEmail) {
+        const emailLocal = project.ownerEmail.split('@')[0];
+        const friendly = emailLocal.replace(/[._-]/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
+        return friendly || 'Project Owner';
+      }
+      return 'Project Owner';
+    }
+    return candidate;
+  }, [fromNameOverride, currentUser?.name, project?.ownerEmail]);
 
   if (!isOpen || !project) return null;
 
@@ -167,7 +183,7 @@ export const ShareModal: React.FC<ShareModalProps> = ({
       }
     }
 
-    onInvite(email, inviteRole, inviteeName);
+    onInvite(email, inviteRole, inviteeName || undefined);
     setEmail('');
     setInviteeName('');
     setError('');
@@ -337,9 +353,14 @@ export const ShareModal: React.FC<ShareModalProps> = ({
 
           {/* Local Invitation Section */}
           <div>
-            <h4 className="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-3 flex items-center gap-2">
-              <Mail className="w-3.5 h-3.5" /> Invite by Email
-            </h4>
+              <div className="flex items-center justify-between mb-3">
+                <h4 className="text-xs font-semibold text-slate-500 uppercase tracking-wider flex items-center gap-2">
+                  <Mail className="w-3.5 h-3.5" /> Invite by Email
+                </h4>
+                <div className="text-[10px] text-slate-500">
+                  From: <span className="font-semibold text-slate-800">{fallbackDisplayName}</span>
+                </div>
+              </div>
             <form onSubmit={handleSubmit} className="space-y-3">
               <div className="flex gap-2 p-1 bg-slate-100 rounded-lg">
                 <button
