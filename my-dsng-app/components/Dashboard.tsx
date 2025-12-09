@@ -428,47 +428,47 @@ export const Dashboard: React.FC<DashboardProps> = ({
             </div>
 
             <div className="pt-4 border-t border-slate-100">
-              <h3 className="text-sm font-medium text-slate-900 mb-3">Analytics</h3>
-              <div className="grid grid-cols-2 gap-3 mb-3">
-                <div className="p-3 rounded-lg border border-slate-200 bg-slate-50">
-                  <div className="text-xs text-slate-500">Engagement score</div>
-                  <div className="text-lg font-semibold text-slate-900">{user.engagementScore ?? '—'}</div>
+              <h3 className="text-sm font-medium text-slate-900 mb-2">Analytics</h3>
+              <div className="grid grid-cols-2 md:grid-cols-3 gap-2 mb-2">
+                <div className="p-2 rounded-lg border border-slate-200 bg-slate-50">
+                  <div className="text-[11px] text-slate-500">Engagement</div>
+                  <div className="text-base font-semibold text-slate-900">{user.engagementScore ?? '—'}</div>
                 </div>
-                <div className="p-3 rounded-lg border border-slate-200 bg-slate-50">
-                  <div className="text-xs text-slate-500">Owned projects</div>
-                  <div className="text-lg font-semibold text-slate-900">{ownedProjects.length}</div>
+                <div className="p-2 rounded-lg border border-slate-200 bg-slate-50">
+                  <div className="text-[11px] text-slate-500">Owned</div>
+                  <div className="text-base font-semibold text-slate-900">{ownedProjects.length}</div>
                 </div>
-                <div className="p-3 rounded-lg border border-slate-200 bg-slate-50">
-                  <div className="text-xs text-slate-500">Shares sent</div>
-                  <div className="text-lg font-semibold text-slate-900">{totalShares}</div>
+                <div className="p-2 rounded-lg border border-slate-200 bg-slate-50">
+                  <div className="text-[11px] text-slate-500">Shares</div>
+                  <div className="text-base font-semibold text-slate-900">{totalShares}</div>
                 </div>
-                <div className="p-3 rounded-lg border border-slate-200 bg-slate-50">
-                  <div className="text-xs text-slate-500">Shared with</div>
-                  <div className="text-lg font-semibold text-slate-900">{sharedWith}</div>
+                <div className="p-2 rounded-lg border border-slate-200 bg-slate-50">
+                  <div className="text-[11px] text-slate-500">Shared with</div>
+                  <div className="text-base font-semibold text-slate-900">{sharedWith}</div>
                 </div>
-                <div className="p-3 rounded-lg border border-slate-200 bg-slate-50">
-                  <div className="text-xs text-slate-500">Comments</div>
-                  <div className="text-lg font-semibold text-slate-900">{user.commentCount ?? 0}</div>
+                <div className="p-2 rounded-lg border border-slate-200 bg-slate-50">
+                  <div className="text-[11px] text-slate-500">Comments</div>
+                  <div className="text-base font-semibold text-slate-900">{user.commentCount ?? 0}</div>
                 </div>
-                <div className="p-3 rounded-lg border border-slate-200 bg-slate-50">
-                  <div className="text-xs text-slate-500">Replies</div>
-                  <div className="text-lg font-semibold text-slate-900">{(user as any).replyCount ?? 0}</div>
+                <div className="p-2 rounded-lg border border-slate-200 bg-slate-50">
+                  <div className="text-[11px] text-slate-500">Replies</div>
+                  <div className="text-base font-semibold text-slate-900">{(user as any).replyCount ?? 0}</div>
                 </div>
               </div>
-              <div className="bg-white border border-slate-200 rounded-lg p-3">
-                <div className="flex items-center justify-between mb-2">
-                  <div className="text-xs font-medium text-slate-700">Activity (logins • shares • comments • projects)</div>
-                  <div className="text-[10px] text-slate-400">Recent signals</div>
+              <div className="bg-white border border-slate-200 rounded-lg p-2">
+                <div className="flex items-center justify-between mb-1.5">
+                  <div className="text-[11px] font-medium text-slate-700">Activity (logins • shares • comments • projects)</div>
+                  <div className="text-[10px] text-slate-400">Recent</div>
                 </div>
-                <svg viewBox="0 0 120 32" className="w-full h-10 text-indigo-600">
+                <svg viewBox="0 0 120 24" className="w-full h-8 text-indigo-600">
                   {activityPoints.map((v, i) => {
-                    const height = Math.max(4, Math.min(28, v));
+                    const height = Math.max(3, Math.min(20, v));
                     return (
                       <rect
                         key={i}
                         x={i * 28 + 4}
-                        y={32 - height}
-                        width={20}
+                        y={24 - height}
+                        width={18}
                         height={height}
                         rx={4}
                         className="fill-indigo-500/80"
@@ -514,25 +514,6 @@ export const Dashboard: React.FC<DashboardProps> = ({
                   </div>
                 </div>
               )}
-
-              {/* Preferences Section */}
-              <div className="pt-4 border-t border-slate-100">
-                <h3 className="text-sm font-medium text-slate-900 mb-3">Preferences</h3>
-                <Button
-                  variant="secondary"
-                  size="sm"
-                  className="w-full justify-start"
-                  onClick={() => {
-                    if (confirm('Are you sure you want to relaunch the onboarding tour?')) {
-                      onRelaunchOnboarding();
-                      setIsEditProfileOpen(false);
-                    }
-                  }}
-                  icon={<Play className="w-4 h-4" />}
-                >
-                  Relaunch Onboarding Tour
-                </Button>
-              </div>
 
               <div className="flex justify-end gap-3 pt-2 border-t border-slate-100">
                 <Button variant="secondary" onClick={() => setIsEditProfileOpen(false)}>Cancel</Button>

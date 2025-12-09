@@ -607,10 +607,19 @@ const App: React.FC = () => {
       // Update DB
       await authService.updateUserProfile(currentUser.id, { hasCompletedOnboarding: false });
 
-      // Update local state
+      // Clear active project/session state so onboarding starts clean
       setCurrentUser({ ...currentUser, hasCompletedOnboarding: false });
+      setActiveProjectId(null);
+      setActiveCategory(DEFAULT_CATEGORY);
+      setActiveCommentId(null);
+      setShareModalProjectId(null);
+      setProjectSettingsProject(null);
+      setIsSidebarOpen(true);
+      setPageNumber(1);
+      setPageCount(null);
+      setPdfScale(1.0);
 
-      // Redirect
+      // Redirect to onboarding view
       setView('onboarding');
 
       setToast({ message: 'Onboarding relaunched!', type: 'success' });
