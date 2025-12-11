@@ -3,6 +3,7 @@ import * as functions from "firebase-functions";
 import * as admin from "firebase-admin";
 import { createCheckoutSession, createPortalSession, initializeStripeProducts, getPaymentHistory, getSubscriptionPlans } from "./stripeService";
 import { sendVersionUpdateEmail } from "./emailService";
+import { generateDailyAnalyticsSnapshot, rebuildAnalyticsDaily } from "./engagement/analyticsDaily";
 import {
     getOrCreateReferralCode,
     applyReferralCode,
@@ -15,7 +16,20 @@ import {
 import { getPDF } from "./pdfProxy";
 import Stripe from "stripe";
 
-admin.initializeApp();
+const initAdminApp = () => {
+    if (admin.apps.length) return admin.app();
+    try {
+        return admin.initializeApp();
+    } catch (error: any) {
+        // If another module initialized already, re-use it
+        if (error?.code === "app/duplicate-app") {
+            return admin.app();
+        }
+        throw error;
+    }
+};
+
+initAdminApp();
 
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY || "", {
     apiVersion: "2023-10-16",
@@ -125,6 +139,10 @@ export const applyReferralCodeFunction = functions.https.onCall(async (data, con
         throw new functions.https.HttpsError("internal", error.message);
     }
 });
+
+// ========== ENGAGEMENT DAILY ANALYTICS ==========
+
+export { generateDailyAnalyticsSnapshot, rebuildAnalyticsDaily };
 
 /**
  * Get referral statistics for the authenticated user

@@ -2,9 +2,9 @@ import React, { useState, useEffect } from 'react';
 import {
     BarChart, Bar, LineChart, Line, AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend, ComposedChart
 } from 'recharts';
-import { ArrowUp, ArrowDown, Users, Activity, Zap, Layers, Filter, Download, RefreshCw } from 'lucide-react';
+import { ArrowUp, ArrowDown, Users, Activity, Zap, Layers, Filter, Download } from 'lucide-react';
 import { Button } from './ui/Button';
-import { getAnalyticsStats, generateMockAnalyticsData, DailyAnalyticsStats } from '../services/analyticsAggregationService';
+import { getAnalyticsStats, DailyAnalyticsStats } from '../services/analyticsAggregationService';
 
 interface EngagementDashboardProps {
     onBack: () => void;
@@ -56,12 +56,6 @@ export const EngagementDashboard: React.FC<EngagementDashboardProps> = ({ onBack
         }
     };
 
-    const handleGenerateData = async () => {
-        setLoading(true);
-        await generateMockAnalyticsData(90);
-        await fetchData();
-    };
-
     // Prepare Chart Data
     const chartData = data.map(d => ({
         date: d.date.slice(5), // MM-DD
@@ -88,9 +82,6 @@ export const EngagementDashboard: React.FC<EngagementDashboardProps> = ({ onBack
                             </div>
                         </div>
                         <div className="flex items-center gap-3">
-                            <Button variant="ghost" size="sm" onClick={handleGenerateData} title="Generate Mock Data">
-                                <RefreshCw className="w-4 h-4 text-slate-400" />
-                            </Button>
                             <Button
                                 variant="secondary"
                                 size="sm"
@@ -142,8 +133,7 @@ export const EngagementDashboard: React.FC<EngagementDashboardProps> = ({ onBack
                     <div className="text-center py-20">
                         <Activity className="w-12 h-12 text-slate-300 mx-auto mb-4" />
                         <h3 className="text-lg font-medium text-slate-900">No Analytics Data Available</h3>
-                        <p className="text-slate-500 mb-6">Generate mock data to see the dashboard in action.</p>
-                        <Button onClick={handleGenerateData}>Generate Mock Data</Button>
+                        <p className="text-slate-500 mb-6">Data will appear here as real usage events are collected.</p>
                     </div>
                 ) : (
                     <>
