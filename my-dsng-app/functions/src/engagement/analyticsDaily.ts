@@ -1,5 +1,6 @@
 import * as functions from "firebase-functions";
 import * as admin from "firebase-admin";
+import * as cors from "cors";
 
 const getAdminApp = () => {
     if (admin.apps.length) return admin.app();
@@ -73,6 +74,28 @@ const reduceRole = (role?: string): keyof RoleBuckets => {
     return "guest";
 };
 
+const corsHandler = cors({
+    origin: true,
+    methods: ["POST", "OPTIONS"],
+    allowedHeaders: ["Content-Type", "Authorization"]
+});
+
+const requireAdminToken = async (authHeader?: string) => {
+    const token = authHeader?.startsWith("Bearer ") ? authHeader.replace("Bearer ", "") : undefined;
+    if (!token) {
+        throw new functions.https.HttpsError("unauthenticated", "Missing bearer token.");
+    }
+
+    const decoded = await getAdminApp().auth().verifyIdToken(token);
+    const caller = await db.collection(USERS_COLLECTION).doc(decoded.uid).get();
+
+    if (!caller.exists || !caller.data()?.isAdmin) {
+        throw new functions.https.HttpsError("permission-denied", "Admin only.");
+    }
+
+    return decoded.uid;
+};
+
 const getUniqueUsersInRange = async (start: number, end: number) => {
     const snapshot = await db.collection(ACTIVITY_COLLECTION)
         .where("timestamp", ">=", start)
@@ -92,6 +115,8 @@ const getUniqueUsersInRange = async (start: number, end: number) => {
 export const computeDailyStats = async (targetDate: Date) => {
     const { start, end } = getDayBounds(targetDate);
     const dateString = formatDate(start);
+
+    console.log(`[analyticsDaily] computing stats for ${dateString} (${start.getTime()}-${end.getTime()})`);
 
     const activitySnap = await db.collection(ACTIVITY_COLLECTION)
         .where("timestamp", ">=", start.getTime())
@@ -169,6 +194,14 @@ export const computeDailyStats = async (targetDate: Date) => {
         engagement_actions: actions
     };
 
+    console.log(`[analyticsDaily] ${dateString} computed`, {
+        dau: stats.dau,
+        wau: stats.wau,
+        mau: stats.mau,
+        actions,
+        roles: roleBuckets
+    });
+
     await db.collection(ANALYTICS_COLLECTION).doc(dateString).set(stats, { merge: true });
     return stats;
 };
@@ -195,6 +228,7 @@ export const rebuildAnalyticsDaily = functions.https.onCall(async (data, context
     }
 
     const days = Number(data?.days) || 30;
+    console.log(`[analyticsDaily] rebuild requested by ${context.auth.uid}, days=${days}`);
     const results = [];
     for (let i = 0; i < days; i++) {
         const date = new Date();
@@ -202,6 +236,48 @@ export const rebuildAnalyticsDaily = functions.https.onCall(async (data, context
         results.push(computeDailyStats(date));
     }
 
-    const computed = await Promise.all(results);
-    return { success: true, daysComputed: computed.length };
+    try {
+        const computed = await Promise.all(results);
+        console.log(`[analyticsDaily] rebuild complete by ${context.auth.uid}`, { daysComputed: computed.length });
+        return { success: true, daysComputed: computed.length };
+    } catch (error: any) {
+        console.error("[analyticsDaily] rebuild failed", error);
+        throw new functions.https.HttpsError("internal", error?.message || "Failed to rebuild daily analytics");
+    }
+});
+
+// HTTP variant to avoid CORS preflight rejections on callable endpoint
+export const rebuildAnalyticsDailyHttp = functions.https.onRequest(async (req, res) => {
+    return corsHandler(req, res, async () => {
+        if (req.method === "OPTIONS") {
+            res.status(204).send("");
+            return;
+        }
+
+        if (req.method !== "POST") {
+            res.status(405).json({ error: "method-not-allowed" });
+            return;
+        }
+
+        try {
+            const uid = await requireAdminToken(req.headers.authorization);
+            const days = Number(req.body?.days ?? req.query?.days) || 30;
+            console.log(`[analyticsDaily] HTTP rebuild requested by ${uid}, days=${days}`);
+
+            const results: Promise<any>[] = [];
+            for (let i = 0; i < days; i++) {
+                const date = new Date();
+                date.setDate(date.getDate() - i);
+                results.push(computeDailyStats(date));
+            }
+
+            const computed = await Promise.all(results);
+            res.json({ success: true, daysComputed: computed.length });
+        } catch (error: any) {
+            const code = error instanceof functions.https.HttpsError ? error.code : "internal";
+            const status = code === "unauthenticated" ? 401 : code === "permission-denied" ? 403 : 500;
+            console.error("[analyticsDaily] HTTP rebuild failed", error);
+            res.status(status).json({ error: error?.message || "Failed to rebuild daily analytics" });
+        }
+    });
 });

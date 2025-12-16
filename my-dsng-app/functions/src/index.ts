@@ -3,7 +3,7 @@ import * as functions from "firebase-functions";
 import * as admin from "firebase-admin";
 import { createCheckoutSession, createPortalSession, initializeStripeProducts, getPaymentHistory, getSubscriptionPlans } from "./stripeService";
 import { sendVersionUpdateEmail } from "./emailService";
-import { generateDailyAnalyticsSnapshot, rebuildAnalyticsDaily } from "./engagement/analyticsDaily";
+import { generateDailyAnalyticsSnapshot, rebuildAnalyticsDaily, rebuildAnalyticsDailyHttp } from "./engagement/analyticsDaily";
 import {
     getOrCreateReferralCode,
     applyReferralCode,
@@ -142,7 +142,7 @@ export const applyReferralCodeFunction = functions.https.onCall(async (data, con
 
 // ========== ENGAGEMENT DAILY ANALYTICS ==========
 
-export { generateDailyAnalyticsSnapshot, rebuildAnalyticsDaily };
+export { generateDailyAnalyticsSnapshot, rebuildAnalyticsDaily, rebuildAnalyticsDailyHttp };
 
 /**
  * Get referral statistics for the authenticated user

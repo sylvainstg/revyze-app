@@ -168,58 +168,71 @@ export const feedbackAnswer = functions.https.onCall(async (data, context) => {
         throw new functions.https.HttpsError('invalid-argument', 'campaignId and answer are required');
     }
 
-    const campaignDoc = await db.collection('feedback_campaigns').doc(campaignId).get();
-    if (!campaignDoc.exists) {
-        throw new functions.https.HttpsError('not-found', 'Campaign not found');
-    }
-
-    const userDoc = await db.collection('users').doc(uid).get();
-    const userData = userDoc.data() || {};
-    const campaign = buildCampaignPayload(campaignDoc);
-
-    const payload: any = {
-        campaignId,
-        userId: campaign.anonymous ? null : uid,
-        answer,
-        timestamp: admin.firestore.FieldValue.serverTimestamp(),
-        segmentData: campaign.anonymous ? null : {
-            plan: userData.plan,
-            role: userData.role,
-            engagementScore: userData.engagementScore,
+    try {
+        const campaignDoc = await db.collection('feedback_campaigns').doc(campaignId).get();
+        if (!campaignDoc.exists) {
+            throw new functions.https.HttpsError('not-found', 'Campaign not found');
         }
-    };
 
-    await db.collection('feedback_answers').add(payload);
+        const userDoc = await db.collection('users').doc(uid).get();
+        const userData = userDoc.data() || {};
+        const campaign = buildCampaignPayload(campaignDoc);
 
-    // Update attribution if exists
-    const attribution = await db.collection('campaign_attribution')
-        .where('campaignId', '==', campaignId)
-        .where('userId', '==', uid)
-        .orderBy('createdAt', 'desc')
-        .limit(1)
-        .get();
-
-    if (!attribution.empty) {
-        await attribution.docs[0].ref.update({
-            answeredAt: admin.firestore.FieldValue.serverTimestamp(),
+        const payload: any = {
+            campaignId,
+            userId: campaign.anonymous ? null : uid,
             answer,
-            updatedAt: admin.firestore.FieldValue.serverTimestamp()
+            timestamp: admin.firestore.FieldValue.serverTimestamp(),
+            segmentData: campaign.anonymous ? null : {
+                plan: userData.plan,
+                role: userData.role,
+                engagementScore: userData.engagementScore,
+            }
+        };
+
+        await db.collection('feedback_answers').add(payload);
+
+        // Update attribution if exists
+        const attribution = await db.collection('campaign_attribution')
+            .where('campaignId', '==', campaignId)
+            .where('userId', '==', uid)
+            .orderBy('createdAt', 'desc')
+            .limit(1)
+            .get();
+
+        if (!attribution.empty) {
+            await attribution.docs[0].ref.update({
+                answeredAt: admin.firestore.FieldValue.serverTimestamp(),
+                answer,
+                updatedAt: admin.firestore.FieldValue.serverTimestamp()
+            });
+        }
+
+        await db.collection('user_activity').add({
+            userId: uid,
+            eventName: 'feedback_campaign_answered',
+            metadata: { campaignId, anonymous: !!campaign.anonymous },
+            timestamp: Date.now(),
+            createdAt: admin.firestore.FieldValue.serverTimestamp()
         });
+
+        await db.collection('users').doc(uid).update({
+            lastFeedbackRequestedAt: admin.firestore.FieldValue.serverTimestamp()
+        });
+
+        return { success: true };
+    } catch (error: any) {
+        console.error('feedbackAnswer failed', error);
+        const message = error?.message || 'Failed to submit feedback';
+        if (error?.code === 9 || message.toLowerCase().includes('index')) {
+            // Surface Firestore missing-index guidance as a failed-precondition error
+            throw new functions.https.HttpsError('failed-precondition', message);
+        }
+        if (error instanceof functions.https.HttpsError) {
+            throw error;
+        }
+        throw new functions.https.HttpsError('internal', message);
     }
-
-    await db.collection('user_activity').add({
-        userId: uid,
-        eventName: 'feedback_campaign_answered',
-        metadata: { campaignId, anonymous: !!campaign.anonymous },
-        timestamp: Date.now(),
-        createdAt: admin.firestore.FieldValue.serverTimestamp()
-    });
-
-    await db.collection('users').doc(uid).update({
-        lastFeedbackRequestedAt: admin.firestore.FieldValue.serverTimestamp()
-    });
-
-    return { success: true };
 });
 
 export const adminListFeedbackCampaigns = functions.https.onCall(async (data, context) => {

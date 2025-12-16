@@ -5,7 +5,7 @@ import { fetchUserPaymentHistory, PaymentRecord } from '../services/paymentServi
 import { useAdmin } from '../contexts/AdminContext';
 import { Button } from './ui/Button';
 import { Input } from './ui/Input';
-import { Shield, Search, Trash2, ArrowLeft, BarChart3, Users, Eye, UserPlus, Check, AlertCircle, Calendar, CreditCard, Receipt, Gift, Megaphone } from 'lucide-react';
+import { Shield, Search, Trash2, ArrowLeft, BarChart3, Users, Eye, UserPlus, Check, AlertCircle, Calendar, CreditCard, Receipt, Gift, Megaphone, RefreshCw, Activity } from 'lucide-react';
 import { FeatureVoteAnalytics } from './FeatureVoteAnalytics';
 import { ReferralManagement } from './ReferralManagement';
 import { getUserActivity, ActivityLog } from '../services/analyticsService';
@@ -15,13 +15,15 @@ import { CampaignDocumentation } from './admin/CampaignDocumentation';
 import { getAnalyticsStats } from '../services/analyticsAggregationService';
 import { getAdminReferralData } from '../services/referralService';
 import { httpsCallable } from 'firebase/functions';
-import { functions } from '../firebaseConfig';
+import { functions, auth } from '../firebaseConfig';
 
 const ReferralDashboardLazy = React.lazy(() => import('./ReferralDashboard'));
 
 const formatEventName = (name: string) => {
     return name.split('_').map(word => word.charAt(0).toUpperCase() + word.slice(1)).join(' ');
 };
+
+const REBUILD_ANALYTICS_ENDPOINT = `${import.meta.env.VITE_FUNCTIONS_BASE_URL || 'https://us-central1-dsng-app.cloudfunctions.net'}/rebuildAnalyticsDailyHttp`;
 
 type AdminTab = 'users' | 'engagement' | 'referrals';
 
@@ -68,6 +70,9 @@ export const AdminPage: React.FC<AdminPageProps> = ({ onBack, currentUser }) => 
     const [showEngagementDashboard, setShowEngagementDashboard] = useState(false);
     const [engagementLoading, setEngagementLoading] = useState(false);
     const [engagementKpis, setEngagementKpis] = useState<{ mau: number; dau: number; stickiness: number; liveness: number; spark: { date: string; dau: number; }[] } | null>(null);
+    const [recalcEngagementLoading, setRecalcEngagementLoading] = useState(false);
+    const [rebuildDailyLoading, setRebuildDailyLoading] = useState(false);
+    const [engagementMessage, setEngagementMessage] = useState<{ text: string; type: 'success' | 'error' } | null>(null);
     const [campaignsSummary, setCampaignsSummary] = useState<{ id: string; name: string; responses: number; impressions: number; }[]>([]);
     const [loadingCampaigns, setLoadingCampaigns] = useState(false);
 
@@ -195,6 +200,7 @@ export const AdminPage: React.FC<AdminPageProps> = ({ onBack, currentUser }) => 
 
     const loadEngagementKpis = async () => {
         setEngagementLoading(true);
+        setEngagementMessage(null);
         try {
             const data = await getAnalyticsStats(28);
             if (!data || data.length === 0) {
@@ -204,16 +210,89 @@ export const AdminPage: React.FC<AdminPageProps> = ({ onBack, currentUser }) => 
             const ordered = [...data].sort((a, b) => a.timestamp - b.timestamp);
             const latest = ordered[ordered.length - 1];
             const mau = latest.mau || 0;
-            const dau = latest.dau || 0;
+            const dau = latest.dau || latest.engagement_actions?.login || 0;
             const stickiness = mau > 0 ? Math.round((dau / mau) * 100) : 0;
             const liveness = Math.min(100, Math.round(((latest.new_projects || 0) + (latest.new_comments || 0) + (latest.new_invites || 0)) * 1.5));
-            const spark = ordered.slice(-14).map(s => ({ date: s.date.slice(5), dau: s.dau }));
+            const spark = ordered.slice(-14).map(s => ({
+                date: s.date.slice(5),
+                dau: s.dau ?? s.engagement_actions?.login ?? 0
+            }));
             setEngagementKpis({ mau, dau, stickiness, liveness, spark });
         } catch (err) {
             console.error('Failed to load engagement KPIs', err);
             setEngagementKpis(null);
         } finally {
             setEngagementLoading(false);
+        }
+    };
+
+    const handleRecalculateEngagement = async () => {
+        setRecalcEngagementLoading(true);
+        setEngagementMessage(null);
+        try {
+            console.log('[Admin] Recalculate engagement triggered');
+            const callable = httpsCallable(functions, 'recalculateAllEngagementScores');
+            const result = await callable({});
+            const updated = (result?.data as any)?.usersUpdated;
+            console.log('[Admin] Engagement recalculation result:', result?.data);
+            setEngagementMessage({
+                text: updated ? `Recalculated engagement for ${updated} users.` : 'Engagement scores recalculated.',
+                type: 'success'
+            });
+            await fetchUsers();
+            await loadEngagementKpis();
+        } catch (error: any) {
+            console.error('Failed to recalculate engagement scores', error);
+            setEngagementMessage({
+                text: error?.message || 'Failed to recalculate engagement scores.',
+                type: 'error'
+            });
+        } finally {
+            setRecalcEngagementLoading(false);
+        }
+    };
+
+    const handleRebuildDailyAnalytics = async () => {
+        setRebuildDailyLoading(true);
+        setEngagementMessage(null);
+        try {
+            console.log('[Admin] Rebuild daily analytics triggered');
+            const idToken = await auth.currentUser?.getIdToken();
+            if (!idToken) {
+                throw new Error('You need to be signed in to rebuild analytics.');
+            }
+
+            const response = await fetch(REBUILD_ANALYTICS_ENDPOINT, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    Authorization: `Bearer ${idToken}`
+                },
+                body: JSON.stringify({ days: 90 })
+            });
+
+            const payload = await response.json().catch(() => ({}));
+            if (!response.ok || !payload?.success) {
+                throw new Error(payload?.error || 'Failed to rebuild daily analytics.');
+            }
+
+            const days = payload?.daysComputed;
+            console.log('[Admin] Rebuild daily analytics result:', payload);
+            setEngagementMessage({
+                text: days
+                    ? `Rebuilt ${days} days of daily analytics.`
+                    : 'Daily analytics rebuilt (no days reported). Check logs to verify writes.',
+                type: 'success'
+            });
+            await loadEngagementKpis();
+        } catch (error: any) {
+            console.error('Failed to rebuild daily analytics', error);
+            setEngagementMessage({
+                text: error?.message || 'Failed to rebuild daily analytics.',
+                type: 'error'
+            });
+        } finally {
+            setRebuildDailyLoading(false);
         }
     };
 
@@ -758,6 +837,22 @@ export const AdminPage: React.FC<AdminPageProps> = ({ onBack, currentUser }) => 
                                 <div className="flex flex-wrap gap-2">
                                     <Button
                                         variant="secondary"
+                                        onClick={handleRecalculateEngagement}
+                                        icon={<RefreshCw className={`w-4 h-4 ${recalcEngagementLoading ? 'animate-spin' : ''}`} />}
+                                        disabled={recalcEngagementLoading}
+                                    >
+                                        {recalcEngagementLoading ? 'Recalculating…' : 'Recalculate Engagement'}
+                                    </Button>
+                                    <Button
+                                        variant="secondary"
+                                        onClick={handleRebuildDailyAnalytics}
+                                        icon={<Activity className={`w-4 h-4 ${rebuildDailyLoading ? 'animate-spin' : ''}`} />}
+                                        disabled={rebuildDailyLoading}
+                                    >
+                                        {rebuildDailyLoading ? 'Rebuilding Daily Stats…' : 'Rebuild Daily Analytics'}
+                                    </Button>
+                                    <Button
+                                        variant="secondary"
                                         onClick={() => setShowCampaignManager(true)}
                                         icon={<Megaphone className="w-4 h-4" />}
                                     >
@@ -771,6 +866,12 @@ export const AdminPage: React.FC<AdminPageProps> = ({ onBack, currentUser }) => 
                                     </Button>
                                 </div>
                             </div>
+                            {engagementMessage && (
+                                <div className={`mt-3 p-3 rounded-lg text-sm flex items-center gap-2 ${engagementMessage.type === 'success' ? 'bg-green-50 text-green-700 border border-green-100' : 'bg-red-50 text-red-700 border border-red-100'}`}>
+                                    {engagementMessage.type === 'success' ? <Check className="w-4 h-4" /> : <AlertCircle className="w-4 h-4" />}
+                                    <span>{engagementMessage.text}</span>
+                                </div>
+                            )}
                             <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mt-4">
                                 <div className="p-4 rounded-lg border border-slate-200 bg-slate-50">
                                     <div className="text-xs text-slate-500">MAU</div>
