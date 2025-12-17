@@ -138,11 +138,10 @@ export const CollaborationPanel: React.FC<CollaborationPanelProps> = ({
                     onClick={() => {
                       onPageChange?.(m.page);
                     }}
-                    className={`relative w-10 h-10 rounded-full flex flex-col items-center justify-center text-sm font-bold transition-colors border ${
-                      pageNumber === m.page
-                        ? 'bg-indigo-100 text-indigo-800 border-indigo-300'
-                        : 'bg-slate-100 text-slate-600 border-slate-200 hover:bg-indigo-50 hover:text-indigo-700'
-                    }`}
+                    className={`relative w-10 h-10 rounded-full flex flex-col items-center justify-center text-sm font-bold transition-colors border ${pageNumber === m.page
+                      ? 'bg-indigo-100 text-indigo-800 border-indigo-300'
+                      : 'bg-slate-100 text-slate-600 border-slate-200 hover:bg-indigo-50 hover:text-indigo-700'
+                      }`}
                     title={`Page ${m.page} • ${m.count} comment${m.count > 1 ? 's' : ''}`}
                   >
                     <span className="block leading-none">{m.page}</span>
@@ -345,7 +344,14 @@ const CommentCard: React.FC<{
               {markerNumber}
             </span>
             <span className={`w-2 h-2 rounded-full ${comment.author === UserRole.DESIGNER ? 'bg-purple-500' : 'bg-blue-500'}`} />
-            <span className="text-xs font-semibold text-slate-700">{comment.authorName || currentUser.name}</span>
+            <span className="text-xs font-semibold text-slate-700">
+              {comment.authorName || comment.author}
+              {comment.authorName && (
+                <span className="ml-1 text-[10px] text-slate-400 font-normal">
+                  ({comment.author})
+                </span>
+              )}
+            </span>
             <span className="text-[10px] text-slate-400">{new Date(comment.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
             {comment.pushedFromGuestComment && (
               <span className="ml-1 px-1.5 py-0.5 bg-green-100 text-green-700 text-[10px] font-medium rounded-full flex items-center gap-1" title="Promoted from Guest comment">
@@ -397,7 +403,14 @@ const CommentCard: React.FC<{
               <div key={reply.id} className="text-xs">
                 <div className="flex items-center gap-2 mb-1">
                   <span className={`w-1.5 h-1.5 rounded-full ${reply.author === UserRole.DESIGNER ? 'bg-purple-400' : 'bg-blue-400'}`} />
-                  <span className="font-medium text-slate-600">{reply.author}</span>
+                  <span className="font-medium text-slate-600">
+                    {reply.authorName || reply.author}
+                    {reply.authorName && (
+                      <span className="ml-1 text-[10px] text-slate-400 font-normal">
+                        ({reply.author})
+                      </span>
+                    )}
+                  </span>
                   <span className="text-[10px] text-slate-400">{new Date(reply.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
                 </div>
                 <p className="text-slate-600 ml-3.5">{reply.text}</p>

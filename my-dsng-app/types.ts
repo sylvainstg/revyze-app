@@ -37,6 +37,7 @@ export interface CommentReply {
   id: string;
   text: string;
   author: UserRole;
+  authorName?: string;
   timestamp: number;
 }
 

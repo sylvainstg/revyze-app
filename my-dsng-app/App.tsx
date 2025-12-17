@@ -1219,6 +1219,7 @@ const App: React.FC = () => {
       id: uuidv4(),
       text,
       author: currentUser.role,
+      authorName: currentUser.name,
       timestamp: Date.now()
     };
 
