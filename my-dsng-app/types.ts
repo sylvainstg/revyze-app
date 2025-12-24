@@ -31,6 +31,16 @@ export interface User {
   tokenBalance?: number;
   totalReferrals?: number;
   hasCompletedOnboarding?: boolean;
+  // Notifications
+  notificationPreferences?: {
+    mentions: 'instant' | 'daily' | 'weekly' | 'none';
+    projectUpdates: 'instant' | 'daily' | 'weekly' | 'none';
+  };
+  digestSettings?: {
+    timezone: string;
+    dailyTime: string; // e.g., "09:00"
+    weeklyDay: number; // 0 = Sunday, 1 = Monday, etc.
+  };
 }
 
 export interface CommentReply {
@@ -38,6 +48,7 @@ export interface CommentReply {
   text: string;
   author: UserRole;
   authorName?: string;
+  mentions?: string[]; // Array of User IDs mentioned in this reply
   timestamp: number;
 }
 
@@ -61,6 +72,7 @@ export interface Comment {
   aiAnalysis?: string; // Optional AI analysis of the pinned area
   resolved: boolean;
   deleted?: boolean; // Soft delete flag
+  mentions?: string[]; // Array of User IDs mentioned in this comment
   replies?: CommentReply[];
 }
 

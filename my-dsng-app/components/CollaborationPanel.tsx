@@ -8,12 +8,13 @@ import { canSeeComment } from '../utils/projectRoleHelper';
 import { ConfirmDialog } from './ui/ConfirmDialog';
 import { FeatureVoteModal } from './FeatureVoteModal';
 import { CollapsibleComingSoon } from './CollapsibleComingSoon';
+import { MentionInput } from './MentionInput';
 
 interface CollaborationPanelProps {
   comments: Comment[];
   onResolveComment: (id: string) => void;
   onDeleteComment: (id: string) => void;
-  onReplyComment: (id: string, text: string) => void;
+  onReplyComment: (id: string, text: string, mentions?: string[]) => void;
   onPushToProfessional?: (commentId: string) => void;
   activeCommentId: string | null;
   setActiveCommentId: (id: string | null) => void;
@@ -27,6 +28,8 @@ interface CollaborationPanelProps {
   isCollapsed?: boolean;
   onToggleCollapse?: (collapsed: boolean) => void;
   pageCount?: number | null;
+  collaborators?: string[];
+  currentUserEmail?: string;
 }
 
 export const CollaborationPanel: React.FC<CollaborationPanelProps> = ({
@@ -46,7 +49,9 @@ export const CollaborationPanel: React.FC<CollaborationPanelProps> = ({
   onUpdateFilter,
   isCollapsed: propIsCollapsed,
   onToggleCollapse,
-  pageCount
+  pageCount,
+  collaborators = [],
+  currentUserEmail = '',
 }) => {
   const [localIsCollapsed, setLocalIsCollapsed] = useState(false);
 
@@ -253,6 +258,8 @@ export const CollaborationPanel: React.FC<CollaborationPanelProps> = ({
                     currentUserRole={currentUserRole}
                     projectRole={projectRole}
                     currentUser={currentUser}
+                    collaborators={collaborators}
+                    currentUserEmail={currentUserEmail}
                   />
                 );
               })
@@ -298,21 +305,25 @@ const CommentCard: React.FC<{
   isActive: boolean;
   onResolve: (id: string) => void;
   onDelete: (id: string) => void;
-  onReply: (id: string, text: string) => void;
+  onReply: (id: string, text: string, mentions?: string[]) => void;
   onPushToProfessional?: (commentId: string) => void;
   onClick: () => void;
   currentUserRole: UserRole;
   projectRole: ProjectRole;
   currentUser: User;
-}> = ({ comment, markerNumber, isActive, onResolve, onDelete, onReply, onPushToProfessional, onClick, currentUserRole, projectRole, currentUser }) => {
+  collaborators: string[];
+  currentUserEmail: string;
+}> = ({ comment, markerNumber, isActive, onResolve, onDelete, onReply, onPushToProfessional, onClick, currentUserRole, projectRole, currentUser, collaborators, currentUserEmail }) => {
   const [replyText, setReplyText] = useState('');
   const [showReplyBox, setShowReplyBox] = useState(false);
   const [isExpanded, setIsExpanded] = useState(!comment.resolved); // Resolved comments start collapsed
+  const [pendingMentions, setPendingMentions] = useState<string[]>([]);
 
   const handleReplySubmit = () => {
     if (replyText.trim()) {
-      onReply(comment.id, replyText);
+      onReply(comment.id, replyText, pendingMentions);
       setReplyText('');
+      setPendingMentions([]);
       setShowReplyBox(false);
     }
   };
@@ -449,21 +460,30 @@ const CommentCard: React.FC<{
             </button>
           ) : (
             <div className="flex-1 flex gap-2" onClick={(e) => e.stopPropagation()}>
-              <input
-                type="text"
-                value={replyText}
-                onChange={(e) => setReplyText(e.target.value)}
-                onKeyDown={(e) => {
-                  if (e.key === 'Enter') handleReplySubmit();
-                  if (e.key === 'Escape') setShowReplyBox(false);
-                }}
-                placeholder="Write a reply..."
-                className="flex-1 text-xs px-2 py-1 border border-slate-200 rounded focus:outline-none focus:border-indigo-400 bg-white text-slate-900"
-                autoFocus
-              />
+              <div className="flex-1">
+                <MentionInput
+                  value={replyText}
+                  onChange={(val, newMentions) => {
+                    setReplyText(val);
+                    setPendingMentions(newMentions);
+                  }}
+                  collaborators={collaborators}
+                  currentUserEmail={currentUserEmail}
+                  placeholder="Write a reply..."
+                  className="flex-1 text-xs px-2 py-1 border border-slate-200 rounded focus:outline-none focus:border-indigo-400 bg-white text-slate-900"
+                  autoFocus
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter' && !e.shiftKey && !e.defaultPrevented) {
+                      handleReplySubmit();
+                    }
+                    if (e.key === 'Escape') setShowReplyBox(false);
+                  }}
+                  minHeight="36px"
+                />
+              </div>
               <button
                 onClick={handleReplySubmit}
-                className="p-1 rounded bg-indigo-600 text-white hover:bg-indigo-700"
+                className="p-1 rounded bg-indigo-600 text-white hover:bg-indigo-700 h-fit mt-1"
                 title="Send reply"
               >
                 <Send className="w-3 h-3" />

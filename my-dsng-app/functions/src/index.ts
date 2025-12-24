@@ -3,6 +3,8 @@ import * as functions from "firebase-functions";
 import * as admin from "firebase-admin";
 import { createCheckoutSession, createPortalSession, initializeStripeProducts, getPaymentHistory, getSubscriptionPlans } from "./stripeService";
 import { sendVersionUpdateEmail } from "./emailService";
+import { processNewMentions } from "./notifications";
+
 import { generateDailyAnalyticsSnapshot, rebuildAnalyticsDaily, rebuildAnalyticsDailyHttp } from "./engagement/analyticsDaily";
 import {
     getOrCreateReferralCode,
@@ -426,6 +428,9 @@ export const onProjectUpdated = functions.firestore
             await Promise.all(emailPromises);
             console.log(`Sent ${emailPromises.length} version update emails.`);
         }
+
+        // Check for new mentions or replies
+        await processNewMentions(before, after, context.params.projectId);
     });
 
 // Export PDF proxy function

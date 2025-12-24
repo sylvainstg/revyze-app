@@ -9,6 +9,7 @@ import { BarChart3 } from 'lucide-react';
 import { useAdmin } from '../contexts/AdminContext';
 
 const ReferralDashboardLazy = React.lazy(() => import('./ReferralDashboard').then(module => ({ default: module.ReferralDashboard })));
+const NotificationSettingsLazy = React.lazy(() => import('./NotificationSettings').then(module => ({ default: module.NotificationSettings })));
 
 interface DashboardProps {
   user: User;
@@ -47,7 +48,8 @@ export const Dashboard: React.FC<DashboardProps> = ({
   const [editName, setEditName] = useState(user.name);
   const [isSavingProfile, setIsSavingProfile] = useState(false);
   const [showReferralDashboard, setShowReferralDashboard] = useState(false);
-
+  const [activeStatsTab, setActiveStatsTab] = useState<'profile' | 'notifications'>('profile');
+  const notificationUpdateRef = useRef<{ prefs: User['notificationPreferences'], digest: User['digestSettings'] } | null>(null);
 
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -78,7 +80,16 @@ export const Dashboard: React.FC<DashboardProps> = ({
 
     try {
       const { updateUserProfile } = await import('../services/authService');
-      const success = await updateUserProfile(user.id, { name: editName });
+
+      const updates: any = { name: editName };
+
+      // Include notification pref updates if present
+      if (notificationUpdateRef.current) {
+        updates.notificationPreferences = notificationUpdateRef.current.prefs;
+        updates.digestSettings = notificationUpdateRef.current.digest;
+      }
+
+      const success = await updateUserProfile(user.id, updates);
       if (success) {
         setIsEditProfileOpen(false);
         // Auth subscription will push the updated user; no full reload needed
@@ -406,115 +417,86 @@ export const Dashboard: React.FC<DashboardProps> = ({
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm">
           <div className="bg-white rounded-xl shadow-xl w-full max-w-md p-6">
             <h2 className="text-xl font-bold text-slate-900 mb-4">Account Settings</h2>
+            <div className="flex border-b border-slate-200 mb-4">
+              <button
+                className={`px-4 py-2 text-sm font-medium border-b-2 transition-colors ${activeStatsTab === 'profile' ? 'border-indigo-600 text-indigo-600' : 'border-transparent text-slate-500 hover:text-slate-700'}`}
+                onClick={() => setActiveStatsTab('profile')}
+              >
+                Profile
+              </button>
+              <button
+                className={`px-4 py-2 text-sm font-medium border-b-2 transition-colors ${activeStatsTab === 'notifications' ? 'border-indigo-600 text-indigo-600' : 'border-transparent text-slate-500 hover:text-slate-700'}`}
+                onClick={() => setActiveStatsTab('notifications')}
+              >
+                Notifications
+              </button>
+            </div>
+
             <div className="space-y-6">
-              <div>
-                <h3 className="text-sm font-medium text-slate-900 mb-3">Profile</h3>
-                <label className="block text-sm font-medium text-slate-700 mb-1">Full Name</label>
-                <input
-                  type="text"
-                  value={editName}
-                  onChange={(e) => setEditName(e.target.value)}
-                  className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 bg-white text-slate-900"
-                />
-                <label className="block text-sm font-medium text-slate-700 mb-1 mt-4">Email</label>
-                <input
-                  type="email"
-                  value={user.email}
-                  disabled
-                  className="w-full px-3 py-2 border border-slate-200 rounded-lg bg-slate-50 text-slate-500 cursor-not-allowed"
-                  aria-readonly
-                />
-              </div>
+              {activeStatsTab === 'profile' ? (
+                <>
+                  <div>
+                    <label className="block text-sm font-medium text-slate-700 mb-1">Full Name</label>
+                    <input
+                      type="text"
+                      value={editName}
+                      onChange={(e) => setEditName(e.target.value)}
+                      className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 bg-white text-slate-900"
+                    />
+                    <label className="block text-sm font-medium text-slate-700 mb-1 mt-4">Email</label>
+                    <input
+                      type="email"
+                      value={user.email}
+                      disabled
+                      className="w-full px-3 py-2 border border-slate-200 rounded-lg bg-slate-50 text-slate-500 cursor-not-allowed"
+                      aria-readonly
+                    />
+                  </div>
 
-              <div className="pt-4 border-t border-slate-100">
-                <h3 className="text-sm font-medium text-slate-900 mb-2">Analytics</h3>
-                <div className="grid grid-cols-2 md:grid-cols-3 gap-2 mb-2">
-                  <div className="p-2 rounded-lg border border-slate-200 bg-slate-50">
-                    <div className="text-[11px] text-slate-500">Engagement</div>
-                    <div className="text-base font-semibold text-slate-900">{user.engagementScore ?? '—'}</div>
-                  </div>
-                  <div className="p-2 rounded-lg border border-slate-200 bg-slate-50">
-                    <div className="text-[11px] text-slate-500">Owned</div>
-                    <div className="text-base font-semibold text-slate-900">{ownedProjects.length}</div>
-                  </div>
-                  <div className="p-2 rounded-lg border border-slate-200 bg-slate-50">
-                    <div className="text-[11px] text-slate-500">Shares</div>
-                    <div className="text-base font-semibold text-slate-900">{totalShares}</div>
-                  </div>
-                  <div className="p-2 rounded-lg border border-slate-200 bg-slate-50">
-                    <div className="text-[11px] text-slate-500">Shared with</div>
-                    <div className="text-base font-semibold text-slate-900">{sharedWith}</div>
-                  </div>
-                  <div className="p-2 rounded-lg border border-slate-200 bg-slate-50">
-                    <div className="text-[11px] text-slate-500">Comments</div>
-                    <div className="text-base font-semibold text-slate-900">{user.commentCount ?? 0}</div>
-                  </div>
-                  <div className="p-2 rounded-lg border border-slate-200 bg-slate-50">
-                    <div className="text-[11px] text-slate-500">Replies</div>
-                    <div className="text-base font-semibold text-slate-900">{(user as any).replyCount ?? 0}</div>
-                  </div>
-                </div>
-                <div className="bg-white border border-slate-200 rounded-lg p-2">
-                  <div className="flex items-center justify-between mb-1.5">
-                    <div className="text-[11px] font-medium text-slate-700">Activity (logins • shares • comments • projects)</div>
-                    <div className="text-[10px] text-slate-400">Recent</div>
-                  </div>
-                  <svg viewBox="0 0 120 24" className="w-full h-8 text-indigo-600">
-                    {activityPoints.map((v, i) => {
-                      const height = Math.max(3, Math.min(20, v));
-                      return (
-                        <rect
-                          key={i}
-                          x={i * 28 + 4}
-                          y={24 - height}
-                          width={18}
-                          height={height}
-                          rx={4}
-                          className="fill-indigo-500/80"
-                        />
-                      );
-                    })}
-                  </svg>
-                </div>
-              </div>
-
-              {/* Subscription Section */}
-              {(currentPlan.id !== 'free' || user.stripeCustomerId) && (
-                <div className="pt-4 border-t border-slate-100">
-                  <h3 className="text-sm font-medium text-slate-900 mb-3">Subscription</h3>
-                  <div className="bg-slate-50 p-4 rounded-lg border border-slate-200">
-                    <div className="flex justify-between items-center mb-2">
-                      <span className="text-sm font-medium text-slate-700">{currentPlan.name}</span>
-                      <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${user.subscriptionStatus === 'active' ? 'bg-green-100 text-green-700' : 'bg-yellow-100 text-yellow-700'}`}>
-                        {user.subscriptionStatus ? user.subscriptionStatus.charAt(0).toUpperCase() + user.subscriptionStatus.slice(1) : 'Active'}
-                      </span>
+                  <div className="pt-4 border-t border-slate-100">
+                    <h3 className="text-sm font-medium text-slate-900 mb-2">Analytics</h3>
+                    <div className="grid grid-cols-2 md:grid-cols-3 gap-2 mb-2">
+                      <div className="p-2 rounded-lg border border-slate-200 bg-slate-50">
+                        <div className="text-[11px] text-slate-500">Engagement</div>
+                        <div className="text-base font-semibold text-slate-900">{user.engagementScore ?? '—'}</div>
+                      </div>
+                      <div className="p-2 rounded-lg border border-slate-200 bg-slate-50">
+                        <div className="text-[11px] text-slate-500">Owned</div>
+                        <div className="text-base font-semibold text-slate-900">{ownedProjects.length}</div>
+                      </div>
+                      <div className="p-2 rounded-lg border border-slate-200 bg-slate-50">
+                        <div className="text-[11px] text-slate-500">Shares</div>
+                        <div className="text-base font-semibold text-slate-900">{totalShares}</div>
+                      </div>
+                      <div className="p-2 rounded-lg border border-slate-200 bg-slate-50">
+                        <div className="text-[11px] text-slate-500">Shared with</div>
+                        <div className="text-base font-semibold text-slate-900">{sharedWith}</div>
+                      </div>
+                      <div className="p-2 rounded-lg border border-slate-200 bg-slate-50">
+                        <div className="text-[11px] text-slate-500">Comments</div>
+                        <div className="text-base font-semibold text-slate-900">{user.commentCount ?? 0}</div>
+                      </div>
+                      <div className="p-2 rounded-lg border border-slate-200 bg-slate-50">
+                        <div className="text-[11px] text-slate-500">Replies</div>
+                        <div className="text-base font-semibold text-slate-900">{(user as any).replyCount ?? 0}</div>
+                      </div>
                     </div>
-                    <Button
-                      variant="secondary"
-                      size="sm"
-                      className="w-full mt-2"
-                      onClick={async () => {
-                        try {
-                          const { createPortalSession } = await import('../services/paymentService');
-                          const url = await createPortalSession();
-                          if (url) {
-                            window.location.href = url;
-                          } else {
-                            alert("Failed to load subscription portal.");
-                          }
-                        } catch (e) {
-                          console.error(e);
-                          alert("Error loading portal.");
-                        }
-                      }}
-                    >
-                      Manage Subscription
-                    </Button>
+                    {/* Activity visualizer is hidden when not enough data */}
                   </div>
-                </div>
+                </>
+              ) : (
+                <Suspense fallback={<div>Loading settings...</div>}>
+                  <NotificationSettingsLazy
+                    user={user}
+                    onChange={(prefs, digest) => {
+                      // We store these in refs or state to submit on Save
+                      notificationUpdateRef.current = { prefs, digest };
+                    }}
+                  />
+                </Suspense>
               )}
 
-              <div className="flex justify-end gap-3 pt-2 border-t border-slate-100">
+              <div className="flex justify-end gap-3 pt-4 border-t border-slate-100 mt-4">
                 <Button variant="secondary" onClick={() => setIsEditProfileOpen(false)}>Cancel</Button>
                 <Button onClick={handleUpdateProfile} isLoading={isSavingProfile}>Save Changes</Button>
               </div>

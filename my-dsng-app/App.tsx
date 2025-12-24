@@ -143,6 +143,11 @@ const App: React.FC = () => {
     }
   }, [currentUser]);
 
+  // Collaborators helper
+  const collaborators: string[] = activeProject
+    ? Array.from(new Set([...(activeProject.collaborators || []), activeProject.ownerEmail])).filter(Boolean) as string[]
+    : [];
+
   const incrementUserField = useCallback(async (field: string, amount: number = 1) => {
     if (!currentUser) return;
     try {
@@ -868,9 +873,10 @@ const App: React.FC = () => {
     if (!projectSettingsProject) return;
     await storageService.updateProjectPartial(projectSettingsProject.id, updates);
     setProjects(prev => prev.map(p => p.id === projectSettingsProject.id ? { ...p, ...updates } : p));
-    if (activeProject?.id === projectSettingsProject.id) {
-      setActiveProject({ ...activeProject, ...updates });
-    }
+    // activeProject is derived from projects and setActiveProjectId, so no need to update it here
+    // if (activeProject?.id === projectSettingsProject.id) {
+    //   setActiveProject({ ...activeProject, ...updates });
+    // }
   };
 
   // Version Management Functions
@@ -921,10 +927,7 @@ const App: React.FC = () => {
       setShowVersionUploadModal(false);
 
       // Show success message
-      const transferMsg = transferComments && commentsToTransfer.length > 0
-        ? ` ${commentsToTransfer.length} unresolved comment${commentsToTransfer.length !== 1 ? 's' : ''} transferred.`
-        : '';
-      setToast({ message: `Version ${categoryVersionNumber} uploaded to ${category}!${transferMsg}`, type: 'success' });
+      setToast({ message: `Version ${categoryVersionNumber} uploaded to ${category}!`, type: 'success' });
 
     } catch (error) {
       console.error('Error uploading new version:', error);
@@ -1212,7 +1215,7 @@ const App: React.FC = () => {
     incrementUserField('commentCount');
   };
 
-  const handleReplyComment = async (commentId: string, text: string) => {
+  const handleReplyComment = async (commentId: string, text: string, mentions?: string[]) => {
     if (!activeProject || !activeVersion || !currentUser) return;
 
     const newReply: CommentReply = {
@@ -1220,7 +1223,8 @@ const App: React.FC = () => {
       text,
       author: currentUser.role,
       authorName: currentUser.name,
-      timestamp: Date.now()
+      timestamp: Date.now(),
+      mentions
     };
 
     const updatedProject = {
@@ -1662,6 +1666,7 @@ const App: React.FC = () => {
                 const isPDF = fileName.endsWith('.pdf');
 
                 const currentProjectRole = getProjectRole(activeProject, currentUser, isGuest, impersonatedRole);
+
                 const filteredComments = activeVersion.comments.filter(c => canSeeComment(c, currentProjectRole) && !c.deleted);
 
                 const handleFocusComment = (commentId: string) => {
@@ -1761,6 +1766,8 @@ const App: React.FC = () => {
                           showPreviousVersionComments={showPreviousVersionComments}
                           onTogglePreviousComments={setShowPreviousVersionComments}
                           onPageCountChange={setPageCount}
+                          collaborators={collaborators}
+                          currentUserEmail={currentUser.email}
                         />
                       ) : (
                         <ImageWorkspace
@@ -1816,6 +1823,8 @@ const App: React.FC = () => {
               onUpdateFilter={setCommentFilter}
               isCollapsed={!isSidebarOpen}
               onToggleCollapse={(collapsed) => setIsSidebarOpen(!collapsed)}
+              collaborators={collaborators}
+              currentUserEmail={currentUser.email}
             />
           </main>
         </div>
