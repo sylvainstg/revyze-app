@@ -129,6 +129,8 @@ const App: React.FC = () => {
   // Feedback Campaign
   const { campaign: feedbackCampaign, submit: submitFeedbackAnswer, dismiss: dismissFeedback } = useFeedback(!!currentUser && !authLoading);
   const sessionStartRef = useRef<number | null>(null);
+  const isGuestRef = useRef(isGuest);
+  const viewRef = useRef(view);
 
   const recordSessionDuration = useCallback(async () => {
     if (!currentUser || !sessionStartRef.current) return;
@@ -273,26 +275,32 @@ const App: React.FC = () => {
     }
   }, []);
 
+  // Keep refs updated
+  useEffect(() => {
+    isGuestRef.current = isGuest;
+    viewRef.current = view;
+  }, [isGuest, view]);
+
   // 1. Handle Auth Session
   useEffect(() => {
     const unsubscribe = authService.subscribeToAuth((user) => {
       // Only update if not in guest mode or if user actually logs in
-      if (!isGuest || user) {
+      if (!isGuestRef.current || user) {
         setCurrentUser(user);
         setAuthLoading(false);
         // Don't auto-redirect logged-in users from landing page
         // Let them view the marketing content if they want
-        if (!user && !isGuest) {
+        if (!user && !isGuestRef.current) {
           setActiveProjectId(null);
           setProjects([]);
-          if (view !== 'landing' && view !== 'auth') {
+          if (viewRef.current !== 'landing' && viewRef.current !== 'auth') {
             setView('landing');
           }
         }
       }
     });
     return () => unsubscribe();
-  }, [isGuest, view]);
+  }, []); // Only set up auth listener once on mount
 
   // 1b. Track session duration (lightweight)
   useEffect(() => {
@@ -319,7 +327,7 @@ const App: React.FC = () => {
       window.removeEventListener('beforeunload', handleBeforeUnload);
       recordSessionDuration();
     };
-  }, [currentUser, recordSessionDuration]);
+  }, []); // Only set up once - currentUser in deps causes loop when recordSessionDuration updates user doc
 
   // 2. Load Projects when User changes
   useEffect(() => {
@@ -407,7 +415,7 @@ const App: React.FC = () => {
     });
 
     return () => unsubscribe();
-  }, [activeProjectId, currentUser, isGuest]);
+  }, [activeProjectId, isGuest]); // currentUser removed - causes loop when incrementUserField updates user doc
 
 
   // 3. Scroll to top whenever view changes
