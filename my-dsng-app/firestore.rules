@@ -74,6 +74,12 @@ service cloud.firestore {
       allow delete: if isAdmin();
     }
 
+    // Plan Limits collection - Read for all, write for admins only
+    match /plan_limits/{planId} {
+      allow read: if isAuthenticated();
+      allow write: if isAdmin();
+    }
+
     // Mail collection (for Firebase Email Extension)
     match /mail/{mailId} {
       allow read, write: if false; // Only Cloud Functions can write

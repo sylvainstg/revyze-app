@@ -4,6 +4,7 @@ import * as admin from "firebase-admin";
 import { createCheckoutSession, createPortalSession, initializeStripeProducts, getPaymentHistory, getSubscriptionPlans } from "./stripeService";
 import { sendVersionUpdateEmail } from "./emailService";
 import { processNewMentions } from "./notifications";
+import { getPlanLimits, updatePlanLimits, initializePlanLimits } from "./planLimits";
 
 import { generateDailyAnalyticsSnapshot, rebuildAnalyticsDaily, rebuildAnalyticsDailyHttp } from "./engagement/analyticsDaily";
 import {
@@ -631,3 +632,7 @@ export {
 
 // Engagement Score Functions
 export { updateEngagementScore, recalculateAllEngagementScores } from './engagement/engagementScore';
+
+// Plan Limits Functions
+export { getPlanLimits, updatePlanLimits, initializePlanLimits };
+

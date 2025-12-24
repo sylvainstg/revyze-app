@@ -121,8 +121,9 @@ const App: React.FC = () => {
   // Onboarding State
   const [onboardingStep, setOnboardingStep] = useState(0);
 
-  // Pricing State (enriched with Stripe data)
+  // Pricing & Limits
   const [enrichedPlans, setEnrichedPlans] = useState<any>(null);
+  const [fetchedLimits, setFetchedLimits] = useState<any>(PLAN_LIMITS); // Default to hardcoded limits
   const [pricingLoading, setPricingLoading] = useState(true);
   const [pricingError, setPricingError] = useState<string | null>(null);
 
@@ -168,25 +169,71 @@ const App: React.FC = () => {
 
   // --- Effects ---
 
-  // 0. Fetch Stripe Pricing on Mount
+  // 0. Fetch Stripe Pricing and Plan Limits on Mount
   useEffect(() => {
-    const loadPricing = async () => {
+    const fetchData = async () => {
       try {
         setPricingLoading(true);
+
+        // 1. Fetch Plan Limits (in parallel with pricing if we wanted, but sequential is fine for now)
+        try {
+          const getPlanLimitsFunc = httpsCallable(functions, 'getPlanLimits');
+          const limitsResult = await getPlanLimitsFunc();
+          const limitsData = limitsResult.data as { limits: any };
+          if (limitsData?.limits) {
+            setFetchedLimits(limitsData.limits);
+            console.log('Fetched dynamic plan limits:', limitsData.limits);
+          }
+        } catch (limitError) {
+          console.error('Failed to fetch plan limits, using defaults:', limitError);
+        }
+
+        // 2. Fetch Stripe Pricing
         const stripePricing = await fetchStripePricing();
-        const enriched = enrichPlansWithPricing(PLAN_METADATA, stripePricing);
+
+        // Use the LATEST limits (either fetched or default) for enriching plans
+        // We need to construct a dynamic metadata object that uses the fetched limits
+        // Note: We use state setter functional update pattern or just rely on the variable we just got if we could, 
+        // but since state updates are async, let's look at how to merge.
+        // Actually, for this initial load, we can't easily rely on 'fetchedLimits' state being updated yet 
+        // if we just called setFetchedLimits above.
+        // So we should capture the limits in a variable.
+        let currentLimits = PLAN_LIMITS;
+        try {
+          const getPlanLimitsFunc = httpsCallable(functions, 'getPlanLimits');
+          const limitsResult = await getPlanLimitsFunc();
+          const limitsData = limitsResult.data as { limits: any };
+          if (limitsData?.limits) {
+            currentLimits = limitsData.limits;
+            setFetchedLimits(currentLimits);
+          }
+        } catch (err) {
+          console.error(err);
+        }
+
+        // Construct dynamic metadata with fetched limits
+        const dynamicMetadata = {
+          ...PLAN_METADATA,
+          free: { ...PLAN_METADATA.free, limits: currentLimits.free },
+          pro: { ...PLAN_METADATA.pro, limits: currentLimits.pro },
+          business: { ...PLAN_METADATA.business, limits: currentLimits.business }
+        };
+
+        const enriched = enrichPlansWithPricing(dynamicMetadata, stripePricing);
         setEnrichedPlans(enriched);
         setPricingError(null);
       } catch (error) {
         console.error('Failed to load pricing from Stripe:', error);
         console.warn('Using plan metadata without Stripe pricing. Update functions/.env with production Stripe key.');
         setPricingError('Could not load pricing from Stripe. Using default prices.');
-        // Fallback: use metadata with default prices (won't have real Stripe price IDs)
+
+        // Fallback: use metadata with default prices
+        const currentLimits = fetchedLimits || PLAN_LIMITS; // Best effort to use what we have
         const fallbackPlans = {
           ...PLAN_METADATA,
-          free: { ...PLAN_METADATA.free, price: { monthly: '$0', yearly: '$0' }, priceIds: { monthly: null, yearly: null } },
-          pro: { ...PLAN_METADATA.pro, price: { monthly: '$10', yearly: '$100' }, priceIds: { monthly: null, yearly: null } },
-          business: { ...PLAN_METADATA.business, price: { monthly: '$50', yearly: '$500' }, priceIds: { monthly: null, yearly: null } }
+          free: { ...PLAN_METADATA.free, limits: currentLimits.free, price: { monthly: '$0', yearly: '$0' }, priceIds: { monthly: null, yearly: null } },
+          pro: { ...PLAN_METADATA.pro, limits: currentLimits.pro, price: { monthly: '$10', yearly: '$100' }, priceIds: { monthly: null, yearly: null } },
+          business: { ...PLAN_METADATA.business, limits: currentLimits.business, price: { monthly: '$50', yearly: '$500' }, priceIds: { monthly: null, yearly: null } }
         };
         setEnrichedPlans(fallbackPlans);
       } finally {
@@ -194,7 +241,7 @@ const App: React.FC = () => {
       }
     };
 
-    loadPricing();
+    fetchData();
   }, []);
 
   // 1. Handle Shared Link and Referral Code
@@ -699,8 +746,9 @@ const App: React.FC = () => {
     if (!currentUser) return;
 
     // Check Limits
+    // Check Limits
     const plan = currentUser.plan || 'free';
-    const limits = PLAN_LIMITS[plan];
+    const limits = fetchedLimits[plan] || PLAN_LIMITS[plan]; // Use dynamic limits, fallback to static
 
     // Count owned projects (projects created by this user)
     const ownedProjects = projects.filter(p => p.ownerId === currentUser.id);

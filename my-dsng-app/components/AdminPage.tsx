@@ -12,6 +12,7 @@ import { getUserActivity, ActivityLog } from '../services/analyticsService';
 import { EngagementDashboard } from './EngagementDashboard';
 import { CampaignManager } from './admin/CampaignManager';
 import { CampaignDocumentation } from './admin/CampaignDocumentation';
+import { PlanLimitsEditor } from './admin/PlanLimitsEditor';
 import { getAnalyticsStats } from '../services/analyticsAggregationService';
 import { getAdminReferralData } from '../services/referralService';
 import { httpsCallable } from 'firebase/functions';
@@ -25,7 +26,7 @@ const formatEventName = (name: string) => {
 
 const REBUILD_ANALYTICS_ENDPOINT = `${import.meta.env.VITE_FUNCTIONS_BASE_URL || 'https://us-central1-dsng-app.cloudfunctions.net'}/rebuildAnalyticsDailyHttp`;
 
-type AdminTab = 'users' | 'engagement' | 'referrals';
+type AdminTab = 'users' | 'engagement' | 'referrals' | 'plan-limits';
 
 interface AdminPageProps {
     onBack: () => void;
@@ -90,6 +91,7 @@ export const AdminPage: React.FC<AdminPageProps> = ({ onBack, currentUser }) => 
         { id: 'users', label: 'Users', description: 'Directory & permissions', icon: Users },
         { id: 'engagement', label: 'Engagement & Campaigns', description: 'Analytics and outreach', icon: BarChart3 },
         { id: 'referrals', label: 'Referrals', description: 'Rewards & token settings', icon: Gift },
+        { id: 'plan-limits', label: 'Plan Limits', description: 'Subscription caps & quotas', icon: Shield },
     ];
 
     useEffect(() => {
@@ -1028,6 +1030,13 @@ export const AdminPage: React.FC<AdminPageProps> = ({ onBack, currentUser }) => 
                             <Suspense fallback={<div className="text-sm text-slate-500">Loading referral data…</div>}>
                                 <ReferralDashboardLazy currentUser={currentUser} />
                             </Suspense>
+                        </div>
+                    )}
+
+                    {/* Plan Limits Tab */}
+                    {activeTab === 'plan-limits' && (
+                        <div className="p-6">
+                            <PlanLimitsEditor />
                         </div>
                     )}
                 </main>
