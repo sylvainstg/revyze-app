@@ -84,6 +84,17 @@ export const feedbackActive = functions.https.onCall(async (data, context) => {
 
     const userData = userDoc.data() || {};
     const now = admin.firestore.Timestamp.now();
+    const forceCampaignId = (data as any)?.forceCampaignId;
+
+    // Special handling for forced campaign (debug mode) - logic moved to top to bypass all filters
+    if (forceCampaignId) {
+        const forcedDoc = await db.collection('feedback_campaigns').doc(forceCampaignId).get();
+        if (forcedDoc.exists) {
+            return { campaign: buildCampaignPayload(forcedDoc) };
+        }
+        // If forced ID not found, fall through or return null? Better to return null to avoid confusion.
+        return { campaign: null };
+    }
 
     // Enforce frequency cap against user's last request time
     const lastRequested = userData.lastFeedbackRequestedAt?.toDate ? userData.lastFeedbackRequestedAt.toDate().getTime() : userData.lastFeedbackRequestedAt;
@@ -139,6 +150,12 @@ export const feedbackActive = functions.https.onCall(async (data, context) => {
         // Mark request time before returning
         await userRef.update({ lastFeedbackRequestedAt: admin.firestore.FieldValue.serverTimestamp() });
 
+        // Update campaign analytics: Impressions
+        await db.collection('feedback_campaigns').doc(campaign.id!).update({
+            'analytics.impressions': admin.firestore.FieldValue.increment(1),
+            updatedAt: admin.firestore.FieldValue.serverTimestamp()
+        });
+
         await db.collection('campaign_attribution').add({
             campaignId: campaign.id,
             userId: uid,
@@ -191,6 +208,16 @@ export const feedbackAnswer = functions.https.onCall(async (data, context) => {
         };
 
         await db.collection('feedback_answers').add(payload);
+
+        // Update campaign analytics: Responses
+        // We also need to update responseRate, but that's harder atomically.
+        // For now just increment responses. Client or scheduled job can recalc rate.
+        // Or we can do a transaction if strict accuracy needed, but increment is fine for now.
+        // We will just update 'responses' count.
+        await db.collection('feedback_campaigns').doc(campaignId).update({
+            'analytics.responses': admin.firestore.FieldValue.increment(1),
+            updatedAt: admin.firestore.FieldValue.serverTimestamp()
+        });
 
         // Update attribution if exists
         const attribution = await db.collection('campaign_attribution')
@@ -251,6 +278,59 @@ export const adminListFeedbackCampaigns = functions.https.onCall(async (data, co
     }));
 
     return { campaigns: results };
+});
+
+export const adminGetCampaignAnswers = functions.https.onCall(async (data, context) => {
+    const uid = requireAuth(context);
+    await ensureAdmin(uid);
+
+    const { campaignId } = data;
+    if (!campaignId) {
+        throw new functions.https.HttpsError('invalid-argument', 'Campaign ID required');
+    }
+
+    const answersSnap = await db.collection('feedback_answers')
+        .where('campaignId', '==', campaignId)
+        .limit(100)
+        .get();
+
+    // Fetch user details for non-anonymous answers
+    const userIds = new Set<string>();
+    answersSnap.docs.forEach(doc => {
+        const d = doc.data();
+        if (d.userId) userIds.add(d.userId);
+    });
+
+    const userMap: Record<string, { name: string; email: string }> = {};
+    if (userIds.size > 0) {
+        // Firestore 'in' query limit is 10, so we have to chunk or just fetch individual if many
+        // For simplicity in this admin tool, let's fetch individual if < 20, otherwise just rely on partial data?
+        // Actually, let's just do a series of gets or multiple 'in' queries.
+        // For now, simpler approach: Promise.all fetches (cache helps if repeated)
+        const userFetches = Array.from(userIds).map(async (uid) => {
+            const uDoc = await db.collection('users').doc(uid).get();
+            if (uDoc.exists) {
+                const uData = uDoc.data() || {};
+                userMap[uid] = { name: uData.name || 'Unknown', email: uData.email || '—' };
+            }
+        });
+        await Promise.all(userFetches);
+    }
+
+    const answers = answersSnap.docs.map(doc => {
+        const d = doc.data();
+        return {
+            id: doc.id,
+            ...d,
+            user: d.userId ? userMap[d.userId] : undefined,
+            timestamp: d.timestamp?.toMillis ? d.timestamp.toMillis() : d.timestamp
+        };
+    });
+
+    // Sort in memory to avoid composite index requirement
+    answers.sort((a, b) => (b.timestamp || 0) - (a.timestamp || 0));
+
+    return { answers };
 });
 
 export const adminCreateFeedbackCampaign = functions.https.onCall(async (data, context) => {

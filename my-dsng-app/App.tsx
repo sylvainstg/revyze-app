@@ -41,7 +41,7 @@ import { EditVersionModal } from './components/EditVersionModal';
 import { EnhancedDeleteDialog } from './components/EnhancedDeleteDialog';
 import { CemeteryView } from './components/CemeteryView';
 import { FeedbackModal } from './components/FeedbackModal';
-import { useFeedback } from './hooks/useFeedback';
+import { useEngagement } from './hooks/useEngagement';
 import { doc, updateDoc, increment } from 'firebase/firestore';
 
 
@@ -128,7 +128,7 @@ const App: React.FC = () => {
   const [pricingError, setPricingError] = useState<string | null>(null);
 
   // Feedback Campaign
-  const { campaign: feedbackCampaign, submit: submitFeedbackAnswer, dismiss: dismissFeedback } = useFeedback(!!currentUser && !authLoading);
+  const { campaign: engagementCampaign, submit: submitEngagementAnswer, dismiss: dismissEngagement } = useEngagement(!!currentUser && !authLoading);
   const sessionStartRef = useRef<number | null>(null);
   const isGuestRef = useRef(isGuest);
   const viewRef = useRef(view);
@@ -1986,12 +1986,12 @@ const App: React.FC = () => {
           />
         )}
 
-        {/* Feedback Campaign Modal */}
-        {feedbackCampaign && (
+        {/* Engagement Campaign Modal */}
+        {engagementCampaign && (
           <FeedbackModal
-            campaign={feedbackCampaign}
-            onSubmit={submitFeedbackAnswer}
-            onDismiss={dismissFeedback}
+            campaign={engagementCampaign}
+            onSubmit={submitEngagementAnswer}
+            onDismiss={dismissEngagement}
           />
         )}
 

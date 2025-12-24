@@ -5,7 +5,7 @@ import { fetchUserPaymentHistory, PaymentRecord } from '../services/paymentServi
 import { useAdmin } from '../contexts/AdminContext';
 import { Button } from './ui/Button';
 import { Input } from './ui/Input';
-import { Shield, Search, Trash2, ArrowLeft, BarChart3, Users, Eye, UserPlus, Check, AlertCircle, Calendar, CreditCard, Receipt, Gift, Megaphone, RefreshCw, Activity } from 'lucide-react';
+import { Shield, Search, Trash2, ArrowLeft, BarChart3, Users, Eye, UserPlus, Check, AlertCircle, Calendar, CreditCard, Receipt, Gift, Megaphone, RefreshCw, Activity, Zap } from 'lucide-react';
 import { FeatureVoteAnalytics } from './FeatureVoteAnalytics';
 import { ReferralManagement } from './ReferralManagement';
 import { getUserActivity, ActivityLog } from '../services/analyticsService';
@@ -941,9 +941,26 @@ export const AdminPage: React.FC<AdminPageProps> = ({ onBack, currentUser }) => 
                                                 <div className="text-sm text-slate-500">No campaigns found.</div>
                                             )}
                                             {campaignsSummary.map(c => (
-                                                <div key={c.id} className="p-3 rounded border border-slate-200 bg-slate-50">
-                                                    <div className="font-medium text-slate-900 text-sm">{c.name}</div>
-                                                    <div className="text-xs text-slate-600 mt-1">Responses: {c.responses} • Impressions: {c.impressions}</div>
+                                                <div key={c.id} className="p-3 rounded border border-slate-200 bg-slate-50 flex items-center justify-between gap-3">
+                                                    <div>
+                                                        <div className="font-medium text-slate-900 text-sm">{c.name}</div>
+                                                        <div className="text-xs text-slate-600 mt-1">Responses: {c.responses} • Impressions: {c.impressions}</div>
+                                                    </div>
+                                                    <Button
+                                                        variant="primary"
+                                                        size="sm"
+                                                        className="h-8 text-xs px-3 bg-indigo-600 hover:bg-indigo-700 text-white shadow-sm"
+                                                        title="Test Trigger (Bypass Locks)"
+                                                        icon={<Zap className="w-3 h-3" />}
+                                                        onClick={() => {
+                                                            const url = new URL(window.location.href);
+                                                            url.searchParams.set('DEBUG_ENGAGEMENT', '1');
+                                                            url.searchParams.set('FORCE_CAMPAIGN_ID', c.id);
+                                                            window.open(url.toString(), '_blank');
+                                                        }}
+                                                    >
+                                                        Test Trigger
+                                                    </Button>
                                                 </div>
                                             ))}
                                         </div>

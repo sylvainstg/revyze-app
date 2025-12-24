@@ -627,6 +627,7 @@ export {
     adminListFeedbackCampaigns,
     adminCreateFeedbackCampaign,
     adminUpdateFeedbackCampaign,
+    adminGetCampaignAnswers,
     sendFeedbackEmailFallbacks
 } from './feedback';
 

@@ -6,9 +6,9 @@ interface ActiveFeedbackResponse {
     campaign: RemoteConfigCampaign | null;
 }
 
-export const getActiveFeedback = async (): Promise<RemoteConfigCampaign | null> => {
-    const callable = httpsCallable<unknown, ActiveFeedbackResponse>(functions, 'feedbackActive');
-    const result = await callable({});
+export const getActiveFeedback = async (forceCampaignId?: string): Promise<RemoteConfigCampaign | null> => {
+    const callable = httpsCallable<any, ActiveFeedbackResponse>(functions, 'feedbackActive');
+    const result = await callable({ forceCampaignId });
     return result.data.campaign || null;
 };
 
@@ -40,4 +40,10 @@ export const sendFeedbackEmailFallbacks = async () => {
     const callable = httpsCallable(functions, 'sendFeedbackEmailFallbacks');
     const res = await callable({});
     return res.data;
+};
+
+export const getFeedbackAnswers = async (campaignId: string) => {
+    const callable = httpsCallable(functions, 'adminGetCampaignAnswers');
+    const res = await callable({ campaignId });
+    return res.data as { answers: any[] };
 };
