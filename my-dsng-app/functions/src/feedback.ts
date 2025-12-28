@@ -201,9 +201,9 @@ export const feedbackAnswer = functions.https.onCall(async (data, context) => {
             answer,
             timestamp: admin.firestore.FieldValue.serverTimestamp(),
             segmentData: campaign.anonymous ? null : {
-                plan: userData.plan,
-                role: userData.role,
-                engagementScore: userData.engagementScore,
+                plan: userData.plan || 'free',
+                role: userData.role || null,
+                engagementScore: userData.engagementScore ?? null,
             }
         };
 
