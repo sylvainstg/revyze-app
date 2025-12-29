@@ -267,12 +267,14 @@ export const Dashboard: React.FC<DashboardProps> = ({
 
               if (isOwner) {
                 // For owners, count guest and pro comments separately
-                const unresolvedComments = allComments.filter(comment => !comment.resolved);
+                // Ensure we filter out deleted comments
+                const unresolvedComments = allComments.filter(comment => !comment.resolved && !comment.deleted);
                 guestUnresolvedCount = unresolvedComments.filter(c => c.audience === 'guest-owner').length;
                 proUnresolvedCount = unresolvedComments.filter(c => c.audience === 'pro-owner').length;
               } else {
                 // For non-owners, show total visible comments
-                const visibleComments = allComments.filter(comment => canSeeComment(comment, userProjectRole));
+                // Ensure we filter out deleted comments
+                const visibleComments = allComments.filter(comment => canSeeComment(comment, userProjectRole) && !comment.deleted);
                 unresolvedCount = visibleComments.filter(comment => !comment.resolved).length;
               }
 
@@ -305,7 +307,8 @@ export const Dashboard: React.FC<DashboardProps> = ({
                     {/* Comment Status Badge */}
                     {(() => {
                       const currentVersion = project.versions.find(v => v.id === project.currentVersionId);
-                      const unresolvedCount = currentVersion?.comments.filter(c => !c.resolved).length || 0;
+                      // Filter out deleted comments here as well
+                      const unresolvedCount = currentVersion?.comments.filter(c => !c.resolved && !c.deleted).length || 0;
 
                       if (unresolvedCount > 0) {
                         return (

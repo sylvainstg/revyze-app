@@ -242,8 +242,9 @@ export const CollaborationPanel: React.FC<CollaborationPanelProps> = ({
               </div>
             ) : (
               sortedComments.map((comment, index) => {
-                // Find the marker number by getting the index in the original comments array
-                const markerNumber = comments.findIndex(c => c.id === comment.id) + 1;
+                // Find the marker number by getting the index in the UN-SORTED filtered list (visibleComments)
+                // This matches the logic in PDFWorkspace where markers are rendered in order
+                const markerNumber = visibleComments.findIndex(c => c.id === comment.id) + 1;
                 return (
                   <CommentCard
                     key={comment.id}
