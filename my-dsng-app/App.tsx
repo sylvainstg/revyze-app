@@ -606,6 +606,12 @@ const App: React.FC = () => {
 
     const success = await storageService.deleteProject(projectToDelete.id, currentUser.id);
     if (success) {
+      // If we are deleting the currently active project, go back to dashboard
+      if (activeProject && projectToDelete.id === activeProject.id) {
+        setView('dashboard');
+        setActiveProjectId(null);
+      }
+
       setProjects(prev => prev.filter(p => p.id !== projectToDelete.id));
       setToast({ message: 'Project moved to trash', type: 'success' });
       setProjectToDelete(null);
@@ -1386,7 +1392,7 @@ const App: React.FC = () => {
 
   // Enhanced Delete Dialog - render at absolute top level
   const renderDeleteDialog = () => {
-    if (projectToDelete && view === 'dashboard') {
+    if (projectToDelete) {
       console.log('[App.tsx] About to render EnhancedDeleteDialog');
       return (
         <EnhancedDeleteDialog
@@ -1404,7 +1410,6 @@ const App: React.FC = () => {
     if (referralCode || inviteDetails) {
       return (
         <>
-          {renderDeleteDialog()}
           <WelcomeLandingPage
             referralCode={referralCode || undefined}
             inviterName={inviteDetails?.inviterName}
@@ -1501,6 +1506,7 @@ const App: React.FC = () => {
   if (view === 'dashboard' && currentUser) {
     return (
       <>
+        {renderDeleteDialog()}
         <Dashboard
           user={currentUser}
           projects={projects}
@@ -1569,6 +1575,13 @@ const App: React.FC = () => {
             }
           }}
         />
+        {toast && (
+          <Toast
+            message={toast.message}
+            type={toast.type}
+            onClose={() => setToast(null)}
+          />
+        )}
       </>
     );
   }
@@ -1642,6 +1655,7 @@ const App: React.FC = () => {
     const canShare = activeProject?.ownerId === currentUser.id;
     return (
       <React.Fragment>
+        {renderDeleteDialog()}
         <div className="h-screen flex flex-col overflow-hidden bg-slate-50">
           {/* Header */}
           <header className="h-16 bg-white border-b border-slate-200 px-6 flex items-center justify-between shrink-0 z-30" style={{ transform: 'none' }}>
