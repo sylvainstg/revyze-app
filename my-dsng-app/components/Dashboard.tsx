@@ -335,9 +335,14 @@ export const Dashboard: React.FC<DashboardProps> = ({
 
                   <div className="p-5 flex-1 flex flex-col">
                     <div className="flex justify-between items-start mb-2">
-                      <h3 className="font-bold text-slate-900 group-hover:text-indigo-600 transition-colors truncate pr-2 flex-1">
-                        {project.name}
-                      </h3>
+                      <div className="flex-1 min-w-0">
+                        <h3 className="font-bold text-slate-900 group-hover:text-indigo-600 transition-colors truncate pr-2">
+                          {project.name}
+                        </h3>
+                        <p className="text-xs text-slate-500 font-medium truncate pr-2 mt-0.5" title={project.ownerName || project.ownerEmail}>
+                          Projet de {project.ownerName || project.ownerEmail.split('@')[0]}
+                        </p>
+                      </div>
 
                       {/* Actions Menu / Share Button */}
                       <div className="flex items-center -mr-1 gap-1">

@@ -817,6 +817,7 @@ const App: React.FC = () => {
       id: newProjectId,
       ownerId: currentUser.id,
       ownerEmail: currentUser.email,
+      ownerName: currentUser.name,
       collaborators: [],
       name: name,
       clientName: clientName,

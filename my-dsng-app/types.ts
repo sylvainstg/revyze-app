@@ -121,6 +121,7 @@ export interface Project {
   clientName: string;
   ownerId: string;
   ownerEmail: string;
+  ownerName?: string;
   collaborators: string[];
   versions: ProjectVersion[];
   currentVersionId: string;

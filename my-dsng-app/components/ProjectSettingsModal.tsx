@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Button } from './ui/Button';
 import { Input } from './ui/Input';
 import { Project } from '../types';
-import { X, Settings, Users, Trash2 } from 'lucide-react';
+import { X, Settings, Users, Trash2, ChevronDown, ChevronRight } from 'lucide-react';
 
 interface ProjectSettingsModalProps {
     project: Project | null;
@@ -24,6 +24,7 @@ export const ProjectSettingsModal: React.FC<ProjectSettingsModalProps> = ({
     const [name, setName] = useState('');
     const [description, setDescription] = useState('');
     const [saving, setSaving] = useState(false);
+    const [showDangerZone, setShowDangerZone] = useState(false);
 
     useEffect(() => {
         if (project) {
@@ -92,19 +93,31 @@ export const ProjectSettingsModal: React.FC<ProjectSettingsModalProps> = ({
                     </div>
 
                     <div className="border-t border-slate-200 pt-4">
-                        <div className="flex items-center justify-between">
-                            <div>
-                                <div className="text-sm font-semibold text-red-700">Delete project</div>
-                                <div className="text-xs text-red-500">Moves project to trash; collaborators lose access</div>
+                        <button
+                            onClick={() => setShowDangerZone(!showDangerZone)}
+                            className="flex items-center justify-between w-full text-left py-2 group"
+                        >
+                            <div className="flex items-center gap-2">
+                                <h4 className="text-sm font-semibold text-red-700">Danger Zone</h4>
+                                {showDangerZone ? <ChevronDown className="w-4 h-4 text-red-500" /> : <ChevronRight className="w-4 h-4 text-red-500" />}
                             </div>
-                            <Button
-                                variant="danger"
-                                icon={<Trash2 className="w-4 h-4" />}
-                                onClick={onDelete}
-                            >
-                                Delete
-                            </Button>
-                        </div>
+                        </button>
+
+                        {showDangerZone && (
+                            <div className="flex items-center justify-between mt-2 p-3 bg-red-50 rounded-xl border border-red-100 animate-in fade-in slide-in-from-top-1 duration-200">
+                                <div>
+                                    <div className="text-sm font-semibold text-red-700">Delete project</div>
+                                    <div className="text-xs text-red-500 max-w-[240px]">Moves project to trash; collaborators lose access. This action can be undone from the cemetery.</div>
+                                </div>
+                                <Button
+                                    variant="danger"
+                                    icon={<Trash2 className="w-4 h-4" />}
+                                    onClick={onDelete}
+                                >
+                                    Delete
+                                </Button>
+                            </div>
+                        )}
                     </div>
                 </div>
 
