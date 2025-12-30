@@ -38,7 +38,7 @@ import { Toast, ToastType } from './components/ui/Toast';
 import { VersionUploadModal } from './components/VersionUploadModal';
 import { VersionSelectorDetailed } from './components/VersionSelector';
 import { CategorySelector } from './components/CategorySelector';
-import { EditVersionModal } from './components/EditVersionModal';
+import { ManageVersionModal } from './components/ManageVersionModal';
 import { EnhancedDeleteDialog } from './components/EnhancedDeleteDialog';
 import { CemeteryView } from './components/CemeteryView';
 import { FeedbackModal } from './components/FeedbackModal';
@@ -1020,33 +1020,36 @@ const App: React.FC = () => {
     setEditVersionModalOpen(true);
   };
 
-  const handleUpdateVersionCategory = async (newCategory: string) => {
+  const handleUpdateVersion = async (updates: { name: string; category: string }) => {
     if (!activeProject || !versionToEdit) return;
 
-    // 1. Calculate new version number for this category
-    const nextCatVer = getNextCategoryVersion(activeProject.versions, newCategory);
+    const { name, category } = updates;
+    const oldCategory = versionToEdit.category;
 
-    console.log('[handleUpdateVersionCategory] Starting update:', {
+    // 1. Calculate new version number for this category if it changed
+    let nextCatVer = versionToEdit.categoryVersionNumber;
+    if (category !== oldCategory) {
+      nextCatVer = getNextCategoryVersion(activeProject.versions, category);
+    }
+
+    console.log('[handleUpdateVersion] Starting update:', {
       versionId: versionToEdit.id,
-      oldCategory: versionToEdit.category,
-      newCategory,
-      nextCatVer,
-      allVersions: activeProject.versions.map(v => ({ id: v.id, category: v.category, catVer: v.categoryVersionNumber }))
+      oldCategory,
+      newCategory: category,
+      newName: name,
+      nextCatVer
     });
 
     // 2. Update the version
     const updatedVersion = {
       ...versionToEdit,
-      category: newCategory,
+      name: name.trim() || undefined,
+      category: category,
       categoryVersionNumber: nextCatVer
     };
 
     // 3. Update project versions
     const updatedVersions = activeProject.versions.map(v => v.id === versionToEdit.id ? updatedVersion : v);
-
-    console.log('[handleUpdateVersionCategory] Updated versions:',
-      updatedVersions.map(v => ({ id: v.id, category: v.category, catVer: v.categoryVersionNumber }))
-    );
 
     const updatedProject = {
       ...activeProject,
@@ -1056,30 +1059,79 @@ const App: React.FC = () => {
 
     // If we moved the currently active version, switch the active category view to the new one
     if (versionToEdit.id === activeProject.currentVersionId) {
-      updatedProject.activeCategory = newCategory;
-      setActiveCategory(newCategory);
+      updatedProject.activeCategory = category;
+      setActiveCategory(category);
     }
 
-    // 4. Save using partial update to be safe
-    // Optimistic update
-    lastOptimisticUpdateRef.current = Date.now(); // Mark the time of optimistic update
+    // 4. Save
+    lastOptimisticUpdateRef.current = Date.now();
     setProjects(prev => prev.map(p => p.id === activeProject.id ? updatedProject : p));
-
-    console.log('[handleUpdateVersionCategory] Optimistic update applied at', lastOptimisticUpdateRef.current, ', sending to Firestore...');
 
     const success = await storageService.updateProjectPartial(activeProject.id, {
       versions: updatedVersions,
       activeCategory: updatedProject.activeCategory
     });
 
-    console.log('[handleUpdateVersionCategory] Firestore update result:', success);
-
     if (success) {
-      setToast({ message: `Version moved to ${newCategory}`, type: 'success' });
+      setToast({ message: `Version updated successfully`, type: 'success' });
       setEditVersionModalOpen(false);
       setVersionToEdit(null);
     } else {
-      setToast({ message: 'Failed to update category', type: 'error' });
+      setToast({ message: 'Failed to update version', type: 'error' });
+    }
+  };
+
+  const handleDeleteVersion = async () => {
+    if (!activeProject || !versionToEdit || !currentUser) return;
+
+    // Minimum 1 version required per project? 
+    // Actually, mood board versions might be special, but let's assume we can't delete the last version overall.
+    if (activeProject.versions.length <= 1) {
+      setToast({ message: 'Cannot delete the only version of a project', type: 'error' });
+      return;
+    }
+
+    const versionIdToDelete = versionToEdit.id;
+    const categoryOfDeleted = versionToEdit.category;
+
+    // Filter out the version
+    const updatedVersions = activeProject.versions.filter(v => v.id !== versionIdToDelete);
+
+    // Determine new active version if the deleted one was active
+    let newActiveVersionId = activeProject.currentVersionId;
+    let newActiveCategory = activeCategory;
+
+    if (versionIdToDelete === activeProject.currentVersionId) {
+      // Find another version in same category first
+      const sameCategoryVersions = updatedVersions.filter(v => v.category === categoryOfDeleted);
+      if (sameCategoryVersions.length > 0) {
+        newActiveVersionId = sameCategoryVersions[0].id;
+      } else {
+        // Find latest version overall
+        const sorted = [...updatedVersions].sort((a, b) => b.timestamp - a.timestamp);
+        newActiveVersionId = sorted[0].id;
+        newActiveCategory = sorted[0].category;
+      }
+    }
+
+    const updatedProject: Project = {
+      ...activeProject,
+      versions: updatedVersions,
+      currentVersionId: newActiveVersionId,
+      activeCategory: newActiveCategory,
+      lastModified: Date.now()
+    };
+
+    // Persist
+    const success = await storageService.saveProject(updatedProject);
+    if (success) {
+      setProjects(prev => prev.map(p => p.id === activeProject.id ? updatedProject : p));
+      setActiveCategory(newActiveCategory);
+      setToast({ message: 'Version deleted successfully', type: 'success' });
+      setEditVersionModalOpen(false);
+      setVersionToEdit(null);
+    } else {
+      setToast({ message: 'Failed to delete version', type: 'error' });
     }
   };
 
@@ -2026,18 +2078,20 @@ const App: React.FC = () => {
           onCreate={handleCreateProjectWithData}
         />
 
-        {/* Edit Version Modal */}
+        {/* Manage Version Modal */}
         {activeProject && versionToEdit && (
-          <EditVersionModal
+          <ManageVersionModal
             isOpen={editVersionModalOpen}
             onClose={() => {
               setEditVersionModalOpen(false);
               setVersionToEdit(null);
             }}
-            onSave={handleUpdateVersionCategory}
+            onSave={handleUpdateVersion}
+            onDelete={handleDeleteVersion}
+            currentName={versionToEdit.name || ''}
             currentCategory={versionToEdit.category || DEFAULT_CATEGORY}
             existingCategories={getCategories(activeProject.versions)}
-            versionName={`Version ${versionToEdit.versionNumber} - ${versionToEdit.fileName} `}
+            versionDisplay={`Version ${versionToEdit.versionNumber} - ${versionToEdit.fileName}`}
           />
         )}
 

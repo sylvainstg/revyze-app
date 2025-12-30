@@ -94,6 +94,7 @@ export interface MoodBoardElement {
 export interface ProjectVersion {
   id: string;
   versionNumber: number; // Global version number across all categories
+  name?: string;
   category: string; // Document category: 'Structural', 'Electrical', 'Plumbing', etc.
   categoryVersionNumber: number; // Version number within this category
   fileUrl: string; // Data URL or Object URL

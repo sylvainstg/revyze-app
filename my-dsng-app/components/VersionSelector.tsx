@@ -28,7 +28,7 @@ export const VersionSelector: React.FC<VersionSelectorProps> = ({
 
                     return (
                         <option key={version.id} value={version.id}>
-                            v{version.versionNumber} - {version.fileName} ({commentsCount} comment{commentsCount !== 1 ? 's' : ''})
+                            {version.name || `v${version.versionNumber}`} - {version.fileName} ({commentsCount} comment{commentsCount !== 1 ? 's' : ''})
                         </option>
                     );
                 })}
@@ -74,8 +74,11 @@ export const VersionSelectorDetailed: React.FC<VersionSelectorDetailedProps> = (
             <button
                 onClick={() => setIsOpen(!isOpen)}
                 className="flex items-center gap-2 bg-white border border-slate-300 rounded-lg px-4 py-2 text-sm font-medium text-slate-700 hover:border-indigo-400 focus:outline-none focus:ring-2 focus:ring-indigo-500 transition-colors"
+                title={currentVersion?.name || `Version ${currentVersion?.versionNumber}`}
             >
-                <span>v{currentVersion?.versionNumber}</span>
+                <span className="truncate max-w-[120px]">
+                    {currentVersion?.name || `v${currentVersion?.versionNumber}`}
+                </span>
                 <svg className={`w-4 h-4 transition-transform ${isOpen ? 'rotate-180' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
                 </svg>
@@ -104,15 +107,20 @@ export const VersionSelectorDetailed: React.FC<VersionSelectorDetailedProps> = (
                                         className="flex-1 min-w-0 text-left"
                                     >
                                         <div className="flex items-center gap-2 mb-1">
-                                            <span className={`font-semibold ${isActive ? 'text-indigo-600' : 'text-slate-900'}`}>
-                                                Version {version.versionNumber}
+                                            <span className={`font-semibold truncate ${isActive ? 'text-indigo-600' : 'text-slate-900'}`}>
+                                                {version.name || `Version ${version.versionNumber}`}
                                             </span>
                                             {isActive && (
-                                                <span className="text-xs bg-indigo-100 text-indigo-700 px-2 py-0.5 rounded-full font-medium">
+                                                <span className="flex-shrink-0 text-xs bg-indigo-100 text-indigo-700 px-2 py-0.5 rounded-full font-medium">
                                                     Current
                                                 </span>
                                             )}
                                         </div>
+                                        {version.name && (
+                                            <div className="text-[10px] text-slate-400 font-medium mb-1 uppercase tracking-wider">
+                                                Version {version.versionNumber}
+                                            </div>
+                                        )}
                                         <div className="text-sm text-slate-600 truncate mb-2">
                                             {version.fileName}
                                         </div>
