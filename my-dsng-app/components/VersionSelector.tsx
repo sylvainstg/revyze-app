@@ -87,7 +87,7 @@ export const VersionSelectorDetailed: React.FC<VersionSelectorDetailedProps> = (
             {isOpen && (
                 <>
                     <div className="fixed inset-0" style={{ zIndex: 99998 }} onClick={() => setIsOpen(false)} />
-                    <div className="absolute left-0 mt-2 w-80 bg-white rounded-xl shadow-lg border border-slate-200 py-2 max-h-96 overflow-y-auto" style={{ zIndex: 99999 }}>
+                    <div className="absolute left-0 mt-2 w-[420px] bg-white rounded-xl shadow-lg border border-slate-200 py-2 max-h-96 overflow-y-auto" style={{ zIndex: 99999 }}>
                         {sortedVersions.map((version) => {
                             const isActive = version.id === currentVersionId;
                             const commentsCount = version.comments?.length || 0;
