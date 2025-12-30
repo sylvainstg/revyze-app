@@ -25,6 +25,7 @@ interface DashboardProps {
   onOpenAdmin: () => void;
   onOpenCemetery: () => void;
   onRelaunchOnboarding: () => void;
+  limits: any;
 }
 
 export const Dashboard: React.FC<DashboardProps> = ({
@@ -40,7 +41,8 @@ export const Dashboard: React.FC<DashboardProps> = ({
   onOpenProjectSettings,
   onOpenAdmin,
   onOpenCemetery,
-  onRelaunchOnboarding
+  onRelaunchOnboarding,
+  limits
 }) => {
   const [search, setSearch] = useState('');
   const [isEditProfileOpen, setIsEditProfileOpen] = useState(false);
@@ -55,13 +57,15 @@ export const Dashboard: React.FC<DashboardProps> = ({
 
   const { toggleAdminMode, impersonatedRole } = useAdmin();
 
+  // Use passed limits or fallback to constants
+  const currentPlan = PLANS[user.plan || 'free'];
+  const planLimits = limits?.[user.plan || 'free'] || currentPlan.limits;
+
   const filteredProjects = projects.filter(p =>
     p.name.toLowerCase().includes(search.toLowerCase()) ||
     p.clientName.toLowerCase().includes(search.toLowerCase())
   );
 
-  const currentPlan = PLANS[user.plan || 'free'];
-  const limits = currentPlan.limits;
   const ownedProjects = projects.filter(p => p.ownerId === user.id);
   const totalShares = (user.shareCountGuest || 0) + (user.shareCountPro || 0);
   const sharedWith = Array.from(new Set(
@@ -223,13 +227,20 @@ export const Dashboard: React.FC<DashboardProps> = ({
             />
           </div>
           <div className="flex items-center gap-4 w-full md:w-auto">
-            {(limits.ownedProjects !== Infinity || limits.totalProjects !== Infinity) && (
-              <div className="text-sm text-slate-600 bg-slate-100 px-3 py-2 rounded-lg">
-                <span className="font-medium">{projects.filter(p => p.ownerId === user.id).length}/{limits.ownedProjects}</span> owned
-                <span className="mx-2">·</span>
-                <span className="font-medium">{projects.length}/{limits.totalProjects}</span> total
-              </div>
-            )}
+            {(() => {
+              const isUnlimited = (val: number) => val === -1 || val === Infinity;
+              const showLimits = !isUnlimited(planLimits.ownedProjects) || !isUnlimited(planLimits.totalProjects);
+
+              if (!showLimits) return null;
+
+              return (
+                <div className="text-sm text-slate-600 bg-slate-100 px-3 py-2 rounded-lg">
+                  <span className="font-medium">{projects.filter(p => p.ownerId === user.id).length}/{planLimits.ownedProjects}</span> owned
+                  <span className="mx-2">·</span>
+                  <span className="font-medium">{projects.length}/{planLimits.totalProjects}</span> total
+                </div>
+              );
+            })()}
             <div className="flex items-center gap-2">
               <Button onClick={onCreateProject} icon={<Plus className="w-4 h-4" />}>
                 New Project

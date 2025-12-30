@@ -175,29 +175,7 @@ const App: React.FC = () => {
       try {
         setPricingLoading(true);
 
-        // 1. Fetch Plan Limits (in parallel with pricing if we wanted, but sequential is fine for now)
-        try {
-          const getPlanLimitsFunc = httpsCallable(functions, 'getPlanLimits');
-          const limitsResult = await getPlanLimitsFunc();
-          const limitsData = limitsResult.data as { limits: any };
-          if (limitsData?.limits) {
-            setFetchedLimits(limitsData.limits);
-            console.log('Fetched dynamic plan limits:', limitsData.limits);
-          }
-        } catch (limitError) {
-          console.error('Failed to fetch plan limits, using defaults:', limitError);
-        }
-
-        // 2. Fetch Stripe Pricing
-        const stripePricing = await fetchStripePricing();
-
-        // Use the LATEST limits (either fetched or default) for enriching plans
-        // We need to construct a dynamic metadata object that uses the fetched limits
-        // Note: We use state setter functional update pattern or just rely on the variable we just got if we could, 
-        // but since state updates are async, let's look at how to merge.
-        // Actually, for this initial load, we can't easily rely on 'fetchedLimits' state being updated yet 
-        // if we just called setFetchedLimits above.
-        // So we should capture the limits in a variable.
+        // 1. Fetch Plan Limits
         let currentLimits = PLAN_LIMITS;
         try {
           const getPlanLimitsFunc = httpsCallable(functions, 'getPlanLimits');
@@ -206,10 +184,14 @@ const App: React.FC = () => {
           if (limitsData?.limits) {
             currentLimits = limitsData.limits;
             setFetchedLimits(currentLimits);
+            console.log('Fetched dynamic plan limits:', currentLimits);
           }
-        } catch (err) {
-          console.error(err);
+        } catch (limitError) {
+          console.error('Failed to fetch plan limits, using defaults:', limitError);
         }
+
+        // 2. Fetch Stripe Pricing
+        const stripePricing = await fetchStripePricing();
 
         // Construct dynamic metadata with fetched limits
         const dynamicMetadata = {
@@ -755,7 +737,8 @@ const App: React.FC = () => {
     const ownedCount = ownedProjects.length;
 
     // Check owned projects limit
-    if (ownedCount >= limits.ownedProjects) {
+    const isOwnedUnlimited = limits.ownedProjects === -1 || limits.ownedProjects === Infinity;
+    if (!isOwnedUnlimited && ownedCount >= limits.ownedProjects) {
       if (confirm(`You have reached the limit of ${limits.ownedProjects} owned project${limits.ownedProjects > 1 ? 's' : ''} for the ${plan} plan.Upgrade to create more ? `)) {
         setView('pricing');
       }
@@ -763,7 +746,8 @@ const App: React.FC = () => {
     }
 
     // Also check total projects limit (owned + shared)
-    if (projects.length >= limits.totalProjects) {
+    const isTotalUnlimited = limits.totalProjects === -1 || limits.totalProjects === Infinity;
+    if (!isTotalUnlimited && projects.length >= limits.totalProjects) {
       if (confirm(`You have reached the limit of ${limits.totalProjects} total projects for the ${plan} plan.Upgrade for unlimited projects ? `)) {
         setView('pricing');
       }
@@ -1520,6 +1504,7 @@ const App: React.FC = () => {
         <Dashboard
           user={currentUser}
           projects={projects}
+          limits={fetchedLimits}
           onCreateProject={() => setIsCreateProjectModalOpen(true)}
           onImportProject={handleImportProject}
           onOpenProject={handleOpenProject}
