@@ -1322,7 +1322,19 @@ const App: React.FC = () => {
   };
 
   const handleDeleteComment = async (id: string) => {
-    if (!activeProject || !activeVersion) return;
+    if (!activeProject || !activeVersion || !currentUser) return;
+
+    // Find the comment and check permissions
+    const comment = activeVersion.comments.find(c => c.id === id);
+    if (!comment) return;
+
+    const isOwner = activeProject.ownerId === currentUser.id;
+    const isAuthor = comment.authorName === currentUser.email;
+
+    if (!isOwner && !isAuthor) {
+      console.warn('[App.tsx] Unauthorized delete attempt:', { id, userId: currentUser.id });
+      return;
+    }
 
     const updatedProject = {
       ...activeProject,

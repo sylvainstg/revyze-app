@@ -385,16 +385,18 @@ const CommentCard: React.FC<{
                 <CheckCircle className="w-4 h-4 text-green-600" />
               </button>
             )}
-            <button
-              onClick={(e) => {
-                e.stopPropagation();
-                onDelete(comment.id);
-              }}
-              className="opacity-0 group-hover:opacity-100 transition-opacity p-1.5 rounded hover:bg-red-50"
-              title="Delete comment"
-            >
-              <Trash2 className="w-4 h-4 text-red-600" />
-            </button>
+            {(projectRole === 'owner' || (currentUserEmail && comment.authorName === currentUserEmail)) && (
+              <button
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onDelete(comment.id);
+                }}
+                className="opacity-0 group-hover:opacity-100 transition-opacity p-1.5 rounded hover:bg-red-50"
+                title="Delete comment"
+              >
+                <Trash2 className="w-4 h-4 text-red-600" />
+              </button>
+            )}
           </div>
         </div>
 
