@@ -328,123 +328,139 @@ export const ImageWorkspace: React.FC<ImageWorkspaceProps> = ({
                             {imageLoaded && visibleComments.map(({ comment, distance }, idx) => {
                                 const fade = Math.max(0.25, 1 - distance * 0.2);
                                 return (
-                                <button
-                                    key={comment.id}
-                                    onClick={(e) => {
-                                        e.stopPropagation();
-                                        setActiveCommentId(comment.id);
-                                        onFocusComment?.(comment.id);
-                                    }}
-                                    className={`absolute w-8 h-8 -ml-4 -mt-8 transform transition-all duration-200 hover:scale-110 z-10 group ${activeCommentId === comment.id ? 'scale-150 z-30' : ''
-                                        } ${comment.deleted ? 'opacity-50 grayscale' : ''} `}
-                                    style={{ left: `${comment.x}%`, top: `${comment.y}%` }}
-                                >
-                                    <div
-                                        className={`relative flex items-center justify-center w-full h-full rounded-full shadow-lg border-2 transition-all duration-200 
-                                            ${comment.deleted ? 'bg-red-100 border-red-200' :
-                                                comment.resolved ? 'bg-slate-400 border-slate-500' :
-                                                    comment.author === currentUserRole ? 'bg-indigo-600 border-indigo-200 ring-2 ring-indigo-400' : // Emphasis for own comments
-                                                        comment.author === UserRole.DESIGNER ? 'bg-purple-600 border-white' : 'bg-blue-500 border-white'
-                                            } ${activeCommentId === comment.id ? 'ring-4 ring-indigo-300/50 shadow-xl' : ''} `} style={{ opacity: fade }}
+                                    <button
+                                        key={comment.id}
+                                        onClick={(e) => {
+                                            e.stopPropagation();
+                                            setActiveCommentId(comment.id);
+                                            onFocusComment?.(comment.id);
+                                        }}
+                                        className={`absolute w-8 h-8 -ml-4 -mt-8 transform transition-all duration-200 hover:scale-110 z-10 group ${activeCommentId === comment.id ? 'scale-150 z-30' : ''
+                                            } ${comment.deleted ? 'opacity-50 grayscale' : ''} `}
+                                        style={{ left: `${comment.x}%`, top: `${comment.y}%` }}
                                     >
-                                        {comment.deleted ? (
-                                            <X className="w-4 h-4 text-red-500" />
-                                        ) : (
-                                            <span className="text-white text-xs font-bold">
-                                                {idx + 1}
-                                            </span>
-                                        )}
-
-                                        {/* Tooltip on hover - Full text */}
-                                        <div className="absolute bottom-full mb-2 hidden group-hover:block w-48 bg-slate-800 text-white text-xs py-2 px-3 rounded shadow-xl pointer-events-none z-50">
-                                            <p className="line-clamp-3">{comment.text}</p>
-                                            <div className="absolute top-full left-1/2 -ml-1 border-4 border-transparent border-t-slate-800"></div>
-                                        </div>
-                                    </div>
-                                    {/* Arrow pointer */}
-                                    {!comment.deleted && (
                                         <div
-                                            className={`absolute top-full left-1/2 -ml-1 -mt-1 w-0 h-0 border-l-4 border-l-transparent border-r-4 border-r-transparent border-t-4 ${comment.resolved ? 'border-t-slate-400' :
-                                                comment.author === UserRole.DESIGNER ? 'border-t-purple-600' : 'border-t-indigo-600'
-                                                } `} style={{ opacity: fade }}
-                                        ></div>
-                                    )}
-                                </button>
-                            );})}
+                                            className={`relative flex items-center justify-center w-full h-full rounded-full shadow-lg border-2 transition-all duration-200 
+                                            ${comment.deleted ? 'bg-red-100 border-red-200' :
+                                                    comment.resolved ? 'bg-slate-400 border-slate-500' :
+                                                        comment.author === currentUserRole ? 'bg-indigo-600 border-indigo-200 ring-2 ring-indigo-400' : // Emphasis for own comments
+                                                            comment.author === UserRole.DESIGNER ? 'bg-purple-600 border-white' : 'bg-blue-500 border-white'
+                                                } ${activeCommentId === comment.id ? 'ring-4 ring-indigo-300/50 shadow-xl' : ''} `} style={{ opacity: fade }}
+                                        >
+                                            {comment.deleted ? (
+                                                <X className="w-4 h-4 text-red-500" />
+                                            ) : (
+                                                <span className="text-white text-xs font-bold">
+                                                    {idx + 1}
+                                                </span>
+                                            )}
+
+                                            {/* Tooltip on hover - Full text */}
+                                            <div className="absolute bottom-full mb-2 hidden group-hover:block w-48 bg-slate-800 text-white text-xs py-2 px-3 rounded shadow-xl pointer-events-none z-50">
+                                                <p className="line-clamp-3">{comment.text}</p>
+                                                <div className="absolute top-full left-1/2 -ml-1 border-4 border-transparent border-t-slate-800"></div>
+                                            </div>
+                                        </div>
+                                        {/* Arrow pointer */}
+                                        {!comment.deleted && (
+                                            <div
+                                                className={`absolute top-full left-1/2 -ml-1 -mt-1 w-0 h-0 border-l-4 border-l-transparent border-r-4 border-r-transparent border-t-4 ${comment.resolved ? 'border-t-slate-400' :
+                                                    comment.author === UserRole.DESIGNER ? 'border-t-purple-600' : 'border-t-indigo-600'
+                                                    } `} style={{ opacity: fade }}
+                                            ></div>
+                                        )}
+                                    </button>
+                                );
+                            })}
 
                             {/* New Comment Form */}
-                            {imageLoaded && tempMarker && (
-                                <div
-                                    className="absolute bg-white rounded-lg shadow-2xl p-4 w-80 z-30 border border-slate-200"
-                                    style={{
-                                        left: `${tempMarker.x}% `,
-                                        top: `${tempMarker.y}% `,
-                                        transform: 'translate(-50%, calc(-100% - 20px))'
-                                    }}
-                                    onClick={(e) => e.stopPropagation()}
-                                >
-                                    <div className="absolute -top-2 left-1/2 -ml-2 w-4 h-4 bg-white border-t border-l border-slate-200 transform rotate-45"></div>
+                            {imageLoaded && tempMarker && (() => {
+                                const isLowY = tempMarker.y < 25;
+                                const isLeftX = tempMarker.x < 15;
+                                const isRightX = tempMarker.x > 85;
 
-                                    <div className="flex justify-between items-center mb-2">
-                                        <span className="text-xs font-semibold text-slate-500 uppercase tracking-wider">
-                                            New Note
-                                        </span>
-                                        <button
-                                            onClick={() => setTempMarker(null)}
-                                            className="text-slate-400 hover:text-slate-600"
-                                        >
-                                            <X className="w-4 h-4" />
-                                        </button>
+                                return (
+                                    <div
+                                        className="absolute bg-white rounded-lg shadow-2xl p-4 w-80 z-30 border border-slate-200"
+                                        style={{
+                                            left: `${tempMarker.x}% `,
+                                            top: `${tempMarker.y}% `,
+                                            transform: `translate(${isLeftX ? '0%' : isRightX ? '-100%' : '-50%'}, ${isLowY ? '20px' : 'calc(-100% - 20px)'})`
+                                        }}
+                                        onClick={(e) => e.stopPropagation()}
+                                    >
+                                        {/* Arrow pointing to marker */}
+                                        <div
+                                            className={`absolute w-4 h-4 bg-white border-slate-200 transform rotate-45 ${isLowY
+                                                ? '-top-2 border-t border-l'
+                                                : 'top-full -mt-2 border-b border-r'
+                                                }`}
+                                            style={{
+                                                left: isLeftX ? '20px' : isRightX ? 'calc(100% - 36px)' : 'calc(50% - 8px)'
+                                            }}
+                                        ></div>
+
+                                        <div className="flex justify-between items-center mb-2">
+                                            <span className="text-xs font-semibold text-slate-500 uppercase tracking-wider">
+                                                New Note
+                                            </span>
+                                            <button
+                                                onClick={() => setTempMarker(null)}
+                                                className="text-slate-400 hover:text-slate-600"
+                                            >
+                                                <X className="w-4 h-4" />
+                                            </button>
+                                        </div>
+
+                                        <textarea
+                                            autoFocus
+                                            value={commentText}
+                                            onChange={(e) => setCommentText(e.target.value)}
+                                            className="w-full text-sm border border-slate-200 rounded-md p-2 focus:ring-2 focus:ring-indigo-500 focus:border-transparent outline-none resize-none mb-3 bg-white text-slate-900 placeholder:text-slate-400"
+                                            placeholder="Type your feedback here..."
+                                            rows={3}
+                                        />
+
+                                        <div className="flex items-center justify-between">
+                                            <label
+                                                className={`flex items - center gap - 1.5 text - xs font - medium cursor - pointer select - none px - 2 py - 1.5 rounded transition - colors ${useAI
+                                                    ? 'bg-indigo-50 text-indigo-700'
+                                                    : 'text-slate-500 hover:bg-slate-50'
+                                                    } `}
+                                            >
+                                                <input
+                                                    type="checkbox"
+                                                    checked={useAI}
+                                                    onChange={(e) => setUseAI(e.target.checked)}
+                                                    className="hidden"
+                                                />
+                                                <Sparkles
+                                                    className={`w - 3.5 h - 3.5 ${useAI ? 'text-indigo-500' : 'text-slate-400'} `}
+                                                />
+                                                {useAI ? 'AI Analysis On' : 'AI Analysis Off'}
+                                            </label>
+
+                                            <button
+                                                onClick={handleSubmitComment}
+                                                disabled={!commentText.trim() || isAnalyzing}
+                                                className="bg-indigo-600 text-white p-2 rounded-md hover:bg-indigo-700 disabled:opacity-50 flex items-center gap-2 text-xs font-medium"
+                                            >
+                                                {isAnalyzing ? (
+                                                    <>
+                                                        <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                                                        Analyzing...
+                                                    </>
+                                                ) : (
+                                                    <>
+                                                        <Plus className="w-3.5 h-3.5" />
+                                                        Post
+                                                    </>
+                                                )}
+                                            </button>
+                                        </div>
                                     </div>
-
-                                    <textarea
-                                        autoFocus
-                                        value={commentText}
-                                        onChange={(e) => setCommentText(e.target.value)}
-                                        className="w-full text-sm border border-slate-200 rounded-md p-2 focus:ring-2 focus:ring-indigo-500 focus:border-transparent outline-none resize-none mb-3 bg-white text-slate-900 placeholder:text-slate-400"
-                                        placeholder="Type your feedback here..."
-                                        rows={3}
-                                    />
-
-                                    <div className="flex items-center justify-between">
-                                        <label
-                                            className={`flex items - center gap - 1.5 text - xs font - medium cursor - pointer select - none px - 2 py - 1.5 rounded transition - colors ${useAI
-                                                ? 'bg-indigo-50 text-indigo-700'
-                                                : 'text-slate-500 hover:bg-slate-50'
-                                                } `}
-                                        >
-                                            <input
-                                                type="checkbox"
-                                                checked={useAI}
-                                                onChange={(e) => setUseAI(e.target.checked)}
-                                                className="hidden"
-                                            />
-                                            <Sparkles
-                                                className={`w - 3.5 h - 3.5 ${useAI ? 'text-indigo-500' : 'text-slate-400'} `}
-                                            />
-                                            {useAI ? 'AI Analysis On' : 'AI Analysis Off'}
-                                        </label>
-
-                                        <button
-                                            onClick={handleSubmitComment}
-                                            disabled={!commentText.trim() || isAnalyzing}
-                                            className="bg-indigo-600 text-white p-2 rounded-md hover:bg-indigo-700 disabled:opacity-50 flex items-center gap-2 text-xs font-medium"
-                                        >
-                                            {isAnalyzing ? (
-                                                <>
-                                                    <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                                                    Analyzing...
-                                                </>
-                                            ) : (
-                                                <>
-                                                    <Plus className="w-3.5 h-3.5" />
-                                                    Post
-                                                </>
-                                            )}
-                                        </button>
-                                    </div>
-                                </div>
-                            )}
+                                );
+                            })()}
 
                             {/* Indicator for creation point */}
                             {imageLoaded && tempMarker && (

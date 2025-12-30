@@ -588,75 +588,90 @@ export const PDFWorkspace: React.FC<PDFWorkspaceProps> = ({
             })}
 
             {/* New Comment Form */}
-            {!loadError && tempMarker && (
-              <div
-                className="absolute bg-white rounded-lg shadow-2xl p-4 w-80 z-30 border border-slate-200"
-                style={{
-                  left: `${tempMarker.x}%`,
-                  top: `${tempMarker.y}%`,
-                  transform: 'translate(-50%, calc(-100% - 20px))'
-                }}
-              >
-                <div className="absolute -top-2 left-1/2 -ml-2 w-4 h-4 bg-white border-t border-l border-slate-200 transform rotate-45"></div>
+            {!loadError && tempMarker && (() => {
+              const isLowY = tempMarker.y < 25;
+              const isLeftX = tempMarker.x < 15;
+              const isRightX = tempMarker.x > 85;
 
-                <div className="flex justify-between items-center mb-2">
-                  <span className="text-xs font-semibold text-slate-500 uppercase tracking-wider">New Note</span>
-                  <button onClick={() => setTempMarker(null)} className="text-slate-400 hover:text-slate-600">
-                    <X className="w-4 h-4" />
-                  </button>
-                </div>
-
-                <MentionInput
-                  autoFocus
-                  value={commentText}
-                  onChange={(val, newMentions) => {
-                    setCommentText(val);
-                    setPendingMentions(newMentions);
+              return (
+                <div
+                  className="absolute bg-white rounded-lg shadow-2xl p-4 w-80 z-30 border border-slate-200"
+                  style={{
+                    left: `${tempMarker.x}%`,
+                    top: `${tempMarker.y}%`,
+                    transform: `translate(${isLeftX ? '0%' : isRightX ? '-100%' : '-50%'}, ${isLowY ? '20px' : 'calc(-100% - 20px)'})`
                   }}
-                  collaborators={collaborators}
-                  placeholder="Type your feedback here... Use @ to mention"
-                  currentUserEmail={currentUserEmail}
-                  className="mb-3 text-sm"
-                  onKeyDown={(e) => {
-                    if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) {
-                      handleSubmitComment();
-                    }
-                  }}
-                  minHeight="80px"
-                />
+                >
+                  {/* Arrow pointing to marker */}
+                  <div
+                    className={`absolute w-4 h-4 bg-white border-slate-200 transform rotate-45 ${isLowY
+                      ? '-top-2 border-t border-l'
+                      : 'top-full -mt-2 border-b border-r'
+                      }`}
+                    style={{
+                      left: isLeftX ? '20px' : isRightX ? 'calc(100% - 36px)' : 'calc(50% - 8px)'
+                    }}
+                  ></div>
 
-                <div className="flex items-center justify-between">
-                  <label className={`flex items-center gap-1.5 text-xs font-medium cursor-pointer select-none px-2 py-1.5 rounded transition-colors ${useAI ? 'bg-indigo-50 text-indigo-700' : 'text-slate-500 hover:bg-slate-50'}`}>
-                    <input
-                      type="checkbox"
-                      checked={useAI}
-                      onChange={(e) => setUseAI(e.target.checked)}
-                      className="hidden"
-                    />
-                    <Sparkles className={`w-3.5 h-3.5 ${useAI ? 'text-indigo-500' : 'text-slate-400'}`} />
-                    {useAI ? 'AI Analysis On' : 'AI Analysis Off'}
-                  </label>
+                  <div className="flex justify-between items-center mb-2">
+                    <span className="text-xs font-semibold text-slate-500 uppercase tracking-wider">New Note</span>
+                    <button onClick={() => setTempMarker(null)} className="text-slate-400 hover:text-slate-600">
+                      <X className="w-4 h-4" />
+                    </button>
+                  </div>
 
-                  <button
-                    onClick={handleSubmitComment}
-                    disabled={!commentText.trim() || isAnalyzing}
-                    className="bg-indigo-600 text-white p-2 rounded-md hover:bg-indigo-700 disabled:opacity-50 flex items-center gap-2 text-xs font-medium"
-                  >
-                    {isAnalyzing ? (
-                      <>
-                        <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                        Analyzing...
-                      </>
-                    ) : (
-                      <>
-                        <Plus className="w-3.5 h-3.5" />
-                        Post
-                      </>
-                    )}
-                  </button>
+                  <MentionInput
+                    autoFocus
+                    value={commentText}
+                    onChange={(val, newMentions) => {
+                      setCommentText(val);
+                      setPendingMentions(newMentions);
+                    }}
+                    collaborators={collaborators}
+                    placeholder="Type your feedback here... Use @ to mention"
+                    currentUserEmail={currentUserEmail}
+                    className="mb-3 text-sm"
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) {
+                        handleSubmitComment();
+                      }
+                    }}
+                    minHeight="80px"
+                  />
+
+                  <div className="flex items-center justify-between">
+                    <label className={`flex items-center gap-1.5 text-xs font-medium cursor-pointer select-none px-2 py-1.5 rounded transition-colors ${useAI ? 'bg-indigo-50 text-indigo-700' : 'text-slate-500 hover:bg-slate-50'}`}>
+                      <input
+                        type="checkbox"
+                        checked={useAI}
+                        onChange={(e) => setUseAI(e.target.checked)}
+                        className="hidden"
+                      />
+                      <Sparkles className={`w-3.5 h-3.5 ${useAI ? 'text-indigo-500' : 'text-slate-400'}`} />
+                      {useAI ? 'AI Analysis On' : 'AI Analysis Off'}
+                    </label>
+
+                    <button
+                      onClick={handleSubmitComment}
+                      disabled={!commentText.trim() || isAnalyzing}
+                      className="bg-indigo-600 text-white p-2 rounded-md hover:bg-indigo-700 disabled:opacity-50 flex items-center gap-2 text-xs font-medium"
+                    >
+                      {isAnalyzing ? (
+                        <>
+                          <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                          Analyzing...
+                        </>
+                      ) : (
+                        <>
+                          <Plus className="w-3.5 h-3.5" />
+                          Post
+                        </>
+                      )}
+                    </button>
+                  </div>
                 </div>
-              </div>
-            )}
+              );
+            })()}
 
             {/* Indicator for creation point */}
             {!loadError && tempMarker && (
