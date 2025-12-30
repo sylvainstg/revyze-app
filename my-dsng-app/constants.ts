@@ -1,6 +1,6 @@
 import { PricingPlan, UserRole } from './types';
 
-export const DEFAULT_CATEGORY = 'Architectural';
+export const DEFAULT_CATEGORY = 'Main Plans';
 
 export const STANDARD_CATEGORIES = [
   'Architectural',

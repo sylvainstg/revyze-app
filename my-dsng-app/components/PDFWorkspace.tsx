@@ -48,6 +48,7 @@ interface PDFWorkspaceProps {
   onPageCountChange?: (count: number | null) => void;
   collaborators?: string[];
   currentUserEmail?: string;
+  isOwner?: boolean;
 }
 
 export const PDFWorkspace: React.FC<PDFWorkspaceProps> = ({
@@ -80,6 +81,7 @@ export const PDFWorkspace: React.FC<PDFWorkspaceProps> = ({
   onPageCountChange,
   collaborators = [],
   currentUserEmail = '',
+  isOwner = false,
 }) => {
   const [numPages, setNumPages] = useState<number | null>(null);
   const [isAddingComment, setIsAddingComment] = useState(false);
@@ -407,56 +409,57 @@ export const PDFWorkspace: React.FC<PDFWorkspaceProps> = ({
                 </button>
               </div>
 
-              {/* Plan Preferences Menu */}
-              <div id="plan-preferences" className="relative group border-l border-indigo-200 pl-4">
-                <button className="px-3 py-1 bg-indigo-100 border border-indigo-400 rounded-full text-indigo-800 hover:bg-indigo-200 hover:text-indigo-900 transition-all shadow text-sm font-medium flex items-center gap-1">
-                  Plan Preferences
-                  <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-                  </svg>
-                </button>
+              {/* Plan Preferences Menu - Owner Only */}
+              {isOwner && (
+                <div id="plan-preferences" className="relative group border-l border-indigo-200 pl-4">
+                  <button className="px-3 py-1 bg-indigo-100 border border-indigo-400 rounded-full text-indigo-800 hover:bg-indigo-200 hover:text-indigo-900 transition-all shadow text-sm font-medium flex items-center gap-1">
+                    Plan Preferences
+                    <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                    </svg>
+                  </button>
 
-                {/* Dropdown Menu */}
-                <div className="fixed bg-white border border-indigo-200 rounded-lg shadow-2xl py-1 min-w-[200px] opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200" style={{ zIndex: 99999, marginTop: '0.5rem' }}>
-                  <button
-                    onClick={() => {
-                      if (onSetDefaultPage) {
-                        onSetDefaultPage(pageNumber);
-                        setDefaultPageSet(true);
-                        setTimeout(() => setDefaultPageSet(false), 2000);
-                      }
-                    }}
-                    className={`w-full px-4 py-2 text-left text-sm transition-colors flex items-center gap-2 ${defaultPageSet || isDefaultPage
-                      ? 'bg-green-50 text-green-700'
-                      : 'text-slate-700 hover:bg-indigo-50 hover:text-indigo-600'
-                      }`}
-                  >
-                    <svg className="w-4 h-4 text-indigo-700" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                    </svg>
-                    {defaultPageSet ? 'Default page set!' : isDefaultPage ? 'Default page' : 'Set this page as default'}
-                  </button>
-                  <button
-                    onClick={() => {
-                      if (onCaptureThumbnail) {
-                        onCaptureThumbnail();
-                        setThumbnailSet(true);
-                        setTimeout(() => setThumbnailSet(false), 2000);
-                      }
-                    }}
-                    className={`w-full px-4 py-2 text-left text-sm transition-colors flex items-center gap-2 ${thumbnailSet
-                      ? 'bg-green-50 text-green-700'
-                      : 'text-slate-700 hover:bg-indigo-50 hover:text-indigo-600'
-                      }`}
-                  >
-                    <svg className="w-4 h-4 text-indigo-700" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z" />
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 13a3 3 0 11-6 0 3 3 0 016 0z" />
-                    </svg>
-                    {thumbnailSet ? 'Thumbnail set!' : 'Set this page as thumbnail'}
-                  </button>
+                  {/* Dropdown Menu */}
+                  <div className="fixed bg-white border border-indigo-200 rounded-lg shadow-2xl py-1 min-w-[200px] opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200" style={{ zIndex: 99999, marginTop: '0.5rem' }}>
+                    <button
+                      onClick={() => {
+                        if (onSetDefaultPage) {
+                          onSetDefaultPage(pageNumber);
+                          setDefaultPageSet(true);
+                          setTimeout(() => setDefaultPageSet(false), 2000);
+                        }
+                      }}
+                      className={`w-full px-4 py-2 text-left text-sm transition-colors flex items-center gap-2 ${defaultPageSet || isDefaultPage
+                        ? 'bg-green-50 text-green-700'
+                        : 'text-slate-700 hover:bg-indigo-50 hover:text-indigo-600'
+                        }`}
+                    >
+                      <svg className="w-4 h-4 text-indigo-700" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                      </svg>
+                      {defaultPageSet ? 'Default page set!' : isDefaultPage ? 'Default page' : 'Set this page as default'}
+                    </button>
+                    <button
+                      onClick={() => {
+                        if (onCaptureThumbnail) {
+                          onCaptureThumbnail();
+                          setThumbnailSet(true);
+                          setTimeout(() => setThumbnailSet(false), 2000);
+                        }
+                      }}
+                      className={`w-full px-4 py-2 text-left text-sm transition-colors flex items-center gap-2 ${thumbnailSet
+                        ? 'bg-green-50 text-green-700'
+                        : 'text-slate-700 hover:bg-indigo-50 hover:text-indigo-600'
+                        }`}
+                    >
+                      <svg className="w-4 h-4 text-indigo-700" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                      </svg>
+                      {thumbnailSet ? 'Thumbnail captured!' : 'Set this page as thumbnail'}
+                    </button>
+                  </div>
                 </div>
-              </div>
+              )}
 
               {/* Previous versions toggle */}
               {versions && versions.length > 1 && (

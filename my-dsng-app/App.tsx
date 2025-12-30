@@ -63,6 +63,7 @@ const App: React.FC = () => {
   const [activeProjectId, setActiveProjectId] = useState<string | null>(null);
   const [activeCategory, setActiveCategory] = useState<string>(DEFAULT_CATEGORY); // Active document category
   const [activeCommentId, setActiveCommentId] = useState<string | null>(null);
+  const [pendingProjectId, setPendingProjectId] = useState<string | null>(null);
 
   // Track last optimistic update to prevent realtime listener from overwriting it
   const lastOptimisticUpdateRef = useRef<number>(0);
@@ -88,7 +89,13 @@ const App: React.FC = () => {
   const [referralCode, setReferralCode] = useState<string | null>(null);
 
   // Invite Details State
-  const [inviteDetails, setInviteDetails] = useState<{ inviterName?: string; projectName?: string; role?: 'guest' | 'pro' } | null>(null);
+  const [inviteDetails, setInviteDetails] = useState<{
+    inviterName?: string;
+    projectName?: string;
+    role?: 'guest' | 'pro';
+    inviteeName?: string;
+    inviteeEmail?: string;
+  } | null>(null);
 
   // Derived State
   const activeProject = projects.find(p => p.id === activeProjectId);
@@ -235,8 +242,15 @@ const App: React.FC = () => {
     const token = params.get('token');
     const inviterName = params.get('inviterName');
     const projectName = params.get('projectName');
+    const inviteeName = params.get('inviteeName') || params.get('name');
     const role = params.get('role') as 'guest' | 'pro' | null;
     const ref = params.get('ref');
+
+    // Capture project ID for deep linking even if not logged in
+    if (projectId && !token && !pendingProjectId) {
+      console.log('[Deep Linking] Capturing pending project ID:', projectId);
+      setPendingProjectId(projectId);
+    }
 
     // Handle referral code
     if (ref && !currentUser && !authLoading) {
@@ -245,23 +259,20 @@ const App: React.FC = () => {
       return;
     }
 
-    if (inviterName || projectName || role) {
+    if (inviterName || projectName || role || projectId) {
       setInviteDetails({
         inviterName: inviterName || undefined,
         projectName: projectName || undefined,
-        role: role || undefined
+        role: role || undefined,
+        inviteeName: inviteeName || undefined,
+        inviteeEmail: params.get('inviteeEmail') || params.get('email') || undefined
       });
-      // Show welcome landing page for project invitations too
+      // Show welcome landing page for project invitations and deep links too
       if (!currentUser && !authLoading) {
+        if (view === 'auth' || view === 'landing') return;
         setView('landing');
         return;
       }
-    }
-
-    // If there's a project invitation but no user is logged in, redirect to landing
-    if (projectId && !currentUser && !authLoading) {
-      setView('landing');
-      return;
     }
 
     if (projectId && token) {
@@ -447,6 +458,64 @@ const App: React.FC = () => {
 
     return () => unsubscribe();
   }, [activeProjectId, isGuest]); // currentUser removed - causes loop when incrementUserField updates user doc
+
+  // 4. Handle Deep Linking (?project=ID or pendingProjectId) for authenticated users
+  useEffect(() => {
+    if (authLoading || !currentUser || projects.length === 0 || isGuest) return;
+
+    const params = new URLSearchParams(window.location.search);
+    const projectIdParam = params.get('project') || pendingProjectId;
+    const tokenParam = params.get('token');
+
+    // Skip if it's a share link (handled by handle Shared Link effect)
+    if (params.get('project') && tokenParam) return;
+
+    if (projectIdParam) {
+      // If we're already on this project, just clean up and return
+      if (activeProjectId === projectIdParam && view === 'workspace') {
+        if (pendingProjectId) setPendingProjectId(null);
+        // Clean URL after delay
+        const timer = setTimeout(() => {
+          const newUrl = window.location.origin + window.location.pathname;
+          window.history.replaceState({}, '', newUrl);
+        }, 500);
+        return () => clearTimeout(timer);
+      }
+
+      console.log('[Deep Linking] Attempting to open project:', projectIdParam);
+      const targetProject = projects.find(p => p.id === projectIdParam);
+
+      if (targetProject) {
+        console.log('[Deep Linking] Found matching project, opening workspace');
+        setActiveProjectId(targetProject.id);
+
+        // Prefer DEFAULT_CATEGORY ('Main Plans') or first available category over whatever was last active
+        // especially to avoid showing the Mood Board first to invitees
+        const categories = getCategories(targetProject.versions);
+        const initialCategory = categories.includes(DEFAULT_CATEGORY)
+          ? DEFAULT_CATEGORY
+          : (categories.find(c => c !== 'Mood Board') || categories[0] || DEFAULT_CATEGORY);
+
+        setActiveCategory(initialCategory);
+        setView('workspace');
+        setPendingProjectId(null);
+
+        // Clean URL after a short delay
+        setTimeout(() => {
+          const newUrl = window.location.origin + window.location.pathname;
+          window.history.replaceState({}, '', newUrl);
+        }, 800);
+      } else {
+        console.warn('[Deep Linking] Project not found or no access:', projectIdParam);
+        setPendingProjectId(null);
+        const newUrl = window.location.origin + window.location.pathname;
+        window.history.replaceState({}, '', newUrl);
+        if (view === 'landing' || view === 'auth') {
+          setView('dashboard');
+        }
+      }
+    }
+  }, [currentUser, projects, authLoading, isGuest, activeProjectId, view, pendingProjectId]);
 
 
   // 3. Scroll to top whenever view changes
@@ -718,6 +787,17 @@ const App: React.FC = () => {
   // --- Actions ---
 
   const handleAuthSuccess = (user: User, isNewUser: boolean) => {
+    // Check if we have a deep link pending
+    const params = new URLSearchParams(window.location.search);
+    const projectId = params.get('project');
+    const token = params.get('token');
+
+    if (projectId && !token) {
+      console.log('[Auth] Deep link detected, letting deep link effect handle it');
+      // Just set view to a loading state or stay on current until projects load
+      return;
+    }
+
     // Auth state is handled by the subscription; always land on dashboard to start free
     setView('dashboard');
   };
@@ -1516,6 +1596,7 @@ const App: React.FC = () => {
             inviterName={inviteDetails?.inviterName}
             projectName={inviteDetails?.projectName}
             inviteRole={inviteDetails?.role}
+            inviteeName={inviteDetails?.inviteeName}
             onGetStarted={() => {
               setAuthMode('register');
               setView('auth');
@@ -1562,6 +1643,7 @@ const App: React.FC = () => {
         projectName={inviteDetails?.projectName}
         inviteRole={inviteDetails?.role}
         inviteeName={inviteDetails?.inviteeName}
+        inviteeEmail={inviteDetails?.inviteeEmail}
         referralCode={referralCode || undefined}
       />
     );
@@ -1967,6 +2049,7 @@ const App: React.FC = () => {
                           onCaptureThumbnail={handleCaptureThumbnail}
                           onSetDefaultPage={handleSetDefaultPage}
                           isDefaultPage={activeProject.categorySettings?.[activeCategory]?.defaultPage === pageNumber}
+                          isOwner={activeProject.ownerId === currentUser.id}
                           showPreviousVersionComments={showPreviousVersionComments}
                           onTogglePreviousComments={setShowPreviousVersionComments}
                           onPageCountChange={setPageCount}
@@ -1994,6 +2077,8 @@ const App: React.FC = () => {
                           onPanChange={handlePanChange}
                           onFocusComment={handleFocusComment}
                           canAddComment={isLatestVersion}
+                          isOwner={activeProject.ownerId === currentUser.id}
+                          onCaptureThumbnail={handleCaptureThumbnail}
                           showPreviousVersionComments={showPreviousVersionComments}
                           onTogglePreviousComments={setShowPreviousVersionComments}
                         />

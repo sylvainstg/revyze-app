@@ -14,10 +14,11 @@ interface AuthPageProps {
   projectName?: string;
   inviteRole?: 'guest' | 'pro';
   inviteeName?: string;
+  inviteeEmail?: string;
   referralCode?: string;
 }
 
-export const AuthPage: React.FC<AuthPageProps> = ({ onAuthSuccess, onBack, initialMode = 'register', inviterName, projectName, inviteRole, inviteeName, referralCode }) => {
+export const AuthPage: React.FC<AuthPageProps> = ({ onAuthSuccess, onBack, initialMode = 'register', inviterName, projectName, inviteRole, inviteeName, inviteeEmail, referralCode }) => {
   const [isLogin, setIsLogin] = useState(initialMode === 'login');
 
   // Determine initial role based on invite
@@ -30,7 +31,7 @@ export const AuthPage: React.FC<AuthPageProps> = ({ onAuthSuccess, onBack, initi
 
   const [formData, setFormData] = useState({
     name: inviteeName || '',
-    email: '',
+    email: inviteeEmail || '',
     password: ''
   });
 
