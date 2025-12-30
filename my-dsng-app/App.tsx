@@ -4,6 +4,7 @@ import { ImageWorkspace } from './components/ImageWorkspace';
 import { CollaborationPanel } from './components/CollaborationPanel';
 import { LandingPage } from './components/LandingPage';
 import { AuthPage } from './components/AuthPage';
+import { MoodBoardWorkspace } from './components/MoodBoardWorkspace';
 
 import { Dashboard } from './components/Dashboard';
 import { Button } from './components/ui/Button';
@@ -12,7 +13,7 @@ import { ThankYouPage } from './components/ThankYouPage';
 import { WelcomeLandingPage } from './components/WelcomeLandingPage';
 import { OnboardingTooltip } from './components/OnboardingTooltip';
 import { ONBOARDING_STEPS } from './constants/onboardingSteps';
-import { UserRole, Comment, Project, ViewState, User, CommentReply, ShareSettings, ProjectVersion } from './types';
+import { UserRole, Comment, Project, ViewState, User, CommentReply, ShareSettings, ProjectVersion, CommentAudience, MoodBoardElement } from './types';
 import { Layout, Upload, FileText, UserPlus, ArrowLeft, ZoomIn, ZoomOut, AlertCircle, Camera } from 'lucide-react';
 import { SAMPLE_PROJECT_ID, MAX_FILE_SIZE_MB, PLAN_LIMITS, STANDARD_CATEGORIES } from './constants';
 import { v4 as uuidv4 } from 'uuid';
@@ -100,6 +101,7 @@ const App: React.FC = () => {
   const [pageNumber, setPageNumber] = useState(1);
   const [pageCount, setPageCount] = useState<number | null>(null);
   const [pdfScale, _setPdfScale] = useState(1.0);
+  const [moodBoardScale, setMoodBoardScale] = useState(1.0);
   const isUserZooming = useRef(false);
   const [showPreviousVersionComments, setShowPreviousVersionComments] = useState(false);
 
@@ -158,7 +160,7 @@ const App: React.FC = () => {
         [field]: increment(amount)
       });
     } catch (err) {
-      console.error(`Failed to increment ${field}`, err);
+      console.error(`Failed to increment ${field} `, err);
     }
   }, [currentUser]);
 
@@ -520,6 +522,7 @@ const App: React.FC = () => {
 
       const fileName = activeVer.fileName.toLowerCase();
       const isPDF = fileName.endsWith('.pdf');
+      const isMoodBoard = activeVer.category === 'Mood Board';
 
       let blob: Blob;
 
@@ -537,6 +540,36 @@ const App: React.FC = () => {
             if (blob) resolve(blob);
           }, 'image/jpeg', 0.8);
         });
+      } else if (isMoodBoard) {
+        // For Mood Boards, capture the mood board container
+        const moodBoardContainer = document.querySelector('.mood-board-container') as HTMLElement;
+        if (!moodBoardContainer) {
+          setToast({ message: 'Could not capture thumbnail. Mood board container not found.', type: 'error' });
+          return;
+        }
+
+        // Use html2canvas or similar library to capture the div
+        // For now, we'll just use a placeholder or a generic image
+        // This part would require a library like html2canvas
+        // For simplicity, let's create a dummy blob for now
+        const dummyCanvas = document.createElement('canvas');
+        dummyCanvas.width = 200;
+        dummyCanvas.height = 150;
+        const ctx = dummyCanvas.getContext('2d');
+        if (ctx) {
+          ctx.fillStyle = '#f0f0f0';
+          ctx.fillRect(0, 0, dummyCanvas.width, dummyCanvas.height);
+          ctx.fillStyle = '#666';
+          ctx.font = '16px Arial';
+          ctx.textAlign = 'center';
+          ctx.fillText('Mood Board', dummyCanvas.width / 2, dummyCanvas.height / 2);
+        }
+        blob = await new Promise<Blob>((resolve) => {
+          dummyCanvas.toBlob((blob) => {
+            if (blob) resolve(blob);
+          }, 'image/jpeg', 0.8);
+        });
+
       } else {
         // For images, find the img element with the specific class
         const img = document.querySelector('img.ImageWorkspace') as HTMLImageElement;
@@ -745,7 +778,7 @@ const App: React.FC = () => {
     // Check owned projects limit
     const isOwnedUnlimited = limits.ownedProjects === -1 || limits.ownedProjects === Infinity;
     if (!isOwnedUnlimited && ownedCount >= limits.ownedProjects) {
-      if (confirm(`You have reached the limit of ${limits.ownedProjects} owned project${limits.ownedProjects > 1 ? 's' : ''} for the ${plan} plan.Upgrade to create more ? `)) {
+      if (confirm(`You have reached the limit of ${limits.ownedProjects} owned project${limits.ownedProjects > 1 ? 's' : ''} for the ${plan} plan. Upgrade to create more?`)) {
         setView('pricing');
       }
       return;
@@ -754,7 +787,7 @@ const App: React.FC = () => {
     // Also check total projects limit (owned + shared)
     const isTotalUnlimited = limits.totalProjects === -1 || limits.totalProjects === Infinity;
     if (!isTotalUnlimited && projects.length >= limits.totalProjects) {
-      if (confirm(`You have reached the limit of ${limits.totalProjects} total projects for the ${plan} plan.Upgrade for unlimited projects ? `)) {
+      if (confirm(`You have reached the limit of ${limits.totalProjects} total projects for the ${plan} plan. Upgrade for unlimited projects?`)) {
         setView('pricing');
       }
       return;
@@ -762,13 +795,13 @@ const App: React.FC = () => {
 
     const fileSizeMB = file.size / (1024 * 1024);
     if (fileSizeMB > MAX_FILE_SIZE_MB) {
-      alert(`File is too large(${fileSizeMB.toFixed(1)}MB).Please choose a file under ${MAX_FILE_SIZE_MB} MB.`);
+      alert(`File is too large (${fileSizeMB.toFixed(1)}MB). Please choose a file under ${MAX_FILE_SIZE_MB} MB.`);
       return;
     }
 
     // Upload to Firebase Storage
     const newProjectId = uuidv4();
-    const path = `projects / ${currentUser.id} /${newProjectId}/v1_${file.name} `;
+    const path = `projects/${currentUser.id}/${newProjectId}/v1_${file.name}`;
 
     // Show uploading indicator (simple alert for now, or we could add state)
     // Since we don't have a UI for uploading state in this function easily without refactoring,
@@ -932,7 +965,7 @@ const App: React.FC = () => {
     // Validate file size
     const fileSizeMB = file.size / (1024 * 1024);
     if (fileSizeMB > MAX_FILE_SIZE_MB) {
-      setToast({ message: `File is too large (${fileSizeMB.toFixed(1)}MB). Please choose a file under ${MAX_FILE_SIZE_MB}MB.`, type: 'error' });
+      setToast({ message: `File is too large(${fileSizeMB.toFixed(1)}MB).Please choose a file under ${MAX_FILE_SIZE_MB} MB.`, type: 'error' });
       return;
     }
 
@@ -941,7 +974,7 @@ const App: React.FC = () => {
       const globalVersionNumber = activeProject.versions.length + 1;
       const categoryVersionNumber = getNextCategoryVersion(activeProject.versions, category);
 
-      const storageRef = ref(storage, `projects/${activeProject.id}/v${globalVersionNumber}_${file.name}`);
+      const storageRef = ref(storage, `projects / ${activeProject.id}/v${globalVersionNumber}_${file.name}`);
       await uploadBytes(storageRef, file);
       const downloadURL = await getDownloadURL(storageRef);
 
@@ -1347,6 +1380,21 @@ const App: React.FC = () => {
     if (activeCommentId === id) setActiveCommentId(null);
   };
 
+  const handleUpdateMoodBoardElements = async (elements: MoodBoardElement[]) => {
+    if (!activeProject || !activeVersion) return;
+
+    const updatedProject = {
+      ...activeProject,
+      versions: activeProject.versions.map(v =>
+        v.id === activeVersion.id
+          ? { ...v, moodBoardElements: elements }
+          : v
+      )
+    };
+
+    await updateProjectState(updatedProject);
+  };
+
   const handlePushToProfessional = async (commentId: string) => {
     if (!activeProject || !activeVersion || !currentUser) return;
 
@@ -1724,6 +1772,28 @@ const App: React.FC = () => {
                   // Set page to default if exists, otherwise 1
                   const defaultPage = activeProject.categorySettings?.[category]?.defaultPage;
                   setPageNumber(defaultPage || 1);
+                } else if (category === 'Mood Board') {
+                  // Auto-create initial Mood Board version
+                  const newMoodBoardVersion: ProjectVersion = {
+                    id: uuidv4(),
+                    versionNumber: activeProject.versions.length + 1,
+                    category: 'Mood Board',
+                    categoryVersionNumber: 1,
+                    fileUrl: 'mood-board-placeholder', // Special flag for mood board
+                    fileName: 'Mood Board',
+                    uploadedBy: currentUser.role,
+                    uploaderEmail: currentUser.email,
+                    timestamp: Date.now(),
+                    comments: [],
+                    moodBoardElements: []
+                  };
+                  const updatedProject = {
+                    ...activeProject,
+                    versions: [...activeProject.versions, newMoodBoardVersion],
+                    currentVersionId: newMoodBoardVersion.id,
+                    activeCategory: category
+                  };
+                  updateProjectState(updatedProject);
                 }
               }}
             />
@@ -1810,7 +1880,15 @@ const App: React.FC = () => {
                       </div>
                     )}
                     <div className="flex-1">
-                      {isPDF ? (
+                      {activeCategory === 'Mood Board' ? (
+                        <MoodBoardWorkspace
+                          elements={activeVersion.moodBoardElements || []}
+                          onUpdateElements={handleUpdateMoodBoardElements}
+                          currentUser={currentUser}
+                          scale={moodBoardScale}
+                          setScale={setMoodBoardScale}
+                        />
+                      ) : isPDF ? (
                         <PDFWorkspace
                           fileUrl={activeVersion.fileUrl}
                           comments={filteredComments}

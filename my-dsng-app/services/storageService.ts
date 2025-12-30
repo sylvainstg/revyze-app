@@ -29,7 +29,8 @@ const sanitizeProject = (data: any): Project => {
     ...data,
     versions: data.versions?.map((v: any) => ({
       ...v,
-      comments: v.commentsJson ? JSON.parse(v.commentsJson) : (v.comments || [])
+      comments: v.commentsJson ? JSON.parse(v.commentsJson) : (v.comments || []),
+      moodBoardElements: v.moodBoardElementsJson ? JSON.parse(v.moodBoardElementsJson) : (v.moodBoardElements || [])
     })) || [],
     collaborators: data.collaborators || []
   } as Project;
@@ -97,10 +98,11 @@ export const saveProject = async (project: Project): Promise<boolean> => {
     const projectData = {
       ...project,
       versions: project.versions.map(version => {
-        const { comments, ...versionWithoutComments } = version;
+        const { comments, moodBoardElements, ...versionWithoutComments } = version;
         return {
           ...versionWithoutComments, // Preserve ALL fields except comments
-          commentsJson: JSON.stringify(comments || [])
+          commentsJson: JSON.stringify(comments || []),
+          moodBoardElementsJson: JSON.stringify(moodBoardElements || [])
         };
       })
     };

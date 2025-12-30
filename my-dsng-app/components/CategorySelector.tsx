@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { Button } from './ui/Button';
 import { Input } from './ui/Input';
-import { Plus, X, FileText } from 'lucide-react';
+import { Plus, X, FileText, Palette } from 'lucide-react';
 import { getCategoryCounts } from '../utils/categoryHelpers';
 import { ProjectVersion } from '../types';
 
@@ -22,10 +22,10 @@ export const CategorySelector: React.FC<CategorySelectorProps> = ({
     const categoryCounts = getCategoryCounts(versions);
     // Ensure active category is always shown, even if it has no versions yet
     const allCategories = new Set(Object.keys(categoryCounts));
-    if (activeCategory) {
+    if (activeCategory && activeCategory !== 'Mood Board') {
         allCategories.add(activeCategory);
     }
-    const categories = Array.from(allCategories).sort();
+    const categories = Array.from(allCategories).filter(c => c !== 'Mood Board').sort();
 
 
     const handleAddCategory = () => {
@@ -37,8 +37,8 @@ export const CategorySelector: React.FC<CategorySelectorProps> = ({
     };
 
     return (
-        <div className="bg-white border-b border-slate-200 px-4 py-3">
-            <div className="flex items-center gap-2 overflow-x-auto no-scrollbar">
+        <div className="bg-white border-b border-slate-200 px-4 py-3 flex items-center justify-between gap-4">
+            <div className="flex items-center gap-2 overflow-x-auto no-scrollbar flex-1">
                 {/* Category Tabs */}
                 {categories.map((category) => (
                     <button
@@ -107,6 +107,19 @@ export const CategorySelector: React.FC<CategorySelectorProps> = ({
                         </button>
                     </div>
                 )}
+            </div>
+
+            {/* Dedicated Mood Board Button */}
+            <div className="flex-shrink-0 border-l border-slate-200 pl-4 py-1">
+                <Button
+                    variant={activeCategory === 'Mood Board' ? 'primary' : 'secondary'}
+                    size="sm"
+                    className={`gap-2 transition-all ${activeCategory === 'Mood Board' ? 'shadow-md scale-105' : ''}`}
+                    icon={<Palette className="w-4 h-4" />}
+                    onClick={() => onCategoryChange('Mood Board')}
+                >
+                    Mood Board
+                </Button>
             </div>
         </div>
     );

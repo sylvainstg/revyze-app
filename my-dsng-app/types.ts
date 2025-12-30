@@ -76,6 +76,21 @@ export interface Comment {
   replies?: CommentReply[];
 }
 
+export interface MoodBoardElement {
+  id: string;
+  type: 'image' | 'text' | 'link';
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+  content: string; // URL for image/link, or text for bubble
+  title?: string; // Optional title for links
+  ownerId: string;
+  ownerName: string;
+  timestamp: number;
+}
+
+
 export interface ProjectVersion {
   id: string;
   versionNumber: number; // Global version number across all categories
@@ -87,6 +102,7 @@ export interface ProjectVersion {
   uploaderEmail?: string;
   timestamp: number;
   comments: Comment[];
+  moodBoardElements?: MoodBoardElement[];
 }
 
 export interface ShareSettings {
