@@ -1306,7 +1306,13 @@ const App: React.FC = () => {
   };
 
   const handleResolveComment = async (id: string) => {
-    if (!activeProject || !activeVersion) return;
+    if (!activeProject || !activeVersion || !currentUser) return;
+
+    // Only project owner can resolve/unresolve
+    if (activeProject.ownerId !== currentUser.id) {
+      console.warn('[App.tsx] Unauthorized resolve attempt:', { id, userId: currentUser.id });
+      return;
+    }
 
     const updatedProject = {
       ...activeProject,

@@ -3,6 +3,7 @@ import { Comment, UserRole } from '../types';
 import { Plus, Loader2, ZoomIn, ZoomOut, Sparkles, X, AlertCircle, Upload } from 'lucide-react';
 import { VersionSelectorDetailed } from './VersionSelector';
 import * as geminiService from '../services/geminiService';
+import { getFileObjectURL, revokeFileObjectURL } from '../utils/pdfUtils';
 
 interface ImageWorkspaceProps {
     fileUrl: string;
@@ -62,6 +63,49 @@ export const ImageWorkspace: React.FC<ImageWorkspaceProps> = ({
     const [imageDimensions, setImageDimensions] = useState<{ width: number; height: number } | null>(null);
     const [imageLoaded, setImageLoaded] = useState(false);
     const [imageError, setImageError] = useState(false);
+    const [proxiedFileUrl, setProxiedFileUrl] = useState<string | null>(null);
+
+    // Convert Firebase Storage URL to object URL to bypass CORS
+    useEffect(() => {
+        setImageError(false);
+        let isMounted = true;
+        let currentObjectURL: string | null = null;
+
+        const loadImage = async () => {
+            console.log('[ImageWorkspace] Loading image from URL:', fileUrl);
+
+            // Clean up previous object URL
+            if (proxiedFileUrl) {
+                revokeFileObjectURL(proxiedFileUrl);
+                setProxiedFileUrl(null);
+            }
+
+            try {
+                const objectURL = await getFileObjectURL(fileUrl);
+                currentObjectURL = objectURL;
+
+                if (isMounted) {
+                    setProxiedFileUrl(objectURL);
+                } else {
+                    revokeFileObjectURL(objectURL);
+                }
+            } catch (error) {
+                console.error('[ImageWorkspace] Failed to load image proxy:', error);
+                if (isMounted) {
+                    setProxiedFileUrl(fileUrl); // Fallback
+                }
+            }
+        };
+
+        loadImage();
+
+        return () => {
+            isMounted = false;
+            if (currentObjectURL) {
+                revokeFileObjectURL(currentObjectURL);
+            }
+        };
+    }, [fileUrl]);
 
     // Update pan offset when initialPanOffset changes
     useEffect(() => {
@@ -205,10 +249,17 @@ export const ImageWorkspace: React.FC<ImageWorkspaceProps> = ({
     };
 
     // Build combined comment list (current + previous versions when enabled)
-    const visibleComments = useMemo(() => {
+    const buildVisibleComments = () => {
+        console.log('[ImageWorkspace] Building visible comments:', {
+            totalComments: comments.length,
+            currentVersionId,
+            showPreviousVersionComments
+        });
+
         let versionsOrdered = versions ? [...versions].sort((a: any, b: any) => (b.timestamp || 0) - (a.timestamp || 0)) : [];
         const currentIdx = versionsOrdered.findIndex(v => v.id === currentVersionId);
         if (currentIdx === -1) {
+            console.warn('[ImageWorkspace] currentVersionId not found in versions!', { currentVersionId, versionsCount: versions?.length });
             versionsOrdered = versions || [];
         }
 
@@ -218,16 +269,22 @@ export const ImageWorkspace: React.FC<ImageWorkspaceProps> = ({
         buckets.forEach((ver, idx) => {
             const distance = currentIdx >= 0 ? Math.max(0, idx - currentIdx) : Math.max(0, idx);
             (ver.comments || []).forEach((c: Comment) => {
-                if ((c.pageNumber || 1) !== 1) return;
+                // For images, we accept page 1 or undefined
+                if (c.pageNumber && c.pageNumber !== 1) return;
+
                 if (c.deleted && !filter.deleted) return;
                 if (c.resolved && !filter.resolved) return;
                 if (!c.resolved && !c.deleted && !filter.active) return;
+
                 collected.push({ comment: c, distance });
             });
         });
 
+        console.log('[ImageWorkspace] Visible comments built:', collected.length);
         return collected;
-    }, [versions, currentVersionId, showPreviousVersionComments, filter]);
+    };
+
+    const visibleComments = buildVisibleComments();
 
     return (
         <div className="flex-1 bg-slate-200/50 flex flex-col h-full">
@@ -307,22 +364,24 @@ export const ImageWorkspace: React.FC<ImageWorkspaceProps> = ({
                         )}
 
                         <div className="relative" onClick={handleImageClick} style={{ cursor: 'crosshair' }}>
-                            <img
-                                ref={imageRef}
-                                src={fileUrl}
-                                alt="Design"
-                                crossOrigin="anonymous"
-                                className="max-w-full h-auto rounded-lg shadow-lg ImageWorkspace"
-                                style={{ display: imageLoaded ? 'block' : 'none' }}
-                                onLoad={() => {
-                                    setImageLoaded(true);
-                                    setImageError(false);
-                                }}
-                                onError={() => {
-                                    setImageError(true);
-                                    setImageLoaded(false);
-                                }}
-                            />
+                            {proxiedFileUrl && (
+                                <img
+                                    ref={imageRef}
+                                    src={proxiedFileUrl}
+                                    alt="Design"
+                                    crossOrigin="anonymous"
+                                    className="rounded-lg shadow-lg ImageWorkspace"
+                                    style={{ display: imageLoaded ? 'block' : 'none' }}
+                                    onLoad={() => {
+                                        setImageLoaded(true);
+                                        setImageError(false);
+                                    }}
+                                    onError={() => {
+                                        setImageError(true);
+                                        setImageLoaded(false);
+                                    }}
+                                />
+                            )}
 
                             {/* Existing Comment Pins */}
                             {imageLoaded && visibleComments.map(({ comment, distance }, idx) => {
@@ -336,7 +395,7 @@ export const ImageWorkspace: React.FC<ImageWorkspaceProps> = ({
                                             onFocusComment?.(comment.id);
                                         }}
                                         className={`absolute w-8 h-8 -ml-4 -mt-8 transform transition-all duration-200 hover:scale-110 z-10 group ${activeCommentId === comment.id ? 'scale-150 z-30' : ''
-                                            } ${comment.deleted ? 'opacity-50 grayscale' : ''} `}
+                                            } ${comment.deleted ? 'opacity-50 grayscale' : ''}`}
                                         style={{ left: `${comment.x}%`, top: `${comment.y}%` }}
                                     >
                                         <div
@@ -345,7 +404,7 @@ export const ImageWorkspace: React.FC<ImageWorkspaceProps> = ({
                                                     comment.resolved ? 'bg-slate-400 border-slate-500' :
                                                         comment.author === currentUserRole ? 'bg-indigo-600 border-indigo-200 ring-2 ring-indigo-400' : // Emphasis for own comments
                                                             comment.author === UserRole.DESIGNER ? 'bg-purple-600 border-white' : 'bg-blue-500 border-white'
-                                                } ${activeCommentId === comment.id ? 'ring-4 ring-indigo-300/50 shadow-xl' : ''} `} style={{ opacity: fade }}
+                                                } ${activeCommentId === comment.id ? 'ring-4 ring-indigo-300/50 shadow-xl' : ''}`} style={{ opacity: fade }}
                                         >
                                             {comment.deleted ? (
                                                 <X className="w-4 h-4 text-red-500" />
@@ -423,10 +482,10 @@ export const ImageWorkspace: React.FC<ImageWorkspaceProps> = ({
 
                                         <div className="flex items-center justify-between">
                                             <label
-                                                className={`flex items - center gap - 1.5 text - xs font - medium cursor - pointer select - none px - 2 py - 1.5 rounded transition - colors ${useAI
+                                                className={`flex items-center gap-1.5 text-xs font-medium cursor-pointer select-none px-2 py-1.5 rounded transition-colors ${useAI
                                                     ? 'bg-indigo-50 text-indigo-700'
                                                     : 'text-slate-500 hover:bg-slate-50'
-                                                    } `}
+                                                    }`}
                                             >
                                                 <input
                                                     type="checkbox"
@@ -435,7 +494,7 @@ export const ImageWorkspace: React.FC<ImageWorkspaceProps> = ({
                                                     className="hidden"
                                                 />
                                                 <Sparkles
-                                                    className={`w - 3.5 h - 3.5 ${useAI ? 'text-indigo-500' : 'text-slate-400'} `}
+                                                    className={`w-3.5 h-3.5 ${useAI ? 'text-indigo-500' : 'text-slate-400'}`}
                                                 />
                                                 {useAI ? 'AI Analysis On' : 'AI Analysis Off'}
                                             </label>

@@ -11,11 +11,11 @@ const pdfCache = new Map<string, string>();
 export const getPDFObjectURL = async (fileUrl: string): Promise<string> => {
     // Check cache first
     if (pdfCache.has(fileUrl)) {
-        console.log('[PDF Utils] Returning cached PDF URL for:', fileUrl);
+        console.log('[File Utils] Returning cached object URL for:', fileUrl);
         return pdfCache.get(fileUrl)!;
     }
 
-    console.log('[PDF Utils] Loading new PDF from:', fileUrl);
+    console.log('[File Utils] Loading new file from:', fileUrl);
 
     try {
         let fetchUrl = fileUrl;
@@ -45,11 +45,11 @@ export const getPDFObjectURL = async (fileUrl: string): Promise<string> => {
 
         // Cache the object URL
         pdfCache.set(fileUrl, objectUrl);
-        console.log('[PDF Utils] PDF cached successfully');
+        console.log('[File Utils] File cached successfully');
 
         return objectUrl;
     } catch (error) {
-        console.error('[PDF Utils] Error loading PDF:', error);
+        console.error('[File Utils] Error loading file:', error);
         // Fallback to original URL if fetch fails (might work if CORS isn't an issue for this specific URL)
         return fileUrl;
     }
@@ -79,5 +79,10 @@ export const clearPDFCache = () => {
         URL.revokeObjectURL(url);
     }
     pdfCache.clear();
-    console.log('[PDF Utils] PDF cache cleared');
+    console.log('[File Utils] Cache cleared');
 };
+
+// Aliases for better semantics when using with images
+export const getFileObjectURL = getPDFObjectURL;
+export const revokeFileObjectURL = revokePDFObjectURL;
+export const clearFileCache = clearPDFCache;

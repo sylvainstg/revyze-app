@@ -356,8 +356,11 @@ const CommentCard: React.FC<{
               {markerNumber}
             </span>
             <span className={`w-2 h-2 rounded-full ${comment.author === UserRole.DESIGNER ? 'bg-purple-500' : 'bg-blue-500'}`} />
-            <span className="text-xs font-semibold text-slate-700">
-              {comment.authorName || comment.author}
+            <span className="text-xs font-semibold text-slate-700 truncate max-w-[120px]" title={comment.authorName || comment.author}>
+              {comment.authorName
+                ? (comment.authorName.length > 15 ? `${comment.authorName.substring(0, 15)}...` : comment.authorName)
+                : comment.author
+              }
               {comment.authorName && (
                 <span className="ml-1 text-[10px] text-slate-400 font-normal">
                   ({comment.author})
@@ -373,7 +376,7 @@ const CommentCard: React.FC<{
             )}
           </div>
           <div className="flex items-center gap-1">
-            {!comment.resolved && (
+            {!comment.resolved && projectRole === 'owner' && (
               <button
                 onClick={(e) => {
                   e.stopPropagation();
