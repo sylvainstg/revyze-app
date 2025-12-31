@@ -41,6 +41,7 @@ export interface User {
     dailyTime: string; // e.g., "09:00"
     weeklyDay: number; // 0 = Sunday, 1 = Monday, etc.
   };
+  targetedCampaignId?: string; // Manually assigned campaign
 }
 
 export interface CommentReply {

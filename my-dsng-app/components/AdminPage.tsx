@@ -1,6 +1,6 @@
-import React, { useState, useEffect, Suspense } from 'react';
+import React, { useState, useEffect, Suspense, useMemo } from 'react';
 import { User, UserRole } from '../types';
-import { getAllUsers, updateAdminStatus } from '../services/storageService';
+import { getAllUsers, updateAdminStatus, targetUserWithCampaign } from '../services/storageService';
 import { fetchUserPaymentHistory, PaymentRecord } from '../services/paymentService';
 import { useAdmin } from '../contexts/AdminContext';
 import { Button } from './ui/Button';
@@ -9,6 +9,7 @@ import { Shield, Search, Trash2, ArrowLeft, BarChart3, Users, Eye, UserPlus, Che
 import { FeatureVoteAnalytics } from './FeatureVoteAnalytics';
 import { ReferralManagement } from './ReferralManagement';
 import { getUserActivity, ActivityLog } from '../services/analyticsService';
+import { listFeedbackCampaigns } from '../services/feedbackService';
 import { EngagementDashboard } from './EngagementDashboard';
 import { CampaignManager } from './admin/CampaignManager';
 import { CampaignDocumentation } from './admin/CampaignDocumentation';
@@ -87,6 +88,12 @@ export const AdminPage: React.FC<AdminPageProps> = ({ onBack, currentUser }) => 
         recentTransactions: Array<{ id: string; description: string; amount: number; type: string; timestamp: number; }>;
     } | null>(null);
 
+    // Targeting State
+    const [allCampaigns, setAllCampaigns] = useState<any[]>([]);
+    const [loadingAllCampaigns, setLoadingAllCampaigns] = useState(false);
+    const [targetingLoading, setTargetingLoading] = useState(false);
+    const [selectedTargetCampaignId, setSelectedTargetCampaignId] = useState<string>('');
+
     const tabs: { id: AdminTab; label: string; description: string; icon: React.ComponentType<{ className?: string }> }[] = [
         { id: 'users', label: 'Users', description: 'Directory & permissions', icon: Users },
         { id: 'engagement', label: 'Engagement & Campaigns', description: 'Analytics and outreach', icon: BarChart3 },
@@ -102,6 +109,10 @@ export const AdminPage: React.FC<AdminPageProps> = ({ onBack, currentUser }) => 
         }
     }, [selectedUser]);
 
+    useEffect(() => {
+        loadAllCampaigns();
+    }, []);
+
     const fetchUserActivity = async (userId: string) => {
         setLoadingActivity(true);
         try {
@@ -113,6 +124,66 @@ export const AdminPage: React.FC<AdminPageProps> = ({ onBack, currentUser }) => 
             setLoadingActivity(false);
         }
     };
+
+    const loadAllCampaigns = async () => {
+        setLoadingAllCampaigns(true);
+        try {
+            const listCamps = httpsCallable(functions, 'listCampaigns');
+            const res = await listCamps({});
+            const data = res.data as { campaigns: any[] };
+            setAllCampaigns(data.campaigns || []);
+        } catch (error) {
+            console.error("Failed to load campaigns for targeting", error);
+        } finally {
+            setLoadingAllCampaigns(false);
+        }
+    };
+
+    const handleAssignCampaign = async () => {
+        if (!selectedUser || !selectedTargetCampaignId) return;
+        setTargetingLoading(true);
+        try {
+            const success = await targetUserWithCampaign(selectedUser.id, selectedTargetCampaignId);
+            if (success) {
+                setMessage({ text: `Successfully targeted ${selectedUser.name} with campaign.`, type: 'success' });
+                // Update local selected user state
+                setSelectedUser({ ...selectedUser, targetedCampaignId: selectedTargetCampaignId });
+            } else {
+                setMessage({ text: 'Failed to assign campaign to user.', type: 'error' });
+            }
+        } catch (error) {
+            console.error("Error assigning campaign:", error);
+            setMessage({ text: 'An error occurred while assigning campaign.', type: 'error' });
+        } finally {
+            setTargetingLoading(false);
+        }
+    };
+
+    const userEngagementSpark = useMemo(() => {
+        const counts: Record<string, number> = {};
+        const last14Days = [...Array(14)].map((_, i) => {
+            const d = new Date();
+            d.setDate(d.getDate() - i);
+            return d.toISOString().split('T')[0];
+        }).reverse();
+
+        last14Days.forEach(date => counts[date] = 0);
+
+        activityLogs.forEach(log => {
+            const date = new Date(log.timestamp).toISOString().split('T')[0];
+            if (counts[date] !== undefined) {
+                counts[date]++;
+            }
+        });
+
+        const data = last14Days.map(date => ({
+            date: date.slice(5),
+            count: counts[date]
+        }));
+
+        const max = Math.max(...data.map(d => d.count), 1);
+        return { data, max };
+    }, [activityLogs]);
 
     useEffect(() => {
         fetchUsers();
@@ -217,7 +288,7 @@ export const AdminPage: React.FC<AdminPageProps> = ({ onBack, currentUser }) => 
             const liveness = Math.min(100, Math.round(((latest.new_projects || 0) + (latest.new_comments || 0) + (latest.new_invites || 0)) * 1.5));
             const spark = ordered.slice(-14).map(s => ({
                 date: s.date.slice(5),
-                dau: s.dau ?? s.engagement_actions?.login ?? 0
+                dau: s.dau || s.engagement_actions?.login || 0
             }));
             setEngagementKpis({ mau, dau, stickiness, liveness, spark });
         } catch (err) {
@@ -917,8 +988,9 @@ export const AdminPage: React.FC<AdminPageProps> = ({ onBack, currentUser }) => 
                                             {(engagementKpis?.spark || []).map(point => (
                                                 <div key={point.date} className="flex-1 flex flex-col items-center">
                                                     <div
-                                                        className="w-full rounded-t bg-indigo-200"
-                                                        style={{ height: `${engagementKpis && engagementKpis.dau > 0 ? Math.max(8, (point.dau / maxSparkDau) * 100) : 10}%`, minHeight: '8px' }}
+                                                        className="w-full rounded-t bg-indigo-200 hover:bg-indigo-300 transition-colors cursor-help"
+                                                        style={{ height: `${maxSparkDau > 0 ? Math.max(8, (point.dau / maxSparkDau) * 100) : 8}%`, minHeight: '8px' }}
+                                                        title={`${point.dau} DAU on ${point.date}`}
                                                     ></div>
                                                     <span className="text-[10px] text-slate-400 mt-1">{point.date}</span>
                                                 </div>
@@ -1114,6 +1186,88 @@ export const AdminPage: React.FC<AdminPageProps> = ({ onBack, currentUser }) => 
                                     </div>
 
 
+
+                                    <div>
+                                        <h4 className="font-semibold text-slate-900 mb-2">Activity trend</h4>
+                                        <div className="bg-slate-50 p-4 rounded-lg border border-slate-200">
+                                            <div className="flex items-end gap-1 h-16">
+                                                {userEngagementSpark.data.map((point, i) => (
+                                                    <div key={i} className="flex-1 h-full flex flex-col justify-end items-center group relative">
+                                                        <div
+                                                            className="w-full rounded-t bg-indigo-300 group-hover:bg-indigo-400 transition-colors"
+                                                            style={{
+                                                                height: `${(point.count / userEngagementSpark.max) * 100}%`,
+                                                                minHeight: point.count > 0 ? '2px' : '1px',
+                                                                opacity: point.count > 0 ? 1 : 0.2
+                                                            }}
+                                                            title={`${point.count} events on ${point.date}`}
+                                                        ></div>
+                                                    </div>
+                                                ))}
+                                            </div>
+                                            <div className="flex justify-between mt-1 text-[10px] text-slate-400 font-medium">
+                                                <span>{userEngagementSpark.data[0]?.date}</span>
+                                                <span>Last 14 days activity</span>
+                                                <span>{userEngagementSpark.data[13]?.date}</span>
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    <div>
+                                        <h4 className="font-semibold text-slate-900 mb-2">Targeted Outreach</h4>
+                                        <div className="bg-indigo-50/50 p-4 rounded-lg border border-indigo-100 space-y-3">
+                                            <p className="text-xs text-slate-600">
+                                                Directly assign a campaign to this user. It will appear on their next login regardless of automatic segments.
+                                            </p>
+
+                                            {selectedUser.targetedCampaignId ? (
+                                                <div className="flex items-center justify-between bg-white px-3 py-2 rounded border border-indigo-200">
+                                                    <div className="flex items-center gap-2">
+                                                        <Check className="w-4 h-4 text-green-500" />
+                                                        <span className="text-sm font-medium text-slate-900">
+                                                            Currently targeted with {allCampaigns.find(c => c.id === selectedUser.targetedCampaignId)?.name || 'a campaign'}
+                                                        </span>
+                                                    </div>
+                                                    <button
+                                                        onClick={() => {
+                                                            setSelectedTargetCampaignId('');
+                                                            targetUserWithCampaign(selectedUser.id, null);
+                                                            setSelectedUser({ ...selectedUser, targetedCampaignId: undefined });
+                                                        }}
+                                                        className="text-xs text-red-600 hover:text-red-700 font-medium"
+                                                    >
+                                                        Cancel
+                                                    </button>
+                                                </div>
+                                            ) : (
+                                                <div className="flex gap-2">
+                                                    <select
+                                                        className="flex-1 rounded-md border border-slate-200 bg-white px-3 py-1.5 text-sm focus:border-indigo-500 focus:outline-none"
+                                                        value={selectedTargetCampaignId}
+                                                        onChange={(e) => setSelectedTargetCampaignId(e.target.value)}
+                                                        disabled={loadingAllCampaigns}
+                                                    >
+                                                        <option value="">{loadingAllCampaigns ? 'Loading campaigns...' : 'Select a campaign...'}</option>
+                                                        {!loadingAllCampaigns && allCampaigns.length === 0 && (
+                                                            <option disabled>No campaigns found</option>
+                                                        )}
+                                                        {allCampaigns.map(c => (
+                                                            <option key={c.id} value={c.id}>
+                                                                {c.name} {c.status !== 'active' ? `(${c.status})` : ''}
+                                                            </option>
+                                                        ))}
+                                                    </select>
+                                                    <Button
+                                                        size="sm"
+                                                        disabled={!selectedTargetCampaignId || targetingLoading}
+                                                        onClick={handleAssignCampaign}
+                                                    >
+                                                        {targetingLoading ? 'Assigning...' : 'Assign'}
+                                                    </Button>
+                                                </div>
+                                            )}
+                                        </div>
+                                    </div>
 
                                     <div>
                                         <h4 className="font-semibold text-slate-900 mb-2">Activity Timeline</h4>

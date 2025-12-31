@@ -14,15 +14,18 @@ interface SegmentQuery {
 interface FeedbackCampaign {
     id?: string;
     name: string;
+    description: string;
     question: string;
     type: 'free_text' | 'multiple_choice' | 'nps' | 'csat';
     choices?: string[];
+    status: string;
     anonymous?: boolean;
     activeFrom: admin.firestore.Timestamp;
     activeUntil: admin.firestore.Timestamp;
     frequencyCapDays?: number;
     emailFallbackAfterHours?: number;
     segmentQuery?: SegmentQuery;
+    createdAt?: admin.firestore.Timestamp | number;
 }
 
 const requireAuth = (context: functions.https.CallableContext) => {
@@ -61,15 +64,18 @@ const buildCampaignPayload = (doc: FirebaseFirestore.DocumentSnapshot): Feedback
     return {
         id: doc.id,
         name: data.name,
+        description: data.description || '',
         question: data.question,
         type: data.type,
         choices: data.choices,
+        status: data.status || 'draft',
         anonymous: data.anonymous ?? false,
         activeFrom: data.activeFrom,
         activeUntil: data.activeUntil,
         frequencyCapDays: data.frequencyCapDays ?? 14,
         emailFallbackAfterHours: data.emailFallbackAfterHours ?? 120,
-        segmentQuery: data.segmentQuery
+        segmentQuery: data.segmentQuery,
+        createdAt: data.createdAt
     };
 };
 
@@ -85,8 +91,34 @@ export const feedbackActive = functions.https.onCall(async (data, context) => {
     const userData = userDoc.data() || {};
     const now = admin.firestore.Timestamp.now();
     const forceCampaignId = (data as any)?.forceCampaignId;
+    const targetedCampaignId = userData.targetedCampaignId;
 
-    // Special handling for forced campaign (debug mode) - logic moved to top to bypass all filters
+    // 1. Priority: Targeted campaign (manual outreach)
+    if (targetedCampaignId) {
+        const targetedDoc = await db.collection('feedback_campaigns').doc(targetedCampaignId).get();
+        if (targetedDoc.exists && targetedDoc.data()?.status === 'active') {
+            const campaign = buildCampaignPayload(targetedDoc);
+
+            // Log analytics for targeted show
+            await db.collection('feedback_campaigns').doc(targetedCampaignId).update({
+                'analytics.impressions': admin.firestore.FieldValue.increment(1),
+                updatedAt: admin.firestore.FieldValue.serverTimestamp()
+            });
+
+            await db.collection('campaign_attribution').add({
+                campaignId: targetedCampaignId,
+                userId: uid,
+                isTargeted: true,
+                shownAt: admin.firestore.FieldValue.serverTimestamp(),
+                createdAt: admin.firestore.FieldValue.serverTimestamp(),
+                updatedAt: admin.firestore.FieldValue.serverTimestamp()
+            });
+
+            return { campaign };
+        }
+    }
+
+    // 2. Special handling for forced campaign (debug mode) - logic moved to top to bypass all filters
     if (forceCampaignId) {
         const forcedDoc = await db.collection('feedback_campaigns').doc(forceCampaignId).get();
         if (forcedDoc.exists) {
@@ -244,7 +276,8 @@ export const feedbackAnswer = functions.https.onCall(async (data, context) => {
         });
 
         await db.collection('users').doc(uid).update({
-            lastFeedbackRequestedAt: admin.firestore.FieldValue.serverTimestamp()
+            lastFeedbackRequestedAt: admin.firestore.FieldValue.serverTimestamp(),
+            targetedCampaignId: admin.firestore.FieldValue.delete()
         });
 
         return { success: true };
@@ -266,7 +299,7 @@ export const adminListFeedbackCampaigns = functions.https.onCall(async (data, co
     const uid = requireAuth(context);
     await ensureAdmin(uid);
 
-    const campaignsSnap = await db.collection('feedback_campaigns').orderBy('activeFrom', 'desc').get();
+    const campaignsSnap = await db.collection('feedback_campaigns').get();
     const results = await Promise.all(campaignsSnap.docs.map(async (doc) => {
         const campaign = buildCampaignPayload(doc);
         const answersSnap = await db.collection('feedback_answers').where('campaignId', '==', doc.id).get();
@@ -276,6 +309,13 @@ export const adminListFeedbackCampaigns = functions.https.onCall(async (data, co
             answerCount: answersSnap.size
         };
     }));
+
+    // Sort in memory by activeFrom (desc)
+    results.sort((a, b) => {
+        const timeA = (a.activeFrom as any)?.toMillis?.() || (a.activeFrom instanceof Date ? a.activeFrom.getTime() : 0);
+        const timeB = (b.activeFrom as any)?.toMillis?.() || (b.activeFrom instanceof Date ? b.activeFrom.getTime() : 0);
+        return timeB - timeA;
+    });
 
     return { campaigns: results };
 });

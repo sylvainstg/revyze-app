@@ -15,7 +15,9 @@ import {
     Search,
     ArrowUp,
     ArrowDown,
-    Zap
+    Zap,
+    ArrowLeft,
+    Megaphone
 } from 'lucide-react';
 import { Button } from '../ui/Button';
 import { FeedbackCampaign, CampaignAnalytics } from '../../types/campaign';
@@ -282,7 +284,27 @@ export const CampaignManager: React.FC<CampaignManagerProps> = ({ onBack }) => {
 
     return (
         <div className="min-h-screen bg-slate-50">
-            {/* ... Header ... */}
+            {/* Header */}
+            <header className="bg-white border-b border-slate-200 sticky top-0 z-10">
+                <div className="mx-auto px-4 sm:px-6 lg:px-8">
+                    <div className="flex justify-between items-center h-16">
+                        <div className="flex items-center gap-4">
+                            <Button variant="ghost" size="sm" onClick={onBack} className="text-slate-500">
+                                <ArrowLeft className="w-5 h-5" />
+                            </Button>
+                            <div className="flex items-center gap-3">
+                                <div className="p-2 bg-indigo-100 rounded-lg">
+                                    <Megaphone className="w-6 h-6 text-indigo-600" />
+                                </div>
+                                <div>
+                                    <h1 className="text-xl font-bold text-slate-900">Campaign Management</h1>
+                                    <p className="text-xs text-slate-500">Feedback and Outreach</p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </header>
 
             {/* ... Main Content ... */}
             <main className="mx-auto px-4 sm:px-6 lg:px-8 py-8">

@@ -520,3 +520,17 @@ export const transferProjectOwnership = async (projectId: string, currentOwnerId
     return { success: false, message: 'Failed to transfer ownership.' };
   }
 };
+
+export const targetUserWithCampaign = async (userId: string, campaignId: string | null): Promise<boolean> => {
+  try {
+    const userRef = doc(db, USERS_COLLECTION, userId);
+    await updateDoc(userRef, {
+      targetedCampaignId: campaignId,
+      updatedAt: Date.now()
+    });
+    return true;
+  } catch (error) {
+    console.error("Error targeting user with campaign:", error);
+    return false;
+  }
+};
