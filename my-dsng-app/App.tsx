@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef, useCallback } from 'react';
+import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { PDFWorkspace } from './components/PDFWorkspace';
 import { ImageWorkspace } from './components/ImageWorkspace';
 import { CollaborationPanel } from './components/CollaborationPanel';
@@ -20,10 +20,11 @@ import { v4 as uuidv4 } from 'uuid';
 import { ShareModal } from './components/ShareModal';
 import { ProjectSettingsModal } from './components/ProjectSettingsModal';
 import { CreateProjectModal } from './components/CreateProjectModal';
+import * as authService from './services/authService';
+import { getUserReferralCode } from './services/referralService';
 import * as storageService from './services/storageService';
 import { db, storage } from './firebaseConfig';
 import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
-import * as authService from './services/authService';
 import { getPDFObjectURL, revokePDFObjectURL } from './utils/pdfUtils';
 import { getProjectRole, getProjectRoleDisplay, getCommentAudience, canSeeComment } from './utils/projectRoleHelper';
 import { getCategories, getVersionsByCategory, getNextCategoryVersion, DEFAULT_CATEGORY, migrateVersionsToCategories } from './utils/categoryHelpers';
@@ -1283,6 +1284,18 @@ const App: React.FC = () => {
         const sendInvitation = httpsCallable(functions, 'sendInvitationEmail');
         const inviterDisplayName = getInviterDisplayName(projectToShare);
 
+        // Ensure we have a referral code for the inviter
+        let code = currentUser.referralCode;
+        if (!code) {
+          try {
+            code = await getUserReferralCode();
+            // Update local user state so we don't fetch it again
+            setCurrentUser({ ...currentUser, referralCode: code });
+          } catch (err) {
+            console.error('Failed to get referral code for invite:', err);
+          }
+        }
+
         // Construct base URL parameters
         const params = new URLSearchParams();
         params.append('project', projectToShare.id);
@@ -1290,6 +1303,7 @@ const App: React.FC = () => {
         params.append('projectName', projectToShare.name);
         params.append('role', role);
         if (name) params.append('inviteeName', name);
+        if (code) params.append('ref', code);
 
         if (projectToShare.shareSettings?.enabled) {
           params.append('token', projectToShare.shareSettings.shareToken);
@@ -1791,10 +1805,18 @@ const App: React.FC = () => {
   }
 
   // Onboarding Logic (handlers)
+  const filteredOnboardingSteps = useMemo(() => {
+    return ONBOARDING_STEPS.filter(step => {
+      // Skip the #plan-preferences step for guests (as they can't see the menu)
+      if (isGuest && step.target === '#plan-preferences') return false;
+      return true;
+    });
+  }, [isGuest]);
+
   const showOnboarding = currentUser && !currentUser.hasCompletedOnboarding && view === 'workspace';
 
   const handleOnboardingNext = async () => {
-    if (onboardingStep < ONBOARDING_STEPS.length - 1) {
+    if (onboardingStep < filteredOnboardingSteps.length - 1) {
       setOnboardingStep(prev => prev + 1);
     } else {
       // Complete
@@ -2215,9 +2237,9 @@ const App: React.FC = () => {
         {/* Onboarding Tooltip */}
         {showOnboarding && (
           <OnboardingTooltip
-            step={ONBOARDING_STEPS[onboardingStep]}
+            step={filteredOnboardingSteps[onboardingStep]}
             currentStep={onboardingStep}
-            totalSteps={ONBOARDING_STEPS.length}
+            totalSteps={filteredOnboardingSteps.length}
             onNext={handleOnboardingNext}
             onSkip={handleOnboardingSkip}
           />
