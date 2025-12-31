@@ -2089,32 +2089,34 @@ const App: React.FC = () => {
               })()}
             </div>
 
-            {/* Collaboration Panel - shrinks/grows based on collapse state */}
-            <CollaborationPanel
-              comments={activeVersion.comments}
-              onResolveComment={handleResolveComment}
-              onDeleteComment={handleDeleteComment}
-              onReplyComment={handleReplyComment}
-              onPushToProfessional={
-                !isGuest && activeProject?.ownerId === currentUser?.id
-                  ? handlePushToProfessional
-                  : undefined
-              }
-              activeCommentId={activeCommentId}
-              setActiveCommentId={setActiveCommentId}
-              currentUserRole={currentUser.role}
-              projectRole={getProjectRole(activeProject, currentUser, isGuest, impersonatedRole)}
-              pageNumber={pageNumber}
-              onPageChange={(page) => setPageNumber(page)}
-              pageCount={pageCount}
-              currentUser={currentUser}
-              filter={commentFilter}
-              onUpdateFilter={setCommentFilter}
-              isCollapsed={!isSidebarOpen}
-              onToggleCollapse={(collapsed) => setIsSidebarOpen(!collapsed)}
-              collaborators={collaborators}
-              currentUserEmail={currentUser.email}
-            />
+            {/* Collaboration Panel - hidden for Mood Board, else shrinks/grows based on collapse state */}
+            {activeCategory !== 'Mood Board' && (
+              <CollaborationPanel
+                comments={activeVersion.comments}
+                onResolveComment={handleResolveComment}
+                onDeleteComment={handleDeleteComment}
+                onReplyComment={handleReplyComment}
+                onPushToProfessional={
+                  !isGuest && activeProject?.ownerId === currentUser?.id
+                    ? handlePushToProfessional
+                    : undefined
+                }
+                activeCommentId={activeCommentId}
+                setActiveCommentId={setActiveCommentId}
+                currentUserRole={currentUser.role}
+                projectRole={getProjectRole(activeProject, currentUser, isGuest, impersonatedRole)}
+                pageNumber={pageNumber}
+                onPageChange={(page) => setPageNumber(page)}
+                pageCount={pageCount}
+                currentUser={currentUser}
+                filter={commentFilter}
+                onUpdateFilter={setCommentFilter}
+                isCollapsed={!isSidebarOpen}
+                onToggleCollapse={(collapsed) => setIsSidebarOpen(!collapsed)}
+                collaborators={collaborators}
+                currentUserEmail={currentUser.email}
+              />
+            )}
           </main>
         </div>
 

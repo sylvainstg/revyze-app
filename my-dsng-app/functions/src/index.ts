@@ -17,6 +17,7 @@ import {
     REFERRAL_CONSTANTS
 } from "./referralService";
 import { getPDF } from "./pdfProxy";
+import { sendDigestEmails } from "./digest";
 import Stripe from "stripe";
 
 const initAdminApp = () => {
@@ -433,6 +434,58 @@ export const onProjectUpdated = functions.firestore
         // Check for new mentions or replies
         await processNewMentions(before, after, context.params.projectId);
     });
+
+// ========== DIGEST NOTIFICATION FUNCTIONS ==========
+
+/**
+ * Daily digest scheduled task (6:00 AM)
+ */
+export const dailyDigestCron = functions.pubsub
+    .schedule("0 6 * * *")
+    .timeZone("America/New_York")
+    .onRun(async (context) => {
+        console.log("Running scheduled Daily Digest...");
+        await sendDigestEmails("daily");
+    });
+
+/**
+ * Weekly digest scheduled task (Sunday 8:00 AM)
+ */
+export const weeklyDigestCron = functions.pubsub
+    .schedule("0 8 * * 0")
+    .timeZone("America/New_York")
+    .onRun(async (context) => {
+        console.log("Running scheduled Weekly Digest...");
+        await sendDigestEmails("weekly");
+    });
+
+/**
+ * Admin manual trigger for digests
+ */
+export const adminTriggerDigest = functions.https.onCall(async (data, context) => {
+    if (!context.auth) {
+        throw new functions.https.HttpsError("unauthenticated", "User must be logged in.");
+    }
+
+    // Check if requester is admin
+    const callerDoc = await admin.firestore().collection("users").doc(context.auth.uid).get();
+    if (!callerDoc.data()?.isAdmin) {
+        throw new functions.https.HttpsError("permission-denied", "Must be an admin to trigger digests.");
+    }
+
+    const { frequency } = data;
+    if (frequency !== "daily" && frequency !== "weekly") {
+        throw new functions.https.HttpsError("invalid-argument", "Frequency must be 'daily' or 'weekly'.");
+    }
+
+    try {
+        await sendDigestEmails(frequency);
+        return { success: true, message: `Successfully triggered ${frequency} digest.` };
+    } catch (error: any) {
+        console.error("Error triggering digest:", error);
+        throw new functions.https.HttpsError("internal", error.message);
+    }
+});
 
 // Export PDF proxy function
 export { getPDF };
