@@ -300,6 +300,21 @@ export const generateMockAnalyticsData = async (days: number = 90) => {
 
         const docRef = doc(db, ANALYTICS_COLLECTION, dateString);
         batch.set(docRef, stats);
+
+        // For the last 14 days, also generate some raw user_activity logs 
+        // to populate the "Live" sparkline instantly
+        if (i < 14) {
+            for (let j = 0; j < stats.dau; j++) {
+                const logRef = doc(collection(db, ACTIVITY_COLLECTION));
+                batch.set(logRef, {
+                    userId: `mock_user_${j}`,
+                    eventName: 'login',
+                    timestamp: date.getTime() + (Math.random() * 3600000 * 24), // Random time in that day
+                    createdAt: Timestamp.fromDate(date),
+                    metadata: { mock: true, role: 'pro' }
+                });
+            }
+        }
     }
 
     await batch.commit();

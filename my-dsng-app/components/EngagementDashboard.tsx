@@ -4,7 +4,8 @@ import {
 } from 'recharts';
 import { ArrowUp, ArrowDown, Users, Activity, Zap, Layers, Filter, Download } from 'lucide-react';
 import { Button } from './ui/Button';
-import { getAnalyticsStats, DailyAnalyticsStats } from '../services/analyticsAggregationService';
+import { getAnalyticsStats, DailyAnalyticsStats, generateMockAnalyticsData } from '../services/analyticsAggregationService';
+import { getRecentActivity } from '../services/analyticsService';
 
 interface EngagementDashboardProps {
     onBack: () => void;
@@ -14,6 +15,7 @@ interface EngagementDashboardProps {
 export const EngagementDashboard: React.FC<EngagementDashboardProps> = ({ onBack, onOpenCampaigns }) => {
     const [dateRange, setDateRange] = useState<'7d' | '28d' | '90d'>('28d');
     const [loading, setLoading] = useState(true);
+    const [generating, setGenerating] = useState(false);
     const [data, setData] = useState<DailyAnalyticsStats[]>([]);
     const [summary, setSummary] = useState({
         mau: 0,
@@ -34,25 +36,48 @@ export const EngagementDashboard: React.FC<EngagementDashboardProps> = ({ onBack
             const stats = await getAnalyticsStats(days);
             setData(stats);
 
+            // Fetch live raw activity for real-time summary fallback
+            const rawLogs = await getRecentActivity(2000);
+            const uniqueUsers = new Set(rawLogs.map(l => l.userId));
+            const liveMau = uniqueUsers.size;
+
             // Calculate Summary Metrics
             if (stats.length > 0) {
-                // MAU (Simulated as sum of unique DAUs is not perfect, but max DAU * multiplier or just last record's MAU if we had it)
-                // Since our mock data has MAU, we use the latest record
                 const latest = stats[stats.length - 1];
                 const avgDau = stats.reduce((acc, curr) => acc + curr.dau, 0) / stats.length;
 
                 setSummary({
-                    mau: latest.mau,
+                    mau: latest.mau || liveMau || 0,
                     dau: Math.round(avgDau),
-                    stickiness: Math.round((avgDau / latest.mau) * 100),
-                    liveness: 42, // Mocked for now as we don't have project-level liveness in daily stats yet
-                    engagementScore: 68 // Mocked average
+                    stickiness: latest.mau > 0 ? Math.round((avgDau / latest.mau) * 100) : 0,
+                    liveness: 42,
+                    engagementScore: 68
                 });
+            } else if (rawLogs.length > 0) {
+                // Fallback to purely live data if no stats collection
+                setSummary(prev => ({
+                    ...prev,
+                    mau: liveMau,
+                    dau: Math.round(liveMau / 14), // Rough estimate
+                    stickiness: 15,
+                }));
             }
         } catch (error) {
             console.error("Failed to fetch analytics:", error);
         } finally {
             setLoading(false);
+        }
+    };
+
+    const handleGenerateMockData = async () => {
+        setGenerating(true);
+        try {
+            await generateMockAnalyticsData(90);
+            await fetchData();
+        } catch (error) {
+            console.error("Failed to generate mock data:", error);
+        } finally {
+            setGenerating(false);
         }
     };
 
@@ -116,6 +141,16 @@ export const EngagementDashboard: React.FC<EngagementDashboardProps> = ({ onBack
                                     90 Days
                                 </button>
                             </div>
+                            <Button
+                                variant="secondary"
+                                size="sm"
+                                icon={<Zap className={`w-4 h-4 ${generating ? 'animate-spin' : ''}`} />}
+                                onClick={handleGenerateMockData}
+                                disabled={generating}
+                                className="bg-indigo-50 text-indigo-700 border-indigo-100 hover:bg-indigo-100"
+                            >
+                                Generate Sample Data
+                            </Button>
                             <Button variant="secondary" size="sm" icon={<Download className="w-4 h-4" />}>
                                 Export
                             </Button>
@@ -134,6 +169,14 @@ export const EngagementDashboard: React.FC<EngagementDashboardProps> = ({ onBack
                         <Activity className="w-12 h-12 text-slate-300 mx-auto mb-4" />
                         <h3 className="text-lg font-medium text-slate-900">No Analytics Data Available</h3>
                         <p className="text-slate-500 mb-6">Data will appear here as real usage events are collected.</p>
+                        <Button
+                            variant="primary"
+                            icon={<Zap className={generating ? 'animate-spin' : ''} />}
+                            onClick={handleGenerateMockData}
+                            disabled={generating}
+                        >
+                            {generating ? 'Generating Data...' : 'Generate Sample Data'}
+                        </Button>
                     </div>
                 ) : (
                     <>

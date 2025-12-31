@@ -8,14 +8,14 @@ import { Input } from './ui/Input';
 import { Shield, Search, Trash2, ArrowLeft, BarChart3, Users, Eye, UserPlus, Check, AlertCircle, Calendar, CreditCard, Receipt, Gift, Megaphone, RefreshCw, Activity, Zap } from 'lucide-react';
 import { FeatureVoteAnalytics } from './FeatureVoteAnalytics';
 import { ReferralManagement } from './ReferralManagement';
-import { getUserActivity, ActivityLog } from '../services/analyticsService';
+import { getUserActivity, ActivityLog, getRecentActivity } from '../services/analyticsService';
 import { listFeedbackCampaigns } from '../services/feedbackService';
 import { EngagementDashboard } from './EngagementDashboard';
 import { CampaignManager } from './admin/CampaignManager';
 import { CampaignDocumentation } from './admin/CampaignDocumentation';
 import { PlanLimitsEditor } from './admin/PlanLimitsEditor';
-import { getAnalyticsStats } from '../services/analyticsAggregationService';
 import { getAdminReferralData } from '../services/referralService';
+import { getAnalyticsStats, generateMockAnalyticsData } from '../services/analyticsAggregationService';
 import { httpsCallable } from 'firebase/functions';
 import { functions, auth } from '../firebaseConfig';
 
@@ -72,6 +72,7 @@ export const AdminPage: React.FC<AdminPageProps> = ({ onBack, currentUser }) => 
     const [showEngagementDashboard, setShowEngagementDashboard] = useState(false);
     const [engagementLoading, setEngagementLoading] = useState(false);
     const [engagementKpis, setEngagementKpis] = useState<{ mau: number; dau: number; stickiness: number; liveness: number; spark: { date: string; dau: number; }[] } | null>(null);
+    const [globalActivityLogs, setGlobalActivityLogs] = useState<ActivityLog[]>([]);
     const [recalcEngagementLoading, setRecalcEngagementLoading] = useState(false);
     const [rebuildDailyLoading, setRebuildDailyLoading] = useState(false);
     const [engagementMessage, setEngagementMessage] = useState<{ text: string; type: 'success' | 'error' } | null>(null);
@@ -185,6 +186,32 @@ export const AdminPage: React.FC<AdminPageProps> = ({ onBack, currentUser }) => 
         return { data, max };
     }, [activityLogs]);
 
+    const systemActivitySpark = useMemo(() => {
+        const counts: Record<string, Set<string>> = {};
+        const last14Days = [...Array(14)].map((_, i) => {
+            const d = new Date();
+            d.setDate(d.getDate() - i);
+            return d.toISOString().split('T')[0];
+        }).reverse();
+
+        last14Days.forEach(date => counts[date] = new Set());
+
+        globalActivityLogs.forEach(log => {
+            const date = new Date(log.timestamp).toISOString().split('T')[0];
+            if (counts[date] !== undefined && log.userId) {
+                counts[date].add(log.userId);
+            }
+        });
+
+        const data = last14Days.map(date => ({
+            date: date.slice(5),
+            dau: counts[date].size
+        }));
+
+        const max = Math.max(...data.map(d => d.dau), 1);
+        return { data, max };
+    }, [globalActivityLogs]);
+
     useEffect(() => {
         fetchUsers();
     }, []);
@@ -276,6 +303,11 @@ export const AdminPage: React.FC<AdminPageProps> = ({ onBack, currentUser }) => 
         setEngagementMessage(null);
         try {
             const data = await getAnalyticsStats(28);
+
+            // Also fetch raw activity for a "live" sparkline if stats are lagging or empty
+            const rawLogs = await getRecentActivity(1000);
+            setGlobalActivityLogs(rawLogs);
+
             if (!data || data.length === 0) {
                 setEngagementKpis(null);
                 return;
@@ -387,6 +419,28 @@ export const AdminPage: React.FC<AdminPageProps> = ({ onBack, currentUser }) => 
             setCampaignsSummary([]);
         } finally {
             setLoadingCampaigns(false);
+        }
+    };
+
+    const handleGenerateMockData = async () => {
+        setEngagementLoading(true);
+        setEngagementMessage(null);
+        try {
+            console.log('[Admin] Generate mock analytics triggered');
+            await generateMockAnalyticsData(90);
+            setEngagementMessage({
+                text: 'Generated 90 days of sample analytics data.',
+                type: 'success'
+            });
+            await loadEngagementKpis();
+        } catch (error: any) {
+            console.error('Failed to generate mock analytics', error);
+            setEngagementMessage({
+                text: error?.message || 'Failed to generate mock analytics.',
+                type: 'error'
+            });
+        } finally {
+            setEngagementLoading(false);
         }
     };
 
@@ -932,10 +986,19 @@ export const AdminPage: React.FC<AdminPageProps> = ({ onBack, currentUser }) => 
                                             Campaign Manager
                                         </Button>
                                         <Button
+                                            variant="secondary"
+                                            onClick={handleGenerateMockData}
+                                            icon={<Zap className={`w-4 h-4 ${engagementLoading ? 'animate-spin' : ''}`} />}
+                                            disabled={engagementLoading}
+                                            className="bg-indigo-50 text-indigo-700 hover:bg-indigo-100"
+                                        >
+                                            Generate Sample Data
+                                        </Button>
+                                        <Button
                                             onClick={() => setShowEngagementDashboard(true)}
                                             icon={<BarChart3 className="w-4 h-4" />}
                                         >
-                                            Open Dashboard
+                                            Full Dashboard
                                         </Button>
                                     </div>
                                 </div>
@@ -985,20 +1048,28 @@ export const AdminPage: React.FC<AdminPageProps> = ({ onBack, currentUser }) => 
                                             {engagementLoading && <div className="text-xs text-slate-400">Loading…</div>}
                                         </div>
                                         <div className="flex items-end gap-2 h-32">
-                                            {(engagementKpis?.spark || []).map(point => (
-                                                <div key={point.date} className="flex-1 flex flex-col items-center">
+                                            {systemActivitySpark.data.map(point => (
+                                                <div key={point.date} className="flex-1 h-full flex flex-col justify-end items-center group relative">
                                                     <div
                                                         className="w-full rounded-t bg-indigo-200 hover:bg-indigo-300 transition-colors cursor-help"
-                                                        style={{ height: `${maxSparkDau > 0 ? Math.max(8, (point.dau / maxSparkDau) * 100) : 8}%`, minHeight: '8px' }}
+                                                        style={{
+                                                            height: `${(point.dau / systemActivitySpark.max) * 100}%`,
+                                                            minHeight: point.dau > 0 ? '2px' : '1px',
+                                                            opacity: point.dau > 0 ? 1 : 0.2
+                                                        }}
                                                         title={`${point.dau} DAU on ${point.date}`}
                                                     ></div>
-                                                    <span className="text-[10px] text-slate-400 mt-1">{point.date}</span>
                                                 </div>
                                             ))}
-                                            {!engagementKpis && !engagementLoading && (
-                                                <div className="text-sm text-slate-500">No analytics yet. Open dashboard to generate mock data.</div>
-                                            )}
                                         </div>
+                                        <div className="flex justify-between mt-2 text-[10px] text-slate-400 font-medium px-1">
+                                            <span>{systemActivitySpark.data[0]?.date}</span>
+                                            <span>Last 14 days activity trend</span>
+                                            <span>{systemActivitySpark.data[13]?.date}</span>
+                                        </div>
+                                        {systemActivitySpark.data.length === 0 && !engagementLoading && (
+                                            <div className="text-sm text-slate-500 text-center py-4">No activity logs found.</div>
+                                        )}
                                     </div>
                                     <div className="p-4 rounded-lg border border-slate-200 bg-white space-y-3">
                                         <div className="flex items-center justify-between">

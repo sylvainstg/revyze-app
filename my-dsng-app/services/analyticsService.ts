@@ -58,6 +58,29 @@ export const logEvent = async (userId: string, eventName: string, metadata: any 
 };
 
 /**
+ * Fetches recent activity logs for ALL users (Admin only).
+ * @param limitCount The maximum number of logs to fetch (default 100)
+ */
+export const getRecentActivity = async (limitCount: number = 100): Promise<ActivityLog[]> => {
+    try {
+        const q = query(
+            collection(db, COLLECTION_NAME),
+            orderBy('createdAt', 'desc'),
+            limit(limitCount)
+        );
+
+        const querySnapshot = await getDocs(q);
+        return querySnapshot.docs.map(doc => ({
+            id: doc.id,
+            ...doc.data()
+        } as ActivityLog));
+    } catch (error) {
+        console.error('Error fetching global activity:', error);
+        return [];
+    }
+};
+
+/**
  * Fetches the recent activity logs for a specific user.
  * @param userId The ID of the user to fetch logs for
  * @param limitCount The maximum number of logs to fetch (default 20)
