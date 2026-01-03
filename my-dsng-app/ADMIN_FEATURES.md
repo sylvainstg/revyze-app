@@ -5,9 +5,11 @@ This document describes hidden administrative features available for database ma
 ## Category Fix Function
 
 ### Purpose
+
 A Cloud Function that allows administrators to reassign the latest version of a project to a different category without requiring user authentication.
 
 ### Function Details
+
 - **Name**: `fixCategoryHttp`
 - **Type**: HTTP-triggered Cloud Function
 - **URL**: `https://us-central1-dsng-app.cloudfunctions.net/fixCategoryHttp`
@@ -24,6 +26,7 @@ curl -X POST https://us-central1-dsng-app.cloudfunctions.net/fixCategoryHttp \
 ```
 
 **Example:**
+
 ```bash
 curl -X POST https://us-central1-dsng-app.cloudfunctions.net/fixCategoryHttp \
   -H "Content-Type: application/json" \
@@ -33,6 +36,7 @@ curl -X POST https://us-central1-dsng-app.cloudfunctions.net/fixCategoryHttp \
 ### Response Format
 
 **Success:**
+
 ```json
 {
   "success": true,
@@ -47,6 +51,7 @@ curl -X POST https://us-central1-dsng-app.cloudfunctions.net/fixCategoryHttp \
 ```
 
 **Already in target category:**
+
 ```json
 {
   "success": true,
@@ -56,6 +61,7 @@ curl -X POST https://us-central1-dsng-app.cloudfunctions.net/fixCategoryHttp \
 ```
 
 **Error:**
+
 ```json
 {
   "error": "Error message"
@@ -76,21 +82,25 @@ curl -X POST https://us-central1-dsng-app.cloudfunctions.net/fixCategoryHttp \
 ⚠️ **Important**: This function has no authentication and should be removed after use or restricted to specific IP addresses in production.
 
 **To remove the function:**
+
 ```bash
 firebase functions:delete fixCategoryHttp
 ```
 
 ### Source Code Location
+
 - Function definition: `/functions/src/index.ts` (line ~496)
 - Deployed: `us-central1` region
 
 ### Use Cases
+
 - Fixing incorrect category assignments
 - Migrating versions between categories
 - Database maintenance after bugs
 - One-time data corrections
 
 ### Limitations
+
 - Only works for "Maison à Irlande" project (hardcoded)
 - Always updates the LATEST version only
 - No undo functionality (manual database edit required to revert)
@@ -100,6 +110,7 @@ firebase functions:delete fixCategoryHttp
 ## Future Admin Features
 
 Consider implementing:
+
 - Authenticated admin panel for database operations
 - Bulk category reassignment
 - Version deletion/restoration

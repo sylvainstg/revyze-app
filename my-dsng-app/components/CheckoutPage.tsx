@@ -1,9 +1,9 @@
-import React, { useState } from 'react';
-import { UserRole } from '../types';
-import { Button } from './ui/Button';
-import { Input } from './ui/Input';
-import { Check, Lock, CreditCard, Loader2 } from 'lucide-react';
-import { getPricingPlansForCheckout } from '../constants';
+import React, { useState } from "react";
+import { UserRole } from "../types";
+import { Button } from "./ui/Button";
+import { Input } from "./ui/Input";
+import { Check, Lock, CreditCard, Loader2 } from "lucide-react";
+import { getPricingPlansForCheckout } from "../constants";
 
 interface CheckoutPageProps {
   userRole: UserRole;
@@ -11,16 +11,20 @@ interface CheckoutPageProps {
   onBack: () => void;
 }
 
-export const CheckoutPage: React.FC<CheckoutPageProps> = ({ userRole, onSuccess, onBack }) => {
+export const CheckoutPage: React.FC<CheckoutPageProps> = ({
+  userRole,
+  onSuccess,
+  onBack,
+}) => {
   const [selectedPlanId, setSelectedPlanId] = useState<string | null>(null);
-  const [step, setStep] = useState<'plans' | 'payment'>('plans');
+  const [step, setStep] = useState<"plans" | "payment">("plans");
   const [isProcessing, setIsProcessing] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   // Use hardcoded pricing from constants
   const plans = getPricingPlansForCheckout();
 
-  const selectedPlan = plans.find(p => p.id === selectedPlanId);
+  const selectedPlan = plans.find((p) => p.id === selectedPlanId);
 
   const handlePlanSelect = (id: string) => {
     setSelectedPlanId(id);
@@ -35,15 +39,15 @@ export const CheckoutPage: React.FC<CheckoutPageProps> = ({ userRole, onSuccess,
 
     try {
       // If plan is Free ($0), skip payment and complete immediately
-      if (selectedPlan?.price === '$0') {
+      if (selectedPlan?.price === "$0") {
         await onSuccess(selectedPlanId);
       } else {
-        setStep('payment');
+        setStep("payment");
         setIsProcessing(false);
       }
     } catch (err) {
-      console.error('Error during checkout:', err);
-      setError('Failed to process your selection. Please try again.');
+      console.error("Error during checkout:", err);
+      setError("Failed to process your selection. Please try again.");
       setIsProcessing(false);
     }
   };
@@ -57,11 +61,11 @@ export const CheckoutPage: React.FC<CheckoutPageProps> = ({ userRole, onSuccess,
 
     try {
       // Simulate payment processing
-      await new Promise(resolve => setTimeout(resolve, 2000));
+      await new Promise((resolve) => setTimeout(resolve, 2000));
       await onSuccess(selectedPlanId);
     } catch (err) {
-      console.error('Error during payment:', err);
-      setError('Payment processing failed. Please try again.');
+      console.error("Error during payment:", err);
+      setError("Payment processing failed. Please try again.");
       setIsProcessing(false);
     }
   };
@@ -72,24 +76,28 @@ export const CheckoutPage: React.FC<CheckoutPageProps> = ({ userRole, onSuccess,
         {/* Header */}
         <div className="text-center mb-12">
           <div className="flex justify-center mb-6">
-            <img src="/revyze-logo.png" alt="Revyze" className="h-12 w-auto object-contain" />
+            <img
+              src="/revyze-logo.png"
+              alt="Revyze"
+              className="h-12 w-auto object-contain"
+            />
           </div>
           <h1 className="text-3xl font-bold text-slate-900">
-            {step === 'plans' ? 'Select a Plan' : 'Secure Checkout'}
+            {step === "plans" ? "Select a Plan" : "Secure Checkout"}
           </h1>
           <p className="text-slate-600 mt-2">
-            {step === 'plans'
+            {step === "plans"
               ? `Choose the option that best fits your needs.`
               : `Complete your subscription for the ${selectedPlan?.name} plan.`}
           </p>
         </div>
 
-        {step === 'plans' ? (
+        {step === "plans" ? (
           <div className="grid md:grid-cols-2 gap-6 max-w-3xl mx-auto">
             {plans.map((plan) => (
               <div
                 key={plan.id}
-                className={`relative bg-white rounded-2xl shadow-sm p-8 border-2 cursor-pointer transition-all hover:shadow-lg ${selectedPlanId === plan.id ? 'border-indigo-600 ring-1 ring-indigo-600' : 'border-transparent hover:border-indigo-200'}`}
+                className={`relative bg-white rounded-2xl shadow-sm p-8 border-2 cursor-pointer transition-all hover:shadow-lg ${selectedPlanId === plan.id ? "border-indigo-600 ring-1 ring-indigo-600" : "border-transparent hover:border-indigo-200"}`}
                 onClick={() => handlePlanSelect(plan.id)}
               >
                 {plan.popular && (
@@ -97,10 +105,18 @@ export const CheckoutPage: React.FC<CheckoutPageProps> = ({ userRole, onSuccess,
                     MOST POPULAR
                   </div>
                 )}
-                <h3 className="text-xl font-bold text-slate-900 mb-2">{plan.name}</h3>
+                <h3 className="text-xl font-bold text-slate-900 mb-2">
+                  {plan.name}
+                </h3>
                 <div className="flex items-baseline mb-6">
-                  <span className="text-4xl font-extrabold text-slate-900">{plan.price}</span>
-                  {plan.period && <span className="text-slate-500 ml-1 text-sm">{plan.period}</span>}
+                  <span className="text-4xl font-extrabold text-slate-900">
+                    {plan.price}
+                  </span>
+                  {plan.period && (
+                    <span className="text-slate-500 ml-1 text-sm">
+                      {plan.period}
+                    </span>
+                  )}
                 </div>
                 <ul className="space-y-4 mb-8">
                   {plan.features.map((feature, i) => (
@@ -110,17 +126,21 @@ export const CheckoutPage: React.FC<CheckoutPageProps> = ({ userRole, onSuccess,
                     </li>
                   ))}
                 </ul>
-                <div className={`w-full h-2 rounded-full bg-slate-100 overflow-hidden ${selectedPlanId === plan.id ? 'opacity-100' : 'opacity-0'}`}>
+                <div
+                  className={`w-full h-2 rounded-full bg-slate-100 overflow-hidden ${selectedPlanId === plan.id ? "opacity-100" : "opacity-0"}`}
+                >
                   <div className="h-full bg-indigo-600 w-full animate-pulse"></div>
                 </div>
 
                 {/* Plan selection indicator */}
                 <div className="mt-6 w-full">
                   <Button
-                    variant={selectedPlanId === plan.id ? 'primary' : 'secondary'}
+                    variant={
+                      selectedPlanId === plan.id ? "primary" : "secondary"
+                    }
                     className="w-full pointer-events-none"
                   >
-                    {selectedPlanId === plan.id ? 'Selected' : 'Select'}
+                    {selectedPlanId === plan.id ? "Selected" : "Select"}
                   </Button>
                 </div>
               </div>
@@ -135,13 +155,27 @@ export const CheckoutPage: React.FC<CheckoutPageProps> = ({ userRole, onSuccess,
               </div>
               <div className="text-right">
                 <p className="font-semibold">{selectedPlan?.name}</p>
-                <button onClick={() => setStep('plans')} className="text-xs text-indigo-300 hover:text-white underline">Change plan</button>
+                <button
+                  onClick={() => setStep("plans")}
+                  className="text-xs text-indigo-300 hover:text-white underline"
+                >
+                  Change plan
+                </button>
               </div>
             </div>
             <div className="p-8">
               <form onSubmit={handlePayment} className="space-y-4">
-                <Input label="Cardholder Name" placeholder="Name on card" required />
-                <Input label="Card Number" placeholder="0000 0000 0000 0000" icon={<CreditCard />} required />
+                <Input
+                  label="Cardholder Name"
+                  placeholder="Name on card"
+                  required
+                />
+                <Input
+                  label="Card Number"
+                  placeholder="0000 0000 0000 0000"
+                  icon={<CreditCard />}
+                  required
+                />
                 <div className="grid grid-cols-2 gap-4">
                   <Input label="Expiry Date" placeholder="MM/YY" required />
                   <Input label="CVC" placeholder="123" required />
@@ -159,10 +193,20 @@ export const CheckoutPage: React.FC<CheckoutPageProps> = ({ userRole, onSuccess,
                 )}
 
                 <div className="flex gap-3">
-                  <Button type="button" variant="secondary" onClick={() => setStep('plans')} className="flex-1" disabled={isProcessing}>
+                  <Button
+                    type="button"
+                    variant="secondary"
+                    onClick={() => setStep("plans")}
+                    className="flex-1"
+                    disabled={isProcessing}
+                  >
                     Back
                   </Button>
-                  <Button type="submit" className="flex-1" isLoading={isProcessing}>
+                  <Button
+                    type="submit"
+                    className="flex-1"
+                    isLoading={isProcessing}
+                  >
                     Pay {selectedPlan?.price}
                   </Button>
                 </div>
@@ -171,7 +215,7 @@ export const CheckoutPage: React.FC<CheckoutPageProps> = ({ userRole, onSuccess,
           </div>
         )}
 
-        {step === 'plans' && (
+        {step === "plans" && (
           <div className="mt-8 flex flex-col items-center gap-4">
             {error && (
               <div className="text-red-600 text-sm bg-red-50 px-4 py-2 rounded-lg border border-red-200">
@@ -179,7 +223,9 @@ export const CheckoutPage: React.FC<CheckoutPageProps> = ({ userRole, onSuccess,
               </div>
             )}
             <div className="flex gap-4">
-              <Button variant="ghost" onClick={onBack} disabled={isProcessing}>Cancel</Button>
+              <Button variant="ghost" onClick={onBack} disabled={isProcessing}>
+                Cancel
+              </Button>
               <Button
                 disabled={!selectedPlanId || isProcessing}
                 onClick={handleContinue}
@@ -187,7 +233,7 @@ export const CheckoutPage: React.FC<CheckoutPageProps> = ({ userRole, onSuccess,
                 className="w-48"
                 isLoading={isProcessing}
               >
-                {selectedPlan?.price === '$0' ? 'Complete Setup' : 'Continue'}
+                {selectedPlan?.price === "$0" ? "Complete Setup" : "Continue"}
               </Button>
             </div>
           </div>

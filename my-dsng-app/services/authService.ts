@@ -1,212 +1,245 @@
 import {
-    createUserWithEmailAndPassword,
-    signInWithEmailAndPassword,
-    signOut,
-    onAuthStateChanged,
-    sendPasswordResetEmail,
-    updateProfile,
-    User as FirebaseUser
-} from 'firebase/auth';
-import { doc, setDoc, getDoc, updateDoc, onSnapshot } from 'firebase/firestore';
-import { auth, db } from '../firebaseConfig';
-import { User, UserRole } from '../types';
+  createUserWithEmailAndPassword,
+  signInWithEmailAndPassword,
+  signOut,
+  onAuthStateChanged,
+  sendPasswordResetEmail,
+  updateProfile,
+  User as FirebaseUser,
+} from "firebase/auth";
+import { doc, setDoc, getDoc, updateDoc, onSnapshot } from "firebase/firestore";
+import { auth, db } from "../firebaseConfig";
+import { User, UserRole } from "../types";
 
 // Collection reference
-const USERS_COLLECTION = 'users';
+const USERS_COLLECTION = "users";
 
 export const registerUser = async (
-    name: string,
-    email: string,
-    password: string,
-    role: UserRole,
-    plan: 'free' | 'pro' = 'free',
-    subscriptionStatus?: 'active' | 'trialing' | 'canceled' | 'past_due'
+  name: string,
+  email: string,
+  password: string,
+  role: UserRole,
+  plan: "free" | "pro" = "free",
+  subscriptionStatus?: "active" | "trialing" | "canceled" | "past_due",
 ): Promise<{ success: boolean; user?: User; message?: string }> => {
-    try {
-        const userCredential = await createUserWithEmailAndPassword(auth, email, password);
-        const firebaseUser = userCredential.user;
+  try {
+    const userCredential = await createUserWithEmailAndPassword(
+      auth,
+      email,
+      password,
+    );
+    const firebaseUser = userCredential.user;
 
-        // Save display name to Auth profile
-        await updateProfile(firebaseUser, { displayName: name });
+    // Save display name to Auth profile
+    await updateProfile(firebaseUser, { displayName: name });
 
-        const newUser: User = {
-            id: firebaseUser.uid,
-            name,
-            email: email.toLowerCase(),
-            role,
-            plan,
+    const newUser: User = {
+      id: firebaseUser.uid,
+      name,
+      email: email.toLowerCase(),
+      role,
+      plan,
 
-            subscriptionStatus,
-            loginCount: 1,
-            lastLogin: Date.now(),
-            shareCountGuest: 0,
-            shareCountPro: 0,
-            projectCount: 0,
-            commentCount: 0,
-            lastSessionDuration: 0
-        };
+      subscriptionStatus,
+      loginCount: 1,
+      lastLogin: Date.now(),
+      shareCountGuest: 0,
+      shareCountPro: 0,
+      projectCount: 0,
+      commentCount: 0,
+      lastSessionDuration: 0,
+    };
 
-        // Save user profile to Firestore
-        await setDoc(doc(db, USERS_COLLECTION, newUser.id), newUser);
+    // Save user profile to Firestore
+    await setDoc(doc(db, USERS_COLLECTION, newUser.id), newUser);
 
-        return { success: true, user: newUser };
-    } catch (error: any) {
-        console.error("Registration error:", error);
-        let message = "Registration failed.";
-        if (error.code === 'auth/email-already-in-use') {
-            message = "Email already in use.";
-        }
-        return { success: false, message };
+    return { success: true, user: newUser };
+  } catch (error: any) {
+    console.error("Registration error:", error);
+    let message = "Registration failed.";
+    if (error.code === "auth/email-already-in-use") {
+      message = "Email already in use.";
     }
+    return { success: false, message };
+  }
 };
 
-import { logEvent } from './analyticsService';
+import { logEvent } from "./analyticsService";
 
 // ... existing imports
 
-export const loginUser = async (email: string, password: string): Promise<{ success: boolean; user?: User; message?: string }> => {
-    try {
-        const userCredential = await signInWithEmailAndPassword(auth, email, password);
-        const firebaseUser = userCredential.user;
+export const loginUser = async (
+  email: string,
+  password: string,
+): Promise<{ success: boolean; user?: User; message?: string }> => {
+  try {
+    const userCredential = await signInWithEmailAndPassword(
+      auth,
+      email,
+      password,
+    );
+    const firebaseUser = userCredential.user;
 
-        // Fetch user profile from Firestore
-        const userDoc = await getDoc(doc(db, USERS_COLLECTION, firebaseUser.uid));
+    // Fetch user profile from Firestore
+    const userDoc = await getDoc(doc(db, USERS_COLLECTION, firebaseUser.uid));
 
-        if (userDoc.exists()) {
-            const userData = userDoc.data() as User;
-            // Update login stats
-            const updates = {
-                loginCount: (userData.loginCount || 0) + 1,
-                lastLogin: Date.now(),
-                previousLogin: userData.lastLogin || 0 // Capture previous login
-            };
-            await updateDoc(doc(db, USERS_COLLECTION, firebaseUser.uid), updates);
+    if (userDoc.exists()) {
+      const userData = userDoc.data() as User;
+      // Update login stats
+      const updates = {
+        loginCount: (userData.loginCount || 0) + 1,
+        lastLogin: Date.now(),
+        previousLogin: userData.lastLogin || 0, // Capture previous login
+      };
+      await updateDoc(doc(db, USERS_COLLECTION, firebaseUser.uid), updates);
 
-            // Log analytics event
-            logEvent(firebaseUser.uid, 'login', { email: userData.email, role: userData.role });
+      // Log analytics event
+      logEvent(firebaseUser.uid, "login", {
+        email: userData.email,
+        role: userData.role,
+      });
 
-            return { success: true, user: { ...userData, ...updates } };
-        } else {
-            // HEALING: User exists in Auth but not in Firestore. Create default profile.
-            const newUser: User = {
-                id: firebaseUser.uid,
-                name: firebaseUser.displayName || 'User',
-                email: email.toLowerCase(),
-                role: UserRole.HOMEOWNER, // Default role
+      return { success: true, user: { ...userData, ...updates } };
+    } else {
+      // HEALING: User exists in Auth but not in Firestore. Create default profile.
+      const newUser: User = {
+        id: firebaseUser.uid,
+        name: firebaseUser.displayName || "User",
+        email: email.toLowerCase(),
+        role: UserRole.HOMEOWNER, // Default role
 
-                plan: 'free',
-                loginCount: 1,
-                lastLogin: Date.now(),
-                shareCountGuest: 0,
-                shareCountPro: 0,
-                projectCount: 0
-            };
+        plan: "free",
+        loginCount: 1,
+        lastLogin: Date.now(),
+        shareCountGuest: 0,
+        shareCountPro: 0,
+        projectCount: 0,
+      };
 
-            try {
-                await setDoc(doc(db, USERS_COLLECTION, newUser.id), newUser);
-                logEvent(newUser.id, 'login', { email: newUser.email, role: newUser.role, isNewProfile: true });
-                return { success: true, user: newUser };
-            } catch (e) {
-                console.error("Failed to create missing profile:", e);
-                return { success: false, message: "User profile missing and could not be created." };
-            }
-        }
-    } catch (error: any) {
-        console.error("Login error:", error);
-        return { success: false, message: "Invalid email or password." };
+      try {
+        await setDoc(doc(db, USERS_COLLECTION, newUser.id), newUser);
+        logEvent(newUser.id, "login", {
+          email: newUser.email,
+          role: newUser.role,
+          isNewProfile: true,
+        });
+        return { success: true, user: newUser };
+      } catch (e) {
+        console.error("Failed to create missing profile:", e);
+        return {
+          success: false,
+          message: "User profile missing and could not be created.",
+        };
+      }
     }
+  } catch (error: any) {
+    console.error("Login error:", error);
+    return { success: false, message: "Invalid email or password." };
+  }
 };
 
 export const logoutUser = async (): Promise<void> => {
-    if (auth.currentUser) {
-        logEvent(auth.currentUser.uid, 'logout');
-    }
-    await signOut(auth);
+  if (auth.currentUser) {
+    logEvent(auth.currentUser.uid, "logout");
+  }
+  await signOut(auth);
 };
 
-export const resetPassword = async (email: string): Promise<{ success: boolean; message?: string }> => {
-    try {
-        await sendPasswordResetEmail(auth, email);
-        return { success: true, message: "Password reset email sent!" };
-    } catch (error: any) {
-        console.error("Reset password error:", error);
-        return { success: false, message: error.message || "Failed to send reset email." };
-    }
+export const resetPassword = async (
+  email: string,
+): Promise<{ success: boolean; message?: string }> => {
+  try {
+    await sendPasswordResetEmail(auth, email);
+    return { success: true, message: "Password reset email sent!" };
+  } catch (error: any) {
+    console.error("Reset password error:", error);
+    return {
+      success: false,
+      message: error.message || "Failed to send reset email.",
+    };
+  }
 };
 
-export const updateUserProfile = async (userId: string, updates: Partial<User>): Promise<boolean> => {
-    try {
-        const userRef = doc(db, USERS_COLLECTION, userId);
-        await updateDoc(userRef, updates);
+export const updateUserProfile = async (
+  userId: string,
+  updates: Partial<User>,
+): Promise<boolean> => {
+  try {
+    const userRef = doc(db, USERS_COLLECTION, userId);
+    await updateDoc(userRef, updates);
 
-        // Also update Auth profile if name is changed
-        if (updates.name && auth.currentUser) {
-            await updateProfile(auth.currentUser, { displayName: updates.name });
-        }
-
-        return true;
-    } catch (e) {
-        console.error("Error updating profile:", e);
-        return false;
+    // Also update Auth profile if name is changed
+    if (updates.name && auth.currentUser) {
+      await updateProfile(auth.currentUser, { displayName: updates.name });
     }
+
+    return true;
+  } catch (e) {
+    console.error("Error updating profile:", e);
+    return false;
+  }
 };
 
 export const subscribeToAuth = (callback: (user: User | null) => void) => {
-    let unsubscribeSnapshot: (() => void) | null = null;
+  let unsubscribeSnapshot: (() => void) | null = null;
 
-    const unsubscribeAuth = onAuthStateChanged(auth, (firebaseUser) => {
-        // Unsubscribe from previous snapshot listener if exists
-        if (unsubscribeSnapshot) {
-            unsubscribeSnapshot();
-            unsubscribeSnapshot = null;
-        }
+  const unsubscribeAuth = onAuthStateChanged(auth, (firebaseUser) => {
+    // Unsubscribe from previous snapshot listener if exists
+    if (unsubscribeSnapshot) {
+      unsubscribeSnapshot();
+      unsubscribeSnapshot = null;
+    }
 
-        if (firebaseUser) {
-            const userRef = doc(db, USERS_COLLECTION, firebaseUser.uid);
+    if (firebaseUser) {
+      const userRef = doc(db, USERS_COLLECTION, firebaseUser.uid);
 
-            // Set up real-time listener
-            unsubscribeSnapshot = onSnapshot(userRef, async (docSnapshot) => {
-                if (docSnapshot.exists()) {
-                    callback(docSnapshot.data() as User);
-                } else {
-                    // HEALING: User exists in Auth but not in Firestore. Create default profile.
-                    console.log("Healing missing profile in subscription...");
-                    const newUser: User = {
-                        id: firebaseUser.uid,
-                        name: firebaseUser.displayName || 'User',
-                        email: firebaseUser.email || '',
-                        role: UserRole.HOMEOWNER, // Default role
+      // Set up real-time listener
+      unsubscribeSnapshot = onSnapshot(
+        userRef,
+        async (docSnapshot) => {
+          if (docSnapshot.exists()) {
+            callback(docSnapshot.data() as User);
+          } else {
+            // HEALING: User exists in Auth but not in Firestore. Create default profile.
+            console.log("Healing missing profile in subscription...");
+            const newUser: User = {
+              id: firebaseUser.uid,
+              name: firebaseUser.displayName || "User",
+              email: firebaseUser.email || "",
+              role: UserRole.HOMEOWNER, // Default role
 
-                        plan: 'free',
-                        loginCount: 1,
-                        lastLogin: Date.now(),
-                        shareCountGuest: 0,
-                        shareCountPro: 0,
-                        projectCount: 0
-                    };
+              plan: "free",
+              loginCount: 1,
+              lastLogin: Date.now(),
+              shareCountGuest: 0,
+              shareCountPro: 0,
+              projectCount: 0,
+            };
 
-                    try {
-                        await setDoc(doc(db, USERS_COLLECTION, newUser.id), newUser);
-                        // No need to callback here, the snapshot listener will fire again with the new data
-                    } catch (e) {
-                        console.error("Error creating default profile:", e);
-                        callback(null);
-                    }
-                }
-            }, (error) => {
-                console.error("Error in auth subscription:", error);
-                callback(null);
-            });
-        } else {
-            callback(null);
-        }
-    });
+            try {
+              await setDoc(doc(db, USERS_COLLECTION, newUser.id), newUser);
+              // No need to callback here, the snapshot listener will fire again with the new data
+            } catch (e) {
+              console.error("Error creating default profile:", e);
+              callback(null);
+            }
+          }
+        },
+        (error) => {
+          console.error("Error in auth subscription:", error);
+          callback(null);
+        },
+      );
+    } else {
+      callback(null);
+    }
+  });
 
-    // Return a function that unsubscribes from both
-    return () => {
-        if (unsubscribeSnapshot) {
-            unsubscribeSnapshot();
-        }
-        unsubscribeAuth();
-    };
+  // Return a function that unsubscribes from both
+  return () => {
+    if (unsubscribeSnapshot) {
+      unsubscribeSnapshot();
+    }
+    unsubscribeAuth();
+  };
 };

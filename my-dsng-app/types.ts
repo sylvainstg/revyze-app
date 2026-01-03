@@ -1,17 +1,27 @@
 export enum UserRole {
-  HOMEOWNER = 'Homeowner',
-  DESIGNER = 'Designer'
+  HOMEOWNER = "Homeowner",
+  DESIGNER = "Designer",
 }
 
-export type ViewState = 'landing' | 'auth' | 'checkout' | 'dashboard' | 'workspace' | 'pricing' | 'thank-you' | 'admin' | 'onboarding' | 'cemetery';
+export type ViewState =
+  | "landing"
+  | "auth"
+  | "checkout"
+  | "dashboard"
+  | "workspace"
+  | "pricing"
+  | "thank-you"
+  | "admin"
+  | "onboarding"
+  | "cemetery";
 
 export interface User {
   id: string;
   name: string;
   email: string;
   role: UserRole;
-  plan?: 'free' | 'pro' | 'business';
-  subscriptionStatus?: 'active' | 'canceled' | 'past_due' | 'trialing';
+  plan?: "free" | "pro" | "business";
+  subscriptionStatus?: "active" | "canceled" | "past_due" | "trialing";
   stripeCustomerId?: string;
   isAdmin?: boolean;
   // Engagement Metrics
@@ -33,8 +43,8 @@ export interface User {
   hasCompletedOnboarding?: boolean;
   // Notifications
   notificationPreferences?: {
-    mentions: 'instant' | 'daily' | 'weekly' | 'none';
-    projectUpdates: 'instant' | 'daily' | 'weekly' | 'none';
+    mentions: "instant" | "daily" | "weekly" | "none";
+    projectUpdates: "instant" | "daily" | "weekly" | "none";
   };
   digestSettings?: {
     timezone: string;
@@ -54,10 +64,10 @@ export interface CommentReply {
 }
 
 // Comment audience determines who can see it
-export type CommentAudience = 'guest-owner' | 'pro-owner' | 'public';
+export type CommentAudience = "guest-owner" | "pro-owner" | "public";
 
 // Project-specific role (different from UserRole)
-export type ProjectRole = 'owner' | 'guest' | 'professional';
+export type ProjectRole = "owner" | "guest" | "professional";
 
 export interface Comment {
   id: string;
@@ -79,7 +89,7 @@ export interface Comment {
 
 export interface MoodBoardElement {
   id: string;
-  type: 'image' | 'text' | 'link';
+  type: "image" | "text" | "link";
   x: number;
   y: number;
   width: number;
@@ -90,7 +100,6 @@ export interface MoodBoardElement {
   ownerName: string;
   timestamp: number;
 }
-
 
 export interface ProjectVersion {
   id: string;
@@ -109,7 +118,7 @@ export interface ProjectVersion {
 
 export interface ShareSettings {
   enabled: boolean;
-  accessLevel: 'view' | 'comment';
+  accessLevel: "view" | "comment";
   shareToken: string;
 }
 
@@ -155,9 +164,12 @@ export interface PricingPlan {
 }
 
 // Feature Voting
-export type FeatureId = 'ai-summary' | 'advanced-collaboration' | 'version-comparison';
+export type FeatureId =
+  | "ai-summary"
+  | "advanced-collaboration"
+  | "version-comparison";
 
-export type VoteInterest = 'not-interested' | 'interested' | 'very-interested';
+export type VoteInterest = "not-interested" | "interested" | "very-interested";
 
 export interface FeatureVote {
   id: string;
@@ -171,7 +183,7 @@ export interface FeatureVote {
 }
 
 // Referral and Fidelity Program Types
-export type ReferralStatus = 'pending' | 'converted' | 'expired';
+export type ReferralStatus = "pending" | "converted" | "expired";
 
 export interface Referral {
   id: string;
@@ -185,7 +197,7 @@ export interface Referral {
   expiresAt: number;
 }
 
-export type TransactionType = 'earned' | 'redeemed' | 'expired';
+export type TransactionType = "earned" | "redeemed" | "expired";
 
 export interface RewardTransaction {
   id: string;

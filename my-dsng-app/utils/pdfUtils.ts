@@ -9,50 +9,54 @@ const pdfCache = new Map<string, string>();
  * Caches the result as a Blob URL for instant subsequent access
  */
 export const getPDFObjectURL = async (fileUrl: string): Promise<string> => {
-    // Check cache first
-    if (pdfCache.has(fileUrl)) {
-        console.log('[File Utils] Returning cached object URL for:', fileUrl);
-        return pdfCache.get(fileUrl)!;
+  // Check cache first
+  if (pdfCache.has(fileUrl)) {
+    console.log("[File Utils] Returning cached object URL for:", fileUrl);
+    return pdfCache.get(fileUrl)!;
+  }
+
+  console.log("[File Utils] Loading new file from:", fileUrl);
+
+  try {
+    let fetchUrl = fileUrl;
+
+    // Check if it's a Firebase Storage URL that needs proxying
+    if (
+      fileUrl.includes("firebasestorage.googleapis.com") ||
+      fileUrl.includes("firebasestorage.app")
+    ) {
+      // Extract the path from the Firebase Storage URL
+      // Pattern: /o/{path}?alt=media or /o/{path}?alt=media&token=...
+      const url = new URL(fileUrl);
+      const pathMatch = url.pathname.match(/\/o\/(.+)$/);
+
+      if (pathMatch) {
+        // The path is already URL-encoded in the pathname
+        const encodedPath = pathMatch[1];
+        // Use Cloud Function proxy
+        fetchUrl = `https://us-central1-dsng-app.cloudfunctions.net/getPDF?path=${encodedPath}`;
+        console.log("[PDF Utils] Using proxy URL:", fetchUrl);
+      }
     }
 
-    console.log('[File Utils] Loading new file from:', fileUrl);
+    // Fetch the PDF as a blob
+    const response = await fetch(fetchUrl);
+    if (!response.ok)
+      throw new Error(`Failed to fetch PDF: ${response.statusText}`);
 
-    try {
-        let fetchUrl = fileUrl;
+    const blob = await response.blob();
+    const objectUrl = URL.createObjectURL(blob);
 
-        // Check if it's a Firebase Storage URL that needs proxying
-        if (fileUrl.includes('firebasestorage.googleapis.com') || fileUrl.includes('firebasestorage.app')) {
-            // Extract the path from the Firebase Storage URL
-            // Pattern: /o/{path}?alt=media or /o/{path}?alt=media&token=...
-            const url = new URL(fileUrl);
-            const pathMatch = url.pathname.match(/\/o\/(.+)$/);
+    // Cache the object URL
+    pdfCache.set(fileUrl, objectUrl);
+    console.log("[File Utils] File cached successfully");
 
-            if (pathMatch) {
-                // The path is already URL-encoded in the pathname
-                const encodedPath = pathMatch[1];
-                // Use Cloud Function proxy
-                fetchUrl = `https://us-central1-dsng-app.cloudfunctions.net/getPDF?path=${encodedPath}`;
-                console.log('[PDF Utils] Using proxy URL:', fetchUrl);
-            }
-        }
-
-        // Fetch the PDF as a blob
-        const response = await fetch(fetchUrl);
-        if (!response.ok) throw new Error(`Failed to fetch PDF: ${response.statusText}`);
-
-        const blob = await response.blob();
-        const objectUrl = URL.createObjectURL(blob);
-
-        // Cache the object URL
-        pdfCache.set(fileUrl, objectUrl);
-        console.log('[File Utils] File cached successfully');
-
-        return objectUrl;
-    } catch (error) {
-        console.error('[File Utils] Error loading file:', error);
-        // Fallback to original URL if fetch fails (might work if CORS isn't an issue for this specific URL)
-        return fileUrl;
-    }
+    return objectUrl;
+  } catch (error) {
+    console.error("[File Utils] Error loading file:", error);
+    // Fallback to original URL if fetch fails (might work if CORS isn't an issue for this specific URL)
+    return fileUrl;
+  }
 };
 
 /**
@@ -60,26 +64,26 @@ export const getPDFObjectURL = async (fileUrl: string): Promise<string> => {
  * NOTE: We intentionally DO NOT revoke cached URLs to keep them available for quick switching
  */
 export const revokePDFObjectURL = (url: string) => {
-    // Only revoke if it's NOT in our cache (e.g. temporary URLs)
-    // We iterate values to check if this URL is in our cache
-    for (const cachedUrl of pdfCache.values()) {
-        if (cachedUrl === url) return;
-    }
+  // Only revoke if it's NOT in our cache (e.g. temporary URLs)
+  // We iterate values to check if this URL is in our cache
+  for (const cachedUrl of pdfCache.values()) {
+    if (cachedUrl === url) return;
+  }
 
-    if (url.startsWith('blob:')) {
-        URL.revokeObjectURL(url);
-    }
+  if (url.startsWith("blob:")) {
+    URL.revokeObjectURL(url);
+  }
 };
 
 /**
  * Optional: Clear the entire cache if memory usage becomes a concern
  */
 export const clearPDFCache = () => {
-    for (const url of pdfCache.values()) {
-        URL.revokeObjectURL(url);
-    }
-    pdfCache.clear();
-    console.log('[File Utils] Cache cleared');
+  for (const url of pdfCache.values()) {
+    URL.revokeObjectURL(url);
+  }
+  pdfCache.clear();
+  console.log("[File Utils] Cache cleared");
 };
 
 // Aliases for better semantics when using with images

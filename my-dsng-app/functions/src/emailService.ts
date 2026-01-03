@@ -1,34 +1,39 @@
 import * as functions from "firebase-functions";
 import * as sgMail from "@sendgrid/mail";
 
-const API_KEY = functions.config().sendgrid?.key || process.env.SENDGRID_API_KEY;
+const API_KEY =
+  functions.config().sendgrid?.key || process.env.SENDGRID_API_KEY;
 
 if (API_KEY) {
-    sgMail.setApiKey(API_KEY);
+  sgMail.setApiKey(API_KEY);
 } else {
-    console.warn("SendGrid API Key is missing!");
+  console.warn("SendGrid API Key is missing!");
 }
 
-export const sendInvitationEmail = functions.https.onCall(async (data: any, context) => {
+export const sendInvitationEmail = functions.https.onCall(
+  async (data: any, context) => {
     // Log the raw incoming data for debugging
     console.log("Incoming data:", JSON.stringify(data));
-    console.log("Context auth:", context.auth ? "authenticated" : "not authenticated");
+    console.log(
+      "Context auth:",
+      context.auth ? "authenticated" : "not authenticated",
+    );
 
     // Ensure user is authenticated
     if (!context.auth) {
-        throw new functions.https.HttpsError(
-            "unauthenticated",
-            "The function must be called while authenticated."
-        );
+      throw new functions.https.HttpsError(
+        "unauthenticated",
+        "The function must be called while authenticated.",
+      );
     }
 
     // Validate data structure
-    if (!data || typeof data !== 'object') {
-        console.error("Invalid data structure:", data);
-        throw new functions.https.HttpsError(
-            "invalid-argument",
-            "Data must be an object"
-        );
+    if (!data || typeof data !== "object") {
+      console.error("Invalid data structure:", data);
+      throw new functions.https.HttpsError(
+        "invalid-argument",
+        "Data must be an object",
+      );
     }
 
     const { email, projectName, url, inviterName } = data;
@@ -37,11 +42,11 @@ export const sendInvitationEmail = functions.https.onCall(async (data: any, cont
     console.log("Extracted values:", { email, projectName, url, inviterName });
 
     if (!email || !url) {
-        console.error("Missing required fields. Email:", email, "URL:", url);
-        throw new functions.https.HttpsError(
-            "invalid-argument",
-            `Missing required fields. email: ${!!email}, url: ${!!url}`
-        );
+      console.error("Missing required fields. Email:", email, "URL:", url);
+      throw new functions.https.HttpsError(
+        "invalid-argument",
+        `Missing required fields. email: ${!!email}, url: ${!!url}`,
+      );
     }
 
     const htmlContent = `
@@ -111,46 +116,51 @@ export const sendInvitationEmail = functions.https.onCall(async (data: any, cont
     `;
 
     const msg: any = {
-        personalizations: [
-            {
-                to: [{ email: email }],
-                subject: `${inviterName} invited you to collaborate on ${projectName}`,
-            }
-        ],
-        from: {
-            email: "info+revyze@dictadoc.app",
-            name: "Revyze"
+      personalizations: [
+        {
+          to: [{ email: email }],
+          subject: `${inviterName} invited you to collaborate on ${projectName}`,
         },
-        content: [
-            {
-                type: "text/html",
-                value: htmlContent
-            }
-        ],
+      ],
+      from: {
+        email: "info+revyze@dictadoc.app",
+        name: "Revyze",
+      },
+      content: [
+        {
+          type: "text/html",
+          value: htmlContent,
+        },
+      ],
     };
 
     try {
-        console.log("Attempting to send email via SendGrid...");
-        await sgMail.send(msg);
-        console.log("Email sent successfully to:", email);
-        return { success: true };
+      console.log("Attempting to send email via SendGrid...");
+      await sgMail.send(msg);
+      console.log("Email sent successfully to:", email);
+      return { success: true };
     } catch (error: any) {
-        console.error("Error sending email:", error);
-        if (error.response) {
-            console.error(error.response.body);
-        }
-        throw new functions.https.HttpsError("internal", "Error sending email", error.message);
+      console.error("Error sending email:", error);
+      if (error.response) {
+        console.error(error.response.body);
+      }
+      throw new functions.https.HttpsError(
+        "internal",
+        "Error sending email",
+        error.message,
+      );
     }
-});
+  },
+);
 
 export const sendVersionUpdateEmail = async (
-    email: string,
-    projectName: string,
-    versionNumber: number,
-    uploaderName: string,
-    url: string
+  email: string,
+  projectName: string,
+  versionNumber: number,
+  uploaderName: string,
+  url: string,
 ) => {
-    const htmlContent = `
+  const htmlContent = `
 <!DOCTYPE html>
 <html>
 <head>
@@ -216,53 +226,55 @@ export const sendVersionUpdateEmail = async (
 </html>
     `;
 
-    const msg: any = {
-        personalizations: [
-            {
-                to: [{ email: email }],
-                subject: `New version uploaded: ${projectName} (v${versionNumber})`,
-            }
-        ],
-        from: {
-            email: "info+revyze@dictadoc.app",
-            name: "Revyze"
-        },
-        content: [
-            {
-                type: "text/html",
-                value: htmlContent
-            }
-        ],
-    };
+  const msg: any = {
+    personalizations: [
+      {
+        to: [{ email: email }],
+        subject: `New version uploaded: ${projectName} (v${versionNumber})`,
+      },
+    ],
+    from: {
+      email: "info+revyze@dictadoc.app",
+      name: "Revyze",
+    },
+    content: [
+      {
+        type: "text/html",
+        value: htmlContent,
+      },
+    ],
+  };
 
-    try {
-        console.log(`Sending version update email to ${email} for project ${projectName} v${versionNumber}`);
-        await sgMail.send(msg);
-        console.log("Email sent successfully");
-        return { success: true };
-    } catch (error: any) {
-        console.error("Error sending email:", error);
-        if (error.response) {
-            console.error(error.response.body);
-        }
-        // Don't throw here, just log error so other emails can still be sent if called in loop
-        return { success: false, error: error.message };
+  try {
+    console.log(
+      `Sending version update email to ${email} for project ${projectName} v${versionNumber}`,
+    );
+    await sgMail.send(msg);
+    console.log("Email sent successfully");
+    return { success: true };
+  } catch (error: any) {
+    console.error("Error sending email:", error);
+    if (error.response) {
+      console.error(error.response.body);
     }
+    // Don't throw here, just log error so other emails can still be sent if called in loop
+    return { success: false, error: error.message };
+  }
 };
 
 export const sendMentionEmail = async (
-    email: string,
-    authorName: string,
-    projectName: string,
-    content: string,
-    url: string,
-    type: "comment" | "reply",
-    contextText?: string
+  email: string,
+  authorName: string,
+  projectName: string,
+  content: string,
+  url: string,
+  type: "comment" | "reply",
+  contextText?: string,
 ) => {
-    const actionText = type === "reply" ? "replied to you" : "mentioned you";
-    const titleText = type === "reply" ? "New Reply" : "New Mention";
+  const actionText = type === "reply" ? "replied to you" : "mentioned you";
+  const titleText = type === "reply" ? "New Reply" : "New Mention";
 
-    const htmlContent = `
+  const htmlContent = `
 <!DOCTYPE html>
 <html>
 <head>
@@ -291,7 +303,7 @@ export const sendMentionEmail = async (
                             </p>
                             
                             <div style="background-color: #f1f5f9; border-left: 4px solid #667eea; padding: 15px; margin-bottom: 25px; border-radius: 4px;">
-                                ${contextText ? `<p style="margin: 0 0 10px 0; color: #94a3b8; font-size: 13px; font-style: italic;">In reply to: "${contextText}"</p>` : ''}
+                                ${contextText ? `<p style="margin: 0 0 10px 0; color: #94a3b8; font-size: 13px; font-style: italic;">In reply to: "${contextText}"</p>` : ""}
                                 <p style="margin: 0; color: #334155; font-size: 15px; font-style: italic;">"${content}"</p>
                             </div>
 
@@ -334,32 +346,32 @@ export const sendMentionEmail = async (
 </html>
     `;
 
-    const msg: any = {
-        personalizations: [
-            {
-                to: [{ email: email }],
-                subject: `${titleText} from ${authorName} in ${projectName}`,
-            }
-        ],
-        from: {
-            email: "info+revyze@dictadoc.app",
-            name: "Revyze"
-        },
-        content: [
-            {
-                type: "text/html",
-                value: htmlContent
-            }
-        ],
-    };
+  const msg: any = {
+    personalizations: [
+      {
+        to: [{ email: email }],
+        subject: `${titleText} from ${authorName} in ${projectName}`,
+      },
+    ],
+    from: {
+      email: "info+revyze@dictadoc.app",
+      name: "Revyze",
+    },
+    content: [
+      {
+        type: "text/html",
+        value: htmlContent,
+      },
+    ],
+  };
 
-    try {
-        console.log(`Sending mention email to ${email}`);
-        await sgMail.send(msg);
-        console.log("Email sent successfully");
-        return { success: true };
-    } catch (error: any) {
-        console.error("Error sending email:", error);
-        return { success: false, error: error.message };
-    }
+  try {
+    console.log(`Sending mention email to ${email}`);
+    await sgMail.send(msg);
+    console.log("Email sent successfully");
+    return { success: true };
+  } catch (error: any) {
+    console.error("Error sending email:", error);
+    return { success: false, error: error.message };
+  }
 };

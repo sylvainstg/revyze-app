@@ -1,28 +1,39 @@
-import React, { useState } from 'react';
-import { Button } from './ui/Button';
-import { Input } from './ui/Input';
-import { UserRole, User } from '../types';
-import { Layout, ArrowLeft, Shield, AlertCircle, Cloud } from 'lucide-react';
-import * as authService from '../services/authService';
-import { applyReferralCode } from '../services/referralService';
+import React, { useState } from "react";
+import { Button } from "./ui/Button";
+import { Input } from "./ui/Input";
+import { UserRole, User } from "../types";
+import { Layout, ArrowLeft, Shield, AlertCircle, Cloud } from "lucide-react";
+import * as authService from "../services/authService";
+import { applyReferralCode } from "../services/referralService";
 
 interface AuthPageProps {
   onAuthSuccess: (user: User, isNewUser: boolean) => void;
   onBack: () => void;
-  initialMode?: 'login' | 'register';
+  initialMode?: "login" | "register";
   inviterName?: string;
   projectName?: string;
-  inviteRole?: 'guest' | 'pro';
+  inviteRole?: "guest" | "pro";
   inviteeName?: string;
   inviteeEmail?: string;
   referralCode?: string;
 }
 
-export const AuthPage: React.FC<AuthPageProps> = ({ onAuthSuccess, onBack, initialMode = 'register', inviterName, projectName, inviteRole, inviteeName, inviteeEmail, referralCode }) => {
-  const [isLogin, setIsLogin] = useState(initialMode === 'login');
+export const AuthPage: React.FC<AuthPageProps> = ({
+  onAuthSuccess,
+  onBack,
+  initialMode = "register",
+  inviterName,
+  projectName,
+  inviteRole,
+  inviteeName,
+  inviteeEmail,
+  referralCode,
+}) => {
+  const [isLogin, setIsLogin] = useState(initialMode === "login");
 
   // Determine initial role based on invite
-  const initialRole = inviteRole === 'pro' ? UserRole.DESIGNER : UserRole.HOMEOWNER;
+  const initialRole =
+    inviteRole === "pro" ? UserRole.DESIGNER : UserRole.HOMEOWNER;
   const [role, setRole] = useState<UserRole>(initialRole);
 
   const [isLoading, setIsLoading] = useState(false);
@@ -30,9 +41,9 @@ export const AuthPage: React.FC<AuthPageProps> = ({ onAuthSuccess, onBack, initi
   const [resetSent, setResetSent] = useState(false);
 
   const [formData, setFormData] = useState({
-    name: inviteeName || '',
-    email: inviteeEmail || '',
-    password: ''
+    name: inviteeName || "",
+    email: inviteeEmail || "",
+    password: "",
   });
 
   // ... (handlers) ...
@@ -75,7 +86,10 @@ export const AuthPage: React.FC<AuthPageProps> = ({ onAuthSuccess, onBack, initi
     try {
       if (isLogin) {
         // LOGIN LOGIC
-        const result = await authService.loginUser(formData.email, formData.password);
+        const result = await authService.loginUser(
+          formData.email,
+          formData.password,
+        );
         if (result.success && result.user) {
           onAuthSuccess(result.user, false);
         } else {
@@ -85,12 +99,12 @@ export const AuthPage: React.FC<AuthPageProps> = ({ onAuthSuccess, onBack, initi
       } else {
         // REGISTER LOGIC
         // Determine plan based on invite role
-        let plan: 'free' | 'pro' = 'free';
-        let subscriptionStatus: 'active' | 'trialing' | undefined = 'active';
+        let plan: "free" | "pro" = "free";
+        let subscriptionStatus: "active" | "trialing" | undefined = "active";
 
-        if (inviteRole === 'pro') {
-          plan = 'pro';
-          subscriptionStatus = 'trialing'; // Pro invitees get trial status
+        if (inviteRole === "pro") {
+          plan = "pro";
+          subscriptionStatus = "trialing"; // Pro invitees get trial status
         }
 
         const result = await authService.registerUser(
@@ -99,7 +113,7 @@ export const AuthPage: React.FC<AuthPageProps> = ({ onAuthSuccess, onBack, initi
           formData.password,
           role,
           plan,
-          subscriptionStatus
+          subscriptionStatus,
         );
 
         if (result.success && result.user) {
@@ -107,9 +121,9 @@ export const AuthPage: React.FC<AuthPageProps> = ({ onAuthSuccess, onBack, initi
           if (referralCode) {
             try {
               await applyReferralCode(referralCode);
-              console.log('Referral code applied successfully');
+              console.log("Referral code applied successfully");
             } catch (error) {
-              console.error('Failed to apply referral code:', error);
+              console.error("Failed to apply referral code:", error);
               // Don't block registration if referral fails
             }
           }
@@ -136,7 +150,12 @@ export const AuthPage: React.FC<AuthPageProps> = ({ onAuthSuccess, onBack, initi
       </div>
 
       <div className="absolute top-6 left-6 z-10">
-        <Button variant="ghost" size="sm" onClick={onBack} icon={<ArrowLeft className="w-4 h-4" />}>
+        <Button
+          variant="ghost"
+          size="sm"
+          onClick={onBack}
+          icon={<ArrowLeft className="w-4 h-4" />}
+        >
           Back
         </Button>
       </div>
@@ -144,7 +163,11 @@ export const AuthPage: React.FC<AuthPageProps> = ({ onAuthSuccess, onBack, initi
       <div className="max-w-md w-full bg-white rounded-2xl shadow-xl p-8 z-10 border border-slate-100">
         <div className="text-center mb-8">
           <div className="flex justify-center mb-6">
-            <img src="/revyze-logo.png" alt="Revyze" className="h-16 w-auto object-contain" />
+            <img
+              src="/revyze-logo.png"
+              alt="Revyze"
+              className="h-16 w-auto object-contain"
+            />
           </div>
 
           {inviteeName && !isLogin ? (
@@ -153,7 +176,9 @@ export const AuthPage: React.FC<AuthPageProps> = ({ onAuthSuccess, onBack, initi
                 Hi {inviteeName}! 👋
               </h1>
               <p className="text-indigo-700 text-sm leading-relaxed">
-                <span className="font-semibold">{inviterName}</span> has invited you to collaborate on <span className="font-semibold">{projectName}</span>.
+                <span className="font-semibold">{inviterName}</span> has invited
+                you to collaborate on{" "}
+                <span className="font-semibold">{projectName}</span>.
               </p>
               <div className="mt-4 pt-4 border-t border-indigo-100 text-xs font-medium text-indigo-600 uppercase tracking-wide">
                 Create your account to join them
@@ -162,17 +187,33 @@ export const AuthPage: React.FC<AuthPageProps> = ({ onAuthSuccess, onBack, initi
           ) : (
             <>
               <h1 className="text-2xl font-bold text-slate-900 tracking-tight">
-                {isLogin ? 'Welcome back' : 'Create Account'}
+                {isLogin ? "Welcome back" : "Create Account"}
               </h1>
               <p className="text-slate-500 mt-2 text-sm">
-                {isLogin ? 'Access your cloud projects.' :
-                  (inviterName && projectName) ? (
-                    <span className="block mt-2 p-3 bg-indigo-50 rounded-lg border border-indigo-100 text-indigo-900">
-                      <span className="font-semibold">{inviterName}</span> invited you to join <span className="font-semibold">{projectName}</span>
-                      {inviteRole && <span> as a <span className="font-bold uppercase">{inviteRole === 'pro' ? 'Professional' : 'Guest'}</span></span>}.
-                      <span className="block mt-1 text-xs text-indigo-700">Create your account below to get started.</span>
+                {isLogin ? (
+                  "Access your cloud projects."
+                ) : inviterName && projectName ? (
+                  <span className="block mt-2 p-3 bg-indigo-50 rounded-lg border border-indigo-100 text-indigo-900">
+                    <span className="font-semibold">{inviterName}</span> invited
+                    you to join{" "}
+                    <span className="font-semibold">{projectName}</span>
+                    {inviteRole && (
+                      <span>
+                        {" "}
+                        as a{" "}
+                        <span className="font-bold uppercase">
+                          {inviteRole === "pro" ? "Professional" : "Guest"}
+                        </span>
+                      </span>
+                    )}
+                    .
+                    <span className="block mt-1 text-xs text-indigo-700">
+                      Create your account below to get started.
                     </span>
-                  ) : 'Create a secure environment for your designs.'}
+                  </span>
+                ) : (
+                  "Create a secure environment for your designs."
+                )}
               </p>
             </>
           )}
@@ -183,14 +224,14 @@ export const AuthPage: React.FC<AuthPageProps> = ({ onAuthSuccess, onBack, initi
             <button
               type="button"
               onClick={() => setRole(UserRole.HOMEOWNER)}
-              className={`text-sm font-medium py-2 rounded-md transition-all ${role === UserRole.HOMEOWNER ? 'bg-white text-indigo-600 shadow-sm ring-1 ring-black/5' : 'text-slate-500 hover:text-slate-700'}`}
+              className={`text-sm font-medium py-2 rounded-md transition-all ${role === UserRole.HOMEOWNER ? "bg-white text-indigo-600 shadow-sm ring-1 ring-black/5" : "text-slate-500 hover:text-slate-700"}`}
             >
               Homeowner
             </button>
             <button
               type="button"
               onClick={() => setRole(UserRole.DESIGNER)}
-              className={`text-sm font-medium py-2 rounded-md transition-all ${role === UserRole.DESIGNER ? 'bg-white text-purple-600 shadow-sm ring-1 ring-black/5' : 'text-slate-500 hover:text-slate-700'}`}
+              className={`text-sm font-medium py-2 rounded-md transition-all ${role === UserRole.DESIGNER ? "bg-white text-purple-600 shadow-sm ring-1 ring-black/5" : "text-slate-500 hover:text-slate-700"}`}
             >
               Professional
             </button>
@@ -198,25 +239,30 @@ export const AuthPage: React.FC<AuthPageProps> = ({ onAuthSuccess, onBack, initi
         )}
 
         <div className="space-y-4">
-
           {/* Info Box explaining the mode */}
           <div className="flex items-start gap-2 text-xs text-slate-600 bg-slate-100 p-3 rounded-lg border border-slate-200">
             <Cloud className="w-4 h-4 text-slate-500 flex-shrink-0 mt-0.5" />
             <div>
-              <p className="font-semibold text-slate-800 mb-0.5">Secure Cloud Storage</p>
-              <p>Your account and projects are stored securely in the cloud. Log in from any device to access them.</p>
+              <p className="font-semibold text-slate-800 mb-0.5">
+                Secure Cloud Storage
+              </p>
+              <p>
+                Your account and projects are stored securely in the cloud. Log
+                in from any device to access them.
+              </p>
             </div>
           </div>
 
           <form onSubmit={handleSubmit} className="space-y-4">
-
             <Input
               label="Email Address"
               type="email"
               placeholder="you@example.com"
               required
               value={formData.email}
-              onChange={e => setFormData({ ...formData, email: e.target.value })}
+              onChange={(e) =>
+                setFormData({ ...formData, email: e.target.value })
+              }
             />
             <Input
               label="Password"
@@ -224,7 +270,9 @@ export const AuthPage: React.FC<AuthPageProps> = ({ onAuthSuccess, onBack, initi
               placeholder="••••••••"
               required
               value={formData.password}
-              onChange={e => setFormData({ ...formData, password: e.target.value })}
+              onChange={(e) =>
+                setFormData({ ...formData, password: e.target.value })
+              }
             />
 
             {isLogin && (
@@ -253,25 +301,30 @@ export const AuthPage: React.FC<AuthPageProps> = ({ onAuthSuccess, onBack, initi
               </div>
             )}
 
-            <Button type="submit" className="w-full mt-2" size="lg" isLoading={isLoading}>
-              {isLogin ? 'Sign In' : 'Create Account'}
+            <Button
+              type="submit"
+              className="w-full mt-2"
+              size="lg"
+              isLoading={isLoading}
+            >
+              {isLogin ? "Sign In" : "Create Account"}
             </Button>
           </form>
         </div>
 
         <div className="mt-6 text-center space-y-4">
           <p className="text-sm text-slate-600">
-            {isLogin ? "Don't have an account?" : "Already have an account?"}{' '}
+            {isLogin ? "Don't have an account?" : "Already have an account?"}{" "}
             <button
               onClick={() => {
                 setIsLogin(!isLogin);
                 setError(null);
                 setResetSent(false);
-                setFormData({ name: '', email: '', password: '' });
+                setFormData({ name: "", email: "", password: "" });
               }}
               className="font-semibold text-indigo-600 hover:text-indigo-500 transition-colors"
             >
-              {isLogin ? 'Sign up' : 'Log in'}
+              {isLogin ? "Sign up" : "Log in"}
             </button>
           </p>
         </div>

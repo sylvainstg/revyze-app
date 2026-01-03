@@ -1,14 +1,26 @@
-import React, { useState, useEffect } from 'react';
-import { Comment, UserRole, ProjectRole, User } from '../types';
-import { Button } from './ui/Button';
-import { MessageSquare, CheckCircle, Bot, Sparkles, Trash2, Send, ThumbsUp, CornerDownRight, ChevronLeft, ChevronRight, Share } from 'lucide-react';
-import * as geminiService from '../services/geminiService';
-import * as featureVoteService from '../services/featureVoteService';
-import { canSeeComment } from '../utils/projectRoleHelper';
-import { ConfirmDialog } from './ui/ConfirmDialog';
-import { FeatureVoteModal } from './FeatureVoteModal';
-import { CollapsibleComingSoon } from './CollapsibleComingSoon';
-import { MentionInput } from './MentionInput';
+import React, { useState, useEffect } from "react";
+import { Comment, UserRole, ProjectRole, User } from "../types";
+import { Button } from "./ui/Button";
+import {
+  MessageSquare,
+  CheckCircle,
+  Bot,
+  Sparkles,
+  Trash2,
+  Send,
+  ThumbsUp,
+  CornerDownRight,
+  ChevronLeft,
+  ChevronRight,
+  Share,
+} from "lucide-react";
+import * as geminiService from "../services/geminiService";
+import * as featureVoteService from "../services/featureVoteService";
+import { canSeeComment } from "../utils/projectRoleHelper";
+import { ConfirmDialog } from "./ui/ConfirmDialog";
+import { FeatureVoteModal } from "./FeatureVoteModal";
+import { CollapsibleComingSoon } from "./CollapsibleComingSoon";
+import { MentionInput } from "./MentionInput";
 
 interface CollaborationPanelProps {
   comments: Comment[];
@@ -24,7 +36,11 @@ interface CollaborationPanelProps {
   onPageChange?: (page: number) => void;
   currentUser: User;
   filter: { active: boolean; resolved: boolean; deleted: boolean };
-  onUpdateFilter: (filter: { active: boolean; resolved: boolean; deleted: boolean }) => void;
+  onUpdateFilter: (filter: {
+    active: boolean;
+    resolved: boolean;
+    deleted: boolean;
+  }) => void;
   isCollapsed?: boolean;
   onToggleCollapse?: (collapsed: boolean) => void;
   pageCount?: number | null;
@@ -51,12 +67,13 @@ export const CollaborationPanel: React.FC<CollaborationPanelProps> = ({
   onToggleCollapse,
   pageCount,
   collaborators = [],
-  currentUserEmail = '',
+  currentUserEmail = "",
 }) => {
   const [localIsCollapsed, setLocalIsCollapsed] = useState(false);
 
   // Use prop if provided, otherwise local state
-  const isCollapsed = propIsCollapsed !== undefined ? propIsCollapsed : localIsCollapsed;
+  const isCollapsed =
+    propIsCollapsed !== undefined ? propIsCollapsed : localIsCollapsed;
   const setIsCollapsed = (collapsed: boolean) => {
     if (onToggleCollapse) {
       onToggleCollapse(collapsed);
@@ -67,19 +84,25 @@ export const CollaborationPanel: React.FC<CollaborationPanelProps> = ({
 
   const [showFeatureVoteModal, setShowFeatureVoteModal] = useState(false);
   const [hasVoted, setHasVoted] = useState(false);
-  const [deleteConfirm, setDeleteConfirm] = useState<{ id: string; show: boolean }>({ id: '', show: false });
+  const [deleteConfirm, setDeleteConfirm] = useState<{
+    id: string;
+    show: boolean;
+  }>({ id: "", show: false });
 
   // Check if user has already voted
   useEffect(() => {
     const checkVote = async () => {
-      const vote = await featureVoteService.getUserVote(currentUser.id, 'ai-summary');
+      const vote = await featureVoteService.getUserVote(
+        currentUser.id,
+        "ai-summary",
+      );
       setHasVoted(!!vote);
     };
     checkVote();
   }, [currentUser]);
 
   // Filter comments for the current page AND by visibility AND by status filter
-  const visibleComments = comments.filter(c => {
+  const visibleComments = comments.filter((c) => {
     if (c.pageNumber && c.pageNumber !== pageNumber) return false;
     if (!canSeeComment(c, projectRole)) return false;
 
@@ -120,7 +143,9 @@ export const CollaborationPanel: React.FC<CollaborationPanelProps> = ({
   }, [comments, filter, projectRole, pageNumber, pageCount]);
 
   return (
-    <div className={`relative flex flex-col h-full bg-white border-l border-slate-200 shadow-xl z-20 shrink-0 transition-all duration-300 ${isCollapsed ? 'w-12' : 'w-96'}`}>
+    <div
+      className={`relative flex flex-col h-full bg-white border-l border-slate-200 shadow-xl z-20 shrink-0 transition-all duration-300 ${isCollapsed ? "w-12" : "w-96"}`}
+    >
       {/* Expand Button - only visible when collapsed */}
       {isCollapsed && (
         <>
@@ -135,7 +160,9 @@ export const CollaborationPanel: React.FC<CollaborationPanelProps> = ({
           <div className="flex flex-col items-center justify-start h-full px-1 py-20">
             <div className="flex flex-col gap-3">
               {pageMarkers.length === 0 ? (
-                <div className="text-[10px] text-slate-400 rotate-90 whitespace-nowrap">No comments</div>
+                <div className="text-[10px] text-slate-400 rotate-90 whitespace-nowrap">
+                  No comments
+                </div>
               ) : (
                 pageMarkers.map((m) => (
                   <button
@@ -143,11 +170,12 @@ export const CollaborationPanel: React.FC<CollaborationPanelProps> = ({
                     onClick={() => {
                       onPageChange?.(m.page);
                     }}
-                    className={`relative w-10 h-10 rounded-full flex flex-col items-center justify-center text-sm font-bold transition-colors border ${pageNumber === m.page
-                      ? 'bg-indigo-100 text-indigo-800 border-indigo-300'
-                      : 'bg-slate-100 text-slate-600 border-slate-200 hover:bg-indigo-50 hover:text-indigo-700'
-                      }`}
-                    title={`Page ${m.page} • ${m.count} comment${m.count > 1 ? 's' : ''}`}
+                    className={`relative w-10 h-10 rounded-full flex flex-col items-center justify-center text-sm font-bold transition-colors border ${
+                      pageNumber === m.page
+                        ? "bg-indigo-100 text-indigo-800 border-indigo-300"
+                        : "bg-slate-100 text-slate-600 border-slate-200 hover:bg-indigo-50 hover:text-indigo-700"
+                    }`}
+                    title={`Page ${m.page} • ${m.count} comment${m.count > 1 ? "s" : ""}`}
                   >
                     <span className="block leading-none">{m.page}</span>
                     {m.count > 0 && (
@@ -188,26 +216,31 @@ export const CollaborationPanel: React.FC<CollaborationPanelProps> = ({
             {/* Filter Toggles */}
             <div className="flex gap-1 p-1 bg-slate-200/50 rounded-lg">
               <button
-                onClick={() => onUpdateFilter({ ...filter, active: !filter.active })}
-                className={`flex-1 px-2 py-1 text-[10px] font-medium rounded-md transition-all ${filter.active ? 'bg-white text-indigo-600 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
+                onClick={() =>
+                  onUpdateFilter({ ...filter, active: !filter.active })
+                }
+                className={`flex-1 px-2 py-1 text-[10px] font-medium rounded-md transition-all ${filter.active ? "bg-white text-indigo-600 shadow-sm" : "text-slate-500 hover:text-slate-700"}`}
               >
                 Active
               </button>
               <button
-                onClick={() => onUpdateFilter({ ...filter, resolved: !filter.resolved })}
-                className={`flex-1 px-2 py-1 text-[10px] font-medium rounded-md transition-all ${filter.resolved ? 'bg-white text-green-600 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
+                onClick={() =>
+                  onUpdateFilter({ ...filter, resolved: !filter.resolved })
+                }
+                className={`flex-1 px-2 py-1 text-[10px] font-medium rounded-md transition-all ${filter.resolved ? "bg-white text-green-600 shadow-sm" : "text-slate-500 hover:text-slate-700"}`}
               >
                 Done
               </button>
               <button
-                onClick={() => onUpdateFilter({ ...filter, deleted: !filter.deleted })}
-                className={`flex-1 px-2 py-1 text-[10px] font-medium rounded-md transition-all ${filter.deleted ? 'bg-white text-red-600 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
+                onClick={() =>
+                  onUpdateFilter({ ...filter, deleted: !filter.deleted })
+                }
+                className={`flex-1 px-2 py-1 text-[10px] font-medium rounded-md transition-all ${filter.deleted ? "bg-white text-red-600 shadow-sm" : "text-slate-500 hover:text-slate-700"}`}
               >
                 Deleted
               </button>
             </div>
           </div>
-
 
           {/* Coming Soon Panel */}
           {comments.length > 0 && (
@@ -238,13 +271,16 @@ export const CollaborationPanel: React.FC<CollaborationPanelProps> = ({
               <div className="text-center py-10 text-slate-400">
                 <MessageSquare className="w-12 h-12 mx-auto mb-3 opacity-20" />
                 <p>No comments yet.</p>
-                <p className="text-sm mt-1">Click anywhere on the PDF to add one.</p>
+                <p className="text-sm mt-1">
+                  Click anywhere on the PDF to add one.
+                </p>
               </div>
             ) : (
               sortedComments.map((comment, index) => {
                 // Find the marker number by getting the index in the UN-SORTED filtered list (visibleComments)
                 // This matches the logic in PDFWorkspace where markers are rendered in order
-                const markerNumber = visibleComments.findIndex(c => c.id === comment.id) + 1;
+                const markerNumber =
+                  visibleComments.findIndex((c) => c.id === comment.id) + 1;
                 return (
                   <CommentCard
                     key={comment.id}
@@ -289,10 +325,10 @@ export const CollaborationPanel: React.FC<CollaborationPanelProps> = ({
         onConfirm={() => {
           if (deleteConfirm.id) {
             onDeleteComment(deleteConfirm.id);
-            setDeleteConfirm({ id: '', show: false });
+            setDeleteConfirm({ id: "", show: false });
           }
         }}
-        onCancel={() => setDeleteConfirm({ id: '', show: false })}
+        onCancel={() => setDeleteConfirm({ id: "", show: false })}
         isDestructive
       />
     </div>
@@ -314,8 +350,22 @@ const CommentCard: React.FC<{
   currentUser: User;
   collaborators: string[];
   currentUserEmail: string;
-}> = ({ comment, markerNumber, isActive, onResolve, onDelete, onReply, onPushToProfessional, onClick, currentUserRole, projectRole, currentUser, collaborators, currentUserEmail }) => {
-  const [replyText, setReplyText] = useState('');
+}> = ({
+  comment,
+  markerNumber,
+  isActive,
+  onResolve,
+  onDelete,
+  onReply,
+  onPushToProfessional,
+  onClick,
+  currentUserRole,
+  projectRole,
+  currentUser,
+  collaborators,
+  currentUserEmail,
+}) => {
+  const [replyText, setReplyText] = useState("");
   const [showReplyBox, setShowReplyBox] = useState(false);
   const [isExpanded, setIsExpanded] = useState(!comment.resolved); // Resolved comments start collapsed
   const [pendingMentions, setPendingMentions] = useState<string[]>([]);
@@ -323,7 +373,7 @@ const CommentCard: React.FC<{
   const handleReplySubmit = () => {
     if (replyText.trim()) {
       onReply(comment.id, replyText, pendingMentions);
-      setReplyText('');
+      setReplyText("");
       setPendingMentions([]);
       setShowReplyBox(false);
     }
@@ -332,12 +382,13 @@ const CommentCard: React.FC<{
   return (
     <div
       id={`comment-${comment.id}`}
-      className={`group rounded-xl border transition-all duration-200 ${isActive
-        ? 'border-indigo-500 ring-1 ring-indigo-500 shadow-md bg-indigo-50/30'
-        : comment.resolved
-          ? 'border-slate-200 bg-slate-50/50'
-          : 'border-slate-200 bg-white hover:border-indigo-300'
-        }`}
+      className={`group rounded-xl border transition-all duration-200 ${
+        isActive
+          ? "border-indigo-500 ring-1 ring-indigo-500 shadow-md bg-indigo-50/30"
+          : comment.resolved
+            ? "border-slate-200 bg-slate-50/50"
+            : "border-slate-200 bg-white hover:border-indigo-300"
+      }`}
     >
       <div
         className="p-3 cursor-pointer"
@@ -355,28 +406,42 @@ const CommentCard: React.FC<{
             <span className="flex items-center justify-center w-5 h-5 rounded-full bg-indigo-600 text-white text-[10px] font-bold">
               {markerNumber}
             </span>
-            <span className={`w-2 h-2 rounded-full ${comment.author === UserRole.DESIGNER ? 'bg-purple-500' : 'bg-blue-500'}`} />
-            <span className="text-xs font-semibold text-slate-700 truncate max-w-[120px]" title={comment.authorName || comment.author}>
+            <span
+              className={`w-2 h-2 rounded-full ${comment.author === UserRole.DESIGNER ? "bg-purple-500" : "bg-blue-500"}`}
+            />
+            <span
+              className="text-xs font-semibold text-slate-700 truncate max-w-[120px]"
+              title={comment.authorName || comment.author}
+            >
               {comment.authorName
-                ? (comment.authorName.length > 15 ? `${comment.authorName.substring(0, 15)}...` : comment.authorName)
-                : comment.author
-              }
+                ? comment.authorName.length > 15
+                  ? `${comment.authorName.substring(0, 15)}...`
+                  : comment.authorName
+                : comment.author}
               {comment.authorName && (
                 <span className="ml-1 text-[10px] text-slate-400 font-normal">
                   ({comment.author})
                 </span>
               )}
             </span>
-            <span className="text-[10px] text-slate-400">{new Date(comment.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
+            <span className="text-[10px] text-slate-400">
+              {new Date(comment.timestamp).toLocaleTimeString([], {
+                hour: "2-digit",
+                minute: "2-digit",
+              })}
+            </span>
             {comment.pushedFromGuestComment && (
-              <span className="ml-1 px-1.5 py-0.5 bg-green-100 text-green-700 text-[10px] font-medium rounded-full flex items-center gap-1" title="Promoted from Guest comment">
+              <span
+                className="ml-1 px-1.5 py-0.5 bg-green-100 text-green-700 text-[10px] font-medium rounded-full flex items-center gap-1"
+                title="Promoted from Guest comment"
+              >
                 <Share className="w-2 h-2" />
                 Promoted
               </span>
             )}
           </div>
           <div className="flex items-center gap-1">
-            {!comment.resolved && projectRole === 'owner' && (
+            {!comment.resolved && projectRole === "owner" && (
               <button
                 onClick={(e) => {
                   e.stopPropagation();
@@ -388,7 +453,9 @@ const CommentCard: React.FC<{
                 <CheckCircle className="w-4 h-4 text-green-600" />
               </button>
             )}
-            {(projectRole === 'owner' || (currentUserEmail && comment.authorName === currentUserEmail)) && (
+            {(projectRole === "owner" ||
+              (currentUserEmail &&
+                comment.authorName === currentUserEmail)) && (
               <button
                 onClick={(e) => {
                   e.stopPropagation();
@@ -409,7 +476,9 @@ const CommentCard: React.FC<{
           <div className="mt-2 p-2 bg-purple-50 rounded-lg border border-purple-100">
             <div className="flex items-start gap-2">
               <Bot className="w-4 h-4 text-purple-600 mt-0.5 flex-shrink-0" />
-              <div className="text-xs text-purple-900 leading-relaxed">{comment.aiAnalysis}</div>
+              <div className="text-xs text-purple-900 leading-relaxed">
+                {comment.aiAnalysis}
+              </div>
             </div>
           </div>
         )}
@@ -419,7 +488,9 @@ const CommentCard: React.FC<{
             {comment.replies.map((reply) => (
               <div key={reply.id} className="text-xs">
                 <div className="flex items-center gap-2 mb-1">
-                  <span className={`w-1.5 h-1.5 rounded-full ${reply.author === UserRole.DESIGNER ? 'bg-purple-400' : 'bg-blue-400'}`} />
+                  <span
+                    className={`w-1.5 h-1.5 rounded-full ${reply.author === UserRole.DESIGNER ? "bg-purple-400" : "bg-blue-400"}`}
+                  />
                   <span className="font-medium text-slate-600">
                     {reply.authorName || reply.author}
                     {reply.authorName && (
@@ -428,7 +499,12 @@ const CommentCard: React.FC<{
                       </span>
                     )}
                   </span>
-                  <span className="text-[10px] text-slate-400">{new Date(reply.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
+                  <span className="text-[10px] text-slate-400">
+                    {new Date(reply.timestamp).toLocaleTimeString([], {
+                      hour: "2-digit",
+                      minute: "2-digit",
+                    })}
+                  </span>
                 </div>
                 <p className="text-slate-600 ml-3.5">{reply.text}</p>
               </div>
@@ -437,21 +513,23 @@ const CommentCard: React.FC<{
         )}
 
         <div className="mt-2 flex items-center gap-2">
-          {projectRole === 'owner' && comment.audience === 'guest-owner' && onPushToProfessional && (
-            <button
-              onClick={(e) => {
-                e.stopPropagation();
-                if (onPushToProfessional) {
-                  onPushToProfessional(comment.id);
-                }
-              }}
-              className="mt-2 w-full flex items-center justify-center gap-2 px-3 py-1.5 bg-green-50 text-green-700 text-xs font-medium rounded-md hover:bg-green-100 transition-colors border border-green-200"
-              title="Promote this guest comment to professional view"
-            >
-              <Share className="w-3 h-3" />
-              Promote to Professional
-            </button>
-          )}
+          {projectRole === "owner" &&
+            comment.audience === "guest-owner" &&
+            onPushToProfessional && (
+              <button
+                onClick={(e) => {
+                  e.stopPropagation();
+                  if (onPushToProfessional) {
+                    onPushToProfessional(comment.id);
+                  }
+                }}
+                className="mt-2 w-full flex items-center justify-center gap-2 px-3 py-1.5 bg-green-50 text-green-700 text-xs font-medium rounded-md hover:bg-green-100 transition-colors border border-green-200"
+                title="Promote this guest comment to professional view"
+              >
+                <Share className="w-3 h-3" />
+                Promote to Professional
+              </button>
+            )}
 
           {!showReplyBox ? (
             <button
@@ -465,7 +543,10 @@ const CommentCard: React.FC<{
               Reply
             </button>
           ) : (
-            <div className="flex-1 flex gap-2" onClick={(e) => e.stopPropagation()}>
+            <div
+              className="flex-1 flex gap-2"
+              onClick={(e) => e.stopPropagation()}
+            >
               <div className="flex-1">
                 <MentionInput
                   value={replyText}
@@ -479,10 +560,14 @@ const CommentCard: React.FC<{
                   className="flex-1 text-xs px-2 py-1 border border-slate-200 rounded focus:outline-none focus:border-indigo-400 bg-white text-slate-900"
                   autoFocus
                   onKeyDown={(e) => {
-                    if (e.key === 'Enter' && !e.shiftKey && !e.defaultPrevented) {
+                    if (
+                      e.key === "Enter" &&
+                      !e.shiftKey &&
+                      !e.defaultPrevented
+                    ) {
                       handleReplySubmit();
                     }
-                    if (e.key === 'Escape') setShowReplyBox(false);
+                    if (e.key === "Escape") setShowReplyBox(false);
                   }}
                   minHeight="36px"
                 />

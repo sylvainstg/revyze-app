@@ -1,26 +1,28 @@
-import React, { useState, useRef, useEffect } from 'react';
-import { Document, Page, pdfjs } from 'react-pdf';
-import { Comment, UserRole } from '../types';
-import { PDF_WORKER_URL } from '../constants';
-import { Plus, Loader2, ZoomIn, ZoomOut, Sparkles, X, AlertCircle, Upload } from 'lucide-react';
-import * as geminiService from '../services/geminiService';
-import { getPDFObjectURL, revokePDFObjectURL } from '../utils/pdfUtils';
-import { VersionSelectorDetailed } from './VersionSelector';
-import { MentionInput } from './MentionInput';
+import React, { useState, useRef, useEffect } from "react";
+import { Document, Page, pdfjs } from "react-pdf";
+import { Comment, UserRole } from "../types";
+import { PDF_WORKER_URL } from "../constants";
+import { Plus, Loader2, Sparkles, X, AlertCircle, Upload } from "lucide-react";
+import * as geminiService from "../services/geminiService";
+import { getPDFObjectURL, revokePDFObjectURL } from "../utils/pdfUtils";
+import { VersionSelectorDetailed } from "./VersionSelector";
+import { MentionInput } from "./MentionInput";
 
 // Set worker
 pdfjs.GlobalWorkerOptions.workerSrc = PDF_WORKER_URL;
 
 // Options to ensure character maps load correctly from CDN
 const pdfOptions = {
-  cMapUrl: 'https://aistudiocdn.com/pdfjs-dist@4.4.168/cmaps/',
+  cMapUrl: "https://aistudiocdn.com/pdfjs-dist@4.4.168/cmaps/",
   cMapPacked: true,
 };
 
 interface PDFWorkspaceProps {
   fileUrl: string;
   comments: Comment[];
-  onAddComment: (comment: Omit<Comment, 'id' | 'timestamp' | 'resolved'>) => void;
+  onAddComment: (
+    comment: Omit<Comment, "id" | "timestamp" | "resolved">,
+  ) => void;
   activeCommentId: string | null;
   setActiveCommentId: (id: string | null) => void;
   currentUserRole: UserRole;
@@ -30,16 +32,21 @@ interface PDFWorkspaceProps {
   setScale: (scale: number | ((prev: number) => number)) => void;
   filter: { active: boolean; resolved: boolean; deleted: boolean };
   // Version management props
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   versions?: any[];
   currentVersionId?: string;
   onVersionChange?: (versionId: string) => void;
   onUploadNewVersion?: () => void;
   canUploadVersion?: boolean;
   onEditVersion?: (versionId: string) => void;
-  initialPanOffset?: { x: number, y: number };
-  onPanChange?: (offset: { x: number, y: number }) => void;
+  initialPanOffset?: { x: number; y: number };
+  onPanChange?: (offset: { x: number; y: number }) => void;
   onFocusComment?: (commentId: string) => void;
   canAddComment?: boolean;
+  onUpdateCommentPosition?: (
+    commentId: string,
+    position: { x: number; y: number },
+  ) => void;
   onCaptureThumbnail?: () => void;
   onSetDefaultPage?: (page: number) => void;
   isDefaultPage?: boolean;
@@ -53,7 +60,7 @@ interface PDFWorkspaceProps {
 
 export const PDFWorkspace: React.FC<PDFWorkspaceProps> = ({
   fileUrl,
-  comments,
+  // comments prop is unused here as we use versions to build visible comments
   onAddComment,
   activeCommentId,
   setActiveCommentId,
@@ -73,6 +80,7 @@ export const PDFWorkspace: React.FC<PDFWorkspaceProps> = ({
   onPanChange,
   onFocusComment,
   canAddComment = true,
+  onUpdateCommentPosition,
   onCaptureThumbnail,
   onSetDefaultPage,
   isDefaultPage = false,
@@ -80,18 +88,32 @@ export const PDFWorkspace: React.FC<PDFWorkspaceProps> = ({
   onTogglePreviousComments,
   onPageCountChange,
   collaborators = [],
-  currentUserEmail = '',
+  currentUserEmail = "",
   isOwner = false,
 }) => {
   const [numPages, setNumPages] = useState<number | null>(null);
-  const [isAddingComment, setIsAddingComment] = useState(false);
-  const [tempMarker, setTempMarker] = useState<{ x: number; y: number } | null>(null);
-  const [commentText, setCommentText] = useState('');
+  const [tempMarker, setTempMarker] = useState<{ x: number; y: number } | null>(
+    null,
+  );
+  const [commentText, setCommentText] = useState("");
   const [pendingMentions, setPendingMentions] = useState<string[]>([]);
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [panOffset, setPanOffset] = useState(initialPanOffset);
   const [isDragging, setIsDragging] = useState(false);
-  const [dragStart, setDragStart] = useState({ x: 0, y: 0 });
+  const [dragStart, setDragStart] = useState({ x: 0, y: 0 }); // For panning
+  const [draggedCommentId, setDraggedCommentId] = useState<string | null>(null); // For comment moving
+  // Initial position of the comment being dragged (to calculate delta)
+  const [commentDragStart, setCommentDragStart] = useState<{
+    x: number;
+    y: number;
+    startX: number;
+    startY: number;
+  } | null>(null);
+  const [draggedItemPosition, setDraggedItemPosition] = useState<{
+    x: number;
+    y: number;
+  } | null>(null);
+
   const [loadError, setLoadError] = useState<Error | null>(null);
   const [pdfObjectURL, setPdfObjectURL] = useState<string | null>(null);
   const [useAI, setUseAI] = useState(false);
@@ -106,26 +128,36 @@ export const PDFWorkspace: React.FC<PDFWorkspaceProps> = ({
     setPanOffset(initialPanOffset);
   }, [initialPanOffset]);
 
-  // Notify parent of pan changes only when dragging ends (handled in mouseUp)
-
   // Handle Esc key to close comment popup
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') {
+      if (e.key === "Escape") {
         if (tempMarker) {
           setTempMarker(null);
-          setCommentText('');
+          setCommentText("");
           setUseAI(false);
         }
         if (activeCommentId) {
           setActiveCommentId(null);
         }
+        if (draggedCommentId) {
+          setDraggedCommentId(null);
+          setCommentDragStart(null);
+          setDraggedItemPosition(null);
+        }
       }
     };
 
-    window.addEventListener('keydown', handleKeyDown);
-    return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [tempMarker, activeCommentId, setTempMarker, setCommentText, setActiveCommentId]);
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [
+    tempMarker,
+    activeCommentId,
+    setTempMarker,
+    setCommentText,
+    setActiveCommentId,
+    draggedCommentId,
+  ]);
 
   // Convert Firebase Storage URL to object URL to bypass CORS
   useEffect(() => {
@@ -134,18 +166,18 @@ export const PDFWorkspace: React.FC<PDFWorkspaceProps> = ({
     let currentObjectURL: string | null = null;
 
     const loadPDF = async () => {
-      console.log('[PDFWorkspace] Loading PDF from URL:', fileUrl);
+      console.log("[PDFWorkspace] Loading PDF from URL:", fileUrl);
 
       // Clean up previous object URL before loading new one
       if (pdfObjectURL) {
-        console.log('[PDFWorkspace] Revoking previous PDF object URL');
+        console.log("[PDFWorkspace] Revoking previous PDF object URL");
         revokePDFObjectURL(pdfObjectURL);
         setPdfObjectURL(null);
       }
 
       try {
         const objectURL = await getPDFObjectURL(fileUrl);
-        console.log('[PDFWorkspace] Converted to proxy URL:', objectURL);
+        console.log("[PDFWorkspace] Converted to proxy URL:", objectURL);
         currentObjectURL = objectURL;
 
         if (isMounted) {
@@ -155,7 +187,7 @@ export const PDFWorkspace: React.FC<PDFWorkspaceProps> = ({
           revokePDFObjectURL(objectURL);
         }
       } catch (error) {
-        console.error('[PDFWorkspace] Failed to load PDF:', error);
+        console.error("[PDFWorkspace] Failed to load PDF:", error);
         if (isMounted) {
           setPdfObjectURL(fileUrl); // Fallback to original URL
         }
@@ -168,13 +200,12 @@ export const PDFWorkspace: React.FC<PDFWorkspaceProps> = ({
       isMounted = false;
       // Cleanup object URL when component unmounts or fileUrl changes
       if (currentObjectURL) {
-        console.log('[PDFWorkspace] Cleanup: Revoking PDF object URL');
+        console.log("[PDFWorkspace] Cleanup: Revoking PDF object URL");
         revokePDFObjectURL(currentObjectURL);
       }
     };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [fileUrl]);
-
-
 
   const pdfWrapperRef = useRef<HTMLDivElement>(null);
 
@@ -192,7 +223,6 @@ export const PDFWorkspace: React.FC<PDFWorkspaceProps> = ({
     }
   }, [numPages, pageNumber, setPageNumber]);
 
-
   const onDocumentLoadError = (error: Error) => {
     console.error("PDF Load Error:", error);
     setLoadError(error);
@@ -204,8 +234,28 @@ export const PDFWorkspace: React.FC<PDFWorkspaceProps> = ({
     onPageCountChange?.(null);
   }, [fileUrl, onPageCountChange]);
 
+  // Handle Comment Drag Start
+  const handleCommentMouseDown = (
+    e: React.MouseEvent,
+    commentId: string,
+    currentX: number,
+    currentY: number,
+  ) => {
+    e.stopPropagation(); // Prevent panning
+    e.preventDefault();
+    setDraggedCommentId(commentId);
+    setDraggedItemPosition({ x: currentX, y: currentY });
+    setCommentDragStart({
+      x: currentX,
+      y: currentY,
+      startX: e.clientX,
+      startY: e.clientY,
+    });
+  };
+
   // Pan/drag handlers
   const handleMouseDown = (e: React.MouseEvent) => {
+    if (draggedCommentId) return; // Don't pan if dragging comment
     // Allow panning at all zoom levels
     setIsDragging(true);
     hasDraggedRef.current = false; // Reset drag flag
@@ -214,25 +264,55 @@ export const PDFWorkspace: React.FC<PDFWorkspaceProps> = ({
   };
 
   const handleMouseMove = (e: React.MouseEvent) => {
+    // 1. Handle Comment Dragging
+    if (draggedCommentId && commentDragStart && pdfWrapperRef.current) {
+      const rect = pdfWrapperRef.current.getBoundingClientRect();
+      const deltaX = ((e.clientX - commentDragStart.startX) / rect.width) * 100;
+      const deltaY =
+        ((e.clientY - commentDragStart.startY) / rect.height) * 100;
+
+      setDraggedItemPosition({
+        x: Math.min(100, Math.max(0, commentDragStart.x + deltaX)),
+        y: Math.min(100, Math.max(0, commentDragStart.y + deltaY)),
+      });
+      return;
+    }
+
+    // 2. Handle Panning
     if (isDragging) {
       hasDraggedRef.current = true; // Mark that we have moved
       setPanOffset({
         x: e.clientX - dragStart.x,
-        y: e.clientY - dragStart.y
+        y: e.clientY - dragStart.y,
       });
     }
   };
 
   const handleMouseUp = () => {
+    if (draggedCommentId && draggedItemPosition) {
+      // Finalize move
+      if (onUpdateCommentPosition) {
+        onUpdateCommentPosition(draggedCommentId, draggedItemPosition);
+      }
+      setDraggedCommentId(null);
+      setCommentDragStart(null);
+      setDraggedItemPosition(null);
+      return;
+    }
+
     if (isDragging) {
       setIsDragging(false);
       onPanChange?.(panOffset);
     }
   };
 
+  const handleLeave = () => {
+    handleMouseUp();
+  };
+
   const handlePdfClick = (e: React.MouseEvent) => {
-    // Don't create comments if we were dragging/panning
-    if (hasDraggedRef.current) {
+    // Don't create comments if we were dragging/panning or moving a comment
+    if (hasDraggedRef.current || draggedCommentId) {
       hasDraggedRef.current = false; // Reset for next time
       return;
     }
@@ -254,7 +334,7 @@ export const PDFWorkspace: React.FC<PDFWorkspaceProps> = ({
     const y = ((e.clientY - rect.top) / rect.height) * 100;
 
     setTempMarker({ x, y });
-    setCommentText('');
+    setCommentText("");
     setUseAI(false);
     setActiveCommentId(null);
   };
@@ -268,7 +348,9 @@ export const PDFWorkspace: React.FC<PDFWorkspaceProps> = ({
       setIsAnalyzing(true);
       try {
         // Capture canvas area
-        const canvas = document.querySelector('.react-pdf__Page__canvas') as HTMLCanvasElement;
+        const canvas = document.querySelector(
+          ".react-pdf__Page__canvas",
+        ) as HTMLCanvasElement;
         if (canvas) {
           // We need to crop the canvas around the click area to give Gemini context
           // Marker is in %, canvas is in px.
@@ -282,14 +364,17 @@ export const PDFWorkspace: React.FC<PDFWorkspaceProps> = ({
           const sw = Math.min(cropSize, canvas.width - sx);
           const sh = Math.min(cropSize, canvas.height - sy);
 
-          const tempCanvas = document.createElement('canvas');
+          const tempCanvas = document.createElement("canvas");
           tempCanvas.width = sw;
           tempCanvas.height = sh;
-          const ctx = tempCanvas.getContext('2d');
+          const ctx = tempCanvas.getContext("2d");
           ctx?.drawImage(canvas, sx, sy, sw, sh, 0, 0, sw, sh);
 
-          const base64 = tempCanvas.toDataURL('image/png');
-          aiAnalysis = await geminiService.analyzeDesignArea(base64, commentText);
+          const base64 = tempCanvas.toDataURL("image/png");
+          aiAnalysis = await geminiService.analyzeDesignArea(
+            base64,
+            commentText,
+          );
         }
       } catch (e) {
         console.error("Analysis failed", e);
@@ -305,30 +390,39 @@ export const PDFWorkspace: React.FC<PDFWorkspaceProps> = ({
       text: commentText,
       author: currentUserRole,
       aiAnalysis,
-      mentions: pendingMentions
+      mentions: pendingMentions,
     });
 
     setTempMarker(null);
-    setCommentText('');
+    setCommentText("");
     setPendingMentions([]);
   };
 
   // Build combined comment list (current + previous versions when enabled)
   const buildVisibleComments = () => {
     // Determine ordering of versions (latest first)
-    let versionsOrdered = versions ? [...versions].sort((a: any, b: any) => (b.timestamp || 0) - (a.timestamp || 0)) : [];
-    const currentIdx = versionsOrdered.findIndex(v => v.id === currentVersionId);
+    let versionsOrdered = versions
+      ? [...versions].sort(
+          (a: any, b: any) => (b.timestamp || 0) - (a.timestamp || 0),
+        )
+      : [];
+    const currentIdx = versionsOrdered.findIndex(
+      (v) => v.id === currentVersionId,
+    );
     if (currentIdx === -1) {
       // Fallback to use provided array as-is
       versionsOrdered = versions || [];
     }
 
-    const buckets = showPreviousVersionComments ? versionsOrdered : versionsOrdered.filter(v => v.id === currentVersionId);
+    const buckets = showPreviousVersionComments
+      ? versionsOrdered
+      : versionsOrdered.filter((v) => v.id === currentVersionId);
 
     const collected: Array<{ comment: Comment; distance: number }> = [];
 
     buckets.forEach((ver, idx) => {
-      const distance = currentIdx >= 0 ? Math.max(0, idx - currentIdx) : Math.max(0, idx);
+      const distance =
+        currentIdx >= 0 ? Math.max(0, idx - currentIdx) : Math.max(0, idx);
       (ver.comments || []).forEach((c: Comment) => {
         // Status filters
         if ((c.pageNumber || 1) !== pageNumber) return;
@@ -353,7 +447,9 @@ export const PDFWorkspace: React.FC<PDFWorkspaceProps> = ({
           <div className="flex items-center gap-3">
             {versions && versions.length > 0 && currentVersionId && (
               <div className="flex items-center gap-2">
-                <span className="text-sm font-medium text-slate-600">Version:</span>
+                <span className="text-sm font-medium text-slate-600">
+                  Version:
+                </span>
                 <VersionSelectorDetailed
                   versions={versions}
                   currentVersionId={currentVersionId}
@@ -370,17 +466,18 @@ export const PDFWorkspace: React.FC<PDFWorkspaceProps> = ({
               <div id="page-navigation" className="flex items-center gap-2">
                 <button
                   disabled={!numPages || pageNumber <= 1}
-                  onClick={() => setPageNumber(prev => prev - 1)}
+                  onClick={() => setPageNumber((prev) => prev - 1)}
                   className="px-3 py-1 bg-indigo-100 border border-indigo-400 rounded-full text-indigo-800 hover:bg-indigo-200 hover:text-indigo-900 disabled:opacity-50 disabled:hover:bg-indigo-100 disabled:hover:text-indigo-700 transition-all shadow text-sm font-medium"
                 >
                   Previous
                 </button>
                 <span className="text-sm text-slate-600 font-medium whitespace-nowrap">
-                  Page {numPages ? pageNumber : '—'}{numPages ? ` of ${numPages}` : ''}
+                  Page {numPages ? pageNumber : "—"}
+                  {numPages ? ` of ${numPages}` : ""}
                 </span>
                 <button
                   disabled={!numPages || pageNumber >= numPages}
-                  onClick={() => setPageNumber(prev => prev + 1)}
+                  onClick={() => setPageNumber((prev) => prev + 1)}
                   className="px-3 py-1 bg-indigo-100 border border-indigo-400 rounded-full text-indigo-800 hover:bg-indigo-200 hover:text-indigo-900 disabled:opacity-50 disabled:hover:bg-indigo-100 disabled:hover:text-indigo-700 transition-all shadow text-sm font-medium"
                 >
                   Next
@@ -388,39 +485,78 @@ export const PDFWorkspace: React.FC<PDFWorkspaceProps> = ({
               </div>
 
               {/* Zoom Controls */}
-              <div id="zoom-controls" className="flex items-center gap-2 border-l border-indigo-200 pl-4">
+              <div
+                id="zoom-controls"
+                className="flex items-center gap-2 border-l border-indigo-200 pl-4"
+              >
                 <button
-                  onClick={() => setScale(prev => Math.max(0.5, prev - 0.1))}
+                  onClick={() => setScale((prev) => Math.max(0.5, prev - 0.1))}
                   className="p-2 bg-indigo-100 border border-indigo-400 rounded-full text-indigo-800 hover:bg-indigo-200 hover:text-indigo-900 transition-all shadow"
                   title="Zoom out"
                 >
-                  <svg className="w-4 h-4 text-indigo-800" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0zM13 10H7" />
+                  <svg
+                    className="w-4 h-4 text-indigo-800"
+                    fill="none"
+                    stroke="currentColor"
+                    viewBox="0 0 24 24"
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth={2}
+                      d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0zM13 10H7"
+                    />
                   </svg>
                 </button>
                 <button
-                  onClick={() => setScale(prev => Math.min(5, prev + 0.1))}
+                  onClick={() => setScale((prev) => Math.min(5, prev + 0.1))}
                   className="p-2 bg-indigo-100 border border-indigo-400 rounded-full text-indigo-800 hover:bg-indigo-200 hover:text-indigo-900 transition-all shadow"
                   title="Zoom in"
                 >
-                  <svg className="w-4 h-4 text-indigo-800" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0zM10 7v3m0 0v3m0-3h3m-3 0H7" />
+                  <svg
+                    className="w-4 h-4 text-indigo-800"
+                    fill="none"
+                    stroke="currentColor"
+                    viewBox="0 0 24 24"
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth={2}
+                      d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0zM10 7v3m0 0v3m0-3h3m-3 0H7"
+                    />
                   </svg>
                 </button>
               </div>
 
               {/* Plan Preferences Menu - Owner Only */}
               {isOwner && (
-                <div id="plan-preferences" className="relative group border-l border-indigo-200 pl-4">
+                <div
+                  id="plan-preferences"
+                  className="relative group border-l border-indigo-200 pl-4"
+                >
                   <button className="px-3 py-1 bg-indigo-100 border border-indigo-400 rounded-full text-indigo-800 hover:bg-indigo-200 hover:text-indigo-900 transition-all shadow text-sm font-medium flex items-center gap-1">
                     Plan Preferences
-                    <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                    <svg
+                      className="w-3 h-3"
+                      fill="none"
+                      stroke="currentColor"
+                      viewBox="0 0 24 24"
+                    >
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        strokeWidth={2}
+                        d="M19 9l-7 7-7-7"
+                      />
                     </svg>
                   </button>
 
                   {/* Dropdown Menu */}
-                  <div className="fixed bg-white border border-indigo-200 rounded-lg shadow-2xl py-1 min-w-[200px] opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200" style={{ zIndex: 99999, marginTop: '0.5rem' }}>
+                  <div
+                    className="fixed bg-white border border-indigo-200 rounded-lg shadow-2xl py-1 min-w-[200px] opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200"
+                    style={{ zIndex: 99999, marginTop: "0.5rem" }}
+                  >
                     <button
                       onClick={() => {
                         if (onSetDefaultPage) {
@@ -429,15 +565,30 @@ export const PDFWorkspace: React.FC<PDFWorkspaceProps> = ({
                           setTimeout(() => setDefaultPageSet(false), 2000);
                         }
                       }}
-                      className={`w-full px-4 py-2 text-left text-sm transition-colors flex items-center gap-2 ${defaultPageSet || isDefaultPage
-                        ? 'bg-green-50 text-green-700'
-                        : 'text-slate-700 hover:bg-indigo-50 hover:text-indigo-600'
-                        }`}
+                      className={`w-full px-4 py-2 text-left text-sm transition-colors flex items-center gap-2 ${
+                        defaultPageSet || isDefaultPage
+                          ? "bg-green-50 text-green-700"
+                          : "text-slate-700 hover:bg-indigo-50 hover:text-indigo-600"
+                      }`}
                     >
-                      <svg className="w-4 h-4 text-indigo-700" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                      <svg
+                        className="w-4 h-4 text-indigo-700"
+                        fill="none"
+                        stroke="currentColor"
+                        viewBox="0 0 24 24"
+                      >
+                        <path
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          strokeWidth={2}
+                          d="M5 13l4 4L19 7"
+                        />
                       </svg>
-                      {defaultPageSet ? 'Default page set!' : isDefaultPage ? 'Default page' : 'Set this page as default'}
+                      {defaultPageSet
+                        ? "Default page set!"
+                        : isDefaultPage
+                          ? "Default page"
+                          : "Set this page as default"}
                     </button>
                     <button
                       onClick={() => {
@@ -447,15 +598,28 @@ export const PDFWorkspace: React.FC<PDFWorkspaceProps> = ({
                           setTimeout(() => setThumbnailSet(false), 2000);
                         }
                       }}
-                      className={`w-full px-4 py-2 text-left text-sm transition-colors flex items-center gap-2 ${thumbnailSet
-                        ? 'bg-green-50 text-green-700'
-                        : 'text-slate-700 hover:bg-indigo-50 hover:text-indigo-600'
-                        }`}
+                      className={`w-full px-4 py-2 text-left text-sm transition-colors flex items-center gap-2 ${
+                        thumbnailSet
+                          ? "bg-green-50 text-green-700"
+                          : "text-slate-700 hover:bg-indigo-50 hover:text-indigo-600"
+                      }`}
                     >
-                      <svg className="w-4 h-4 text-indigo-700" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                      <svg
+                        className="w-4 h-4 text-indigo-700"
+                        fill="none"
+                        stroke="currentColor"
+                        viewBox="0 0 24 24"
+                      >
+                        <path
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          strokeWidth={2}
+                          d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"
+                        />
                       </svg>
-                      {thumbnailSet ? 'Thumbnail captured!' : 'Set this page as thumbnail'}
+                      {thumbnailSet
+                        ? "Thumbnail captured!"
+                        : "Set this page as thumbnail"}
                     </button>
                   </div>
                 </div>
@@ -467,7 +631,9 @@ export const PDFWorkspace: React.FC<PDFWorkspaceProps> = ({
                   <input
                     type="checkbox"
                     checked={!!showPreviousVersionComments}
-                    onChange={(e) => onTogglePreviousComments?.(e.target.checked)}
+                    onChange={(e) =>
+                      onTogglePreviousComments?.(e.target.checked)
+                    }
                     className="w-4 h-4 text-indigo-600 border-indigo-300 bg-white rounded focus:ring-indigo-500"
                   />
                   Show previous versions' comments
@@ -494,7 +660,7 @@ export const PDFWorkspace: React.FC<PDFWorkspaceProps> = ({
         <div
           ref={viewportRef}
           className="flex-1 overflow-hidden bg-slate-100 flex items-start justify-start"
-          style={{ cursor: isDragging ? 'grabbing' : 'grab' }}
+          style={{ cursor: isDragging ? "grabbing" : "grab" }}
           onMouseDown={handleMouseDown}
           onMouseMove={handleMouseMove}
           onMouseUp={handleMouseUp}
@@ -505,7 +671,7 @@ export const PDFWorkspace: React.FC<PDFWorkspaceProps> = ({
             ref={pdfWrapperRef}
             style={{
               transform: `translate(${panOffset.x}px, ${panOffset.y}px)`,
-              transition: isDragging ? 'none' : 'transform 0.1s ease-out'
+              transition: isDragging ? "none" : "transform 0.1s ease-out",
             }}
           >
             {!pdfObjectURL && !loadError && (
@@ -518,9 +684,12 @@ export const PDFWorkspace: React.FC<PDFWorkspaceProps> = ({
               <div className="w-[600px] h-[800px] flex flex-col items-center justify-center bg-white rounded-lg text-red-500 p-10 text-center">
                 <AlertCircle className="w-10 h-10 mb-4 opacity-50" />
                 <p className="font-semibold mb-2">Failed to load PDF.</p>
-                <p className="text-sm text-slate-500 mb-4">Ensure the file is a valid PDF and try again.</p>
+                <p className="text-sm text-slate-500 mb-4">
+                  Ensure the file is a valid PDF and try again.
+                </p>
                 <div className="text-xs bg-red-50 p-2 rounded border border-red-100 max-w-md break-all">
-                  <span className="font-bold">Error Details:</span> {loadError.message}
+                  <span className="font-bold">Error Details:</span>{" "}
+                  {loadError.message}
                 </div>
               </div>
             )}
@@ -545,136 +714,198 @@ export const PDFWorkspace: React.FC<PDFWorkspaceProps> = ({
             )}
 
             {/* Existing Comment Pins - Only show if not error */}
-            {!loadError && visibleComments.map(({ comment, distance }, idx) => {
-              const fade = Math.max(0.25, 1 - distance * 0.2);
-              return (
-                <button
-                  key={comment.id}
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    setActiveCommentId(comment.id);
-                    onFocusComment?.(comment.id);
-                  }}
-                  className={`absolute w-8 h-8 -ml-4 -mt-8 transform transition-all duration-200 hover:scale-110 z-10 group ${activeCommentId === comment.id ? 'scale-150 z-30' : ''
-                    } ${comment.deleted ? 'opacity-50 grayscale' : ''}`}
-                  style={{ left: `${comment.x}%`, top: `${comment.y}%` }}
-                >
-                  <div className={`relative flex items-center justify-center w-full h-full rounded-full shadow-lg border-2 transition-all duration-200 
-                  ${comment.deleted ? 'bg-red-100 border-red-200' :
-                      comment.resolved ? 'bg-slate-400 border-slate-500' :
-                        comment.author === currentUserRole ? 'bg-indigo-600 border-indigo-200 ring-2 ring-indigo-400' : // Emphasis for own comments
-                          comment.author === UserRole.DESIGNER ? 'bg-purple-600 border-white' : 'bg-blue-500 border-white'
-                    } ${activeCommentId === comment.id ? 'ring-4 ring-indigo-300/50 shadow-xl' : ''}`} style={{ opacity: fade }}>
+            {!loadError &&
+              visibleComments.map(({ comment, distance }, idx) => {
+                const fade = Math.max(0.25, 1 - distance * 0.2);
+                const isDraggable =
+                  !comment.deleted &&
+                  (isOwner || comment.author === currentUserRole);
+                const isBeingDragged = draggedCommentId === comment.id;
+                const displayX =
+                  isBeingDragged && draggedItemPosition
+                    ? draggedItemPosition.x
+                    : comment.x;
+                const displayY =
+                  isBeingDragged && draggedItemPosition
+                    ? draggedItemPosition.y
+                    : comment.y;
 
-                    {comment.deleted ? (
-                      <X className="w-4 h-4 text-red-500" />
-                    ) : (
-                      <span className="text-white text-xs font-bold">
-                        {idx + 1}
-                      </span>
-                    )}
-
-                    {/* Tooltip on hover - Full text */}
-                    <div className="absolute bottom-full mb-2 hidden group-hover:block w-48 bg-slate-800 text-white text-xs py-2 px-3 rounded shadow-xl pointer-events-none z-50">
-                      <p className="line-clamp-3">{comment.text}</p>
-                      <div className="absolute top-full left-1/2 -ml-1 border-4 border-transparent border-t-slate-800"></div>
-                    </div>
-                  </div>
-                  {/* Arrow pointer */}
-                  {!comment.deleted && (
-                    <div className={`absolute top-full left-1/2 -ml-1 -mt-1 w-0 h-0 border-l-4 border-l-transparent border-r-4 border-r-transparent border-t-4 ${comment.resolved ? 'border-t-slate-400' :
-                      comment.author === UserRole.DESIGNER ? 'border-t-purple-600' : 'border-t-indigo-600'
-                      }`} style={{ opacity: fade }}></div>
-                  )}
-                </button>
-              );
-            })}
-
-            {/* New Comment Form */}
-            {!loadError && tempMarker && (() => {
-              const isLowY = tempMarker.y < 25;
-              const isLeftX = tempMarker.x < 15;
-              const isRightX = tempMarker.x > 85;
-
-              return (
-                <div
-                  className="absolute bg-white rounded-lg shadow-2xl p-4 w-80 z-30 border border-slate-200"
-                  style={{
-                    left: `${tempMarker.x}%`,
-                    top: `${tempMarker.y}%`,
-                    transform: `translate(${isLeftX ? '0%' : isRightX ? '-100%' : '-50%'}, ${isLowY ? '20px' : 'calc(-100% - 20px)'})`
-                  }}
-                >
-                  {/* Arrow pointing to marker */}
-                  <div
-                    className={`absolute w-4 h-4 bg-white border-slate-200 transform rotate-45 ${isLowY
-                      ? '-top-2 border-t border-l'
-                      : 'top-full -mt-2 border-b border-r'
-                      }`}
-                    style={{
-                      left: isLeftX ? '20px' : isRightX ? 'calc(100% - 36px)' : 'calc(50% - 8px)'
-                    }}
-                  ></div>
-
-                  <div className="flex justify-between items-center mb-2">
-                    <span className="text-xs font-semibold text-slate-500 uppercase tracking-wider">New Note</span>
-                    <button onClick={() => setTempMarker(null)} className="text-slate-400 hover:text-slate-600">
-                      <X className="w-4 h-4" />
-                    </button>
-                  </div>
-
-                  <MentionInput
-                    autoFocus
-                    value={commentText}
-                    onChange={(val, newMentions) => {
-                      setCommentText(val);
-                      setPendingMentions(newMentions);
-                    }}
-                    collaborators={collaborators}
-                    placeholder="Type your feedback here... Use @ to mention"
-                    currentUserEmail={currentUserEmail}
-                    className="mb-3 text-sm"
-                    onKeyDown={(e) => {
-                      if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) {
-                        handleSubmitComment();
+                return (
+                  <button
+                    key={comment.id}
+                    onMouseDown={(e) => {
+                      if (isDraggable) {
+                        handleCommentMouseDown(
+                          e,
+                          comment.id,
+                          comment.x,
+                          comment.y,
+                        );
                       }
                     }}
-                    minHeight="80px"
-                  />
-
-                  <div className="flex items-center justify-between">
-                    <label className={`flex items-center gap-1.5 text-xs font-medium cursor-pointer select-none px-2 py-1.5 rounded transition-colors ${useAI ? 'bg-indigo-50 text-indigo-700' : 'text-slate-500 hover:bg-slate-50'}`}>
-                      <input
-                        type="checkbox"
-                        checked={useAI}
-                        onChange={(e) => setUseAI(e.target.checked)}
-                        className="hidden"
-                      />
-                      <Sparkles className={`w-3.5 h-3.5 ${useAI ? 'text-indigo-500' : 'text-slate-400'}`} />
-                      {useAI ? 'AI Analysis On' : 'AI Analysis Off'}
-                    </label>
-
-                    <button
-                      onClick={handleSubmitComment}
-                      disabled={!commentText.trim() || isAnalyzing}
-                      className="bg-indigo-600 text-white p-2 rounded-md hover:bg-indigo-700 disabled:opacity-50 flex items-center gap-2 text-xs font-medium"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setActiveCommentId(comment.id);
+                      onFocusComment?.(comment.id);
+                    }}
+                    className={`absolute w-8 h-8 -ml-4 -mt-8 transform transition-all duration-200 hover:scale-110 z-10 group ${
+                      activeCommentId === comment.id ? "scale-150 z-30" : ""
+                    } ${comment.deleted ? "opacity-50 grayscale" : ""} ${
+                      isDraggable ? "cursor-move" : "cursor-pointer"
+                    }`}
+                    style={{
+                      left: `${displayX}%`,
+                      top: `${displayY}%`,
+                      zIndex: isBeingDragged ? 100 : undefined,
+                    }}
+                  >
+                    <div
+                      className={`relative flex items-center justify-center w-full h-full rounded-full shadow-lg border-2 transition-all duration-200 
+                  ${
+                    comment.deleted
+                      ? "bg-red-100 border-red-200"
+                      : comment.resolved
+                        ? "bg-slate-400 border-slate-500"
+                        : comment.author === currentUserRole
+                          ? "bg-indigo-600 border-indigo-200 ring-2 ring-indigo-400" // Emphasis for own comments
+                          : comment.author === UserRole.DESIGNER
+                            ? "bg-purple-600 border-white"
+                            : "bg-blue-500 border-white"
+                  } ${activeCommentId === comment.id ? "ring-4 ring-indigo-300/50 shadow-xl" : ""}`}
+                      style={{ opacity: fade }}
                     >
-                      {isAnalyzing ? (
-                        <>
-                          <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                          Analyzing...
-                        </>
+                      {comment.deleted ? (
+                        <X className="w-4 h-4 text-red-500" />
                       ) : (
-                        <>
-                          <Plus className="w-3.5 h-3.5" />
-                          Post
-                        </>
+                        <span className="text-white text-xs font-bold">
+                          {idx + 1}
+                        </span>
                       )}
-                    </button>
+
+                      {/* Tooltip on hover - Full text */}
+                      <div className="absolute bottom-full mb-2 hidden group-hover:block w-48 bg-slate-800 text-white text-xs py-2 px-3 rounded shadow-xl pointer-events-none z-50">
+                        <p className="line-clamp-3">{comment.text}</p>
+                        <div className="absolute top-full left-1/2 -ml-1 border-4 border-transparent border-t-slate-800"></div>
+                      </div>
+                    </div>
+                    {/* Arrow pointer */}
+                    {!comment.deleted && (
+                      <div
+                        className={`absolute top-full left-1/2 -ml-1 -mt-1 w-0 h-0 border-l-4 border-l-transparent border-r-4 border-r-transparent border-t-4 ${
+                          comment.resolved
+                            ? "border-t-slate-400"
+                            : comment.author === UserRole.DESIGNER
+                              ? "border-t-purple-600"
+                              : "border-t-indigo-600"
+                        }`}
+                        style={{ opacity: fade }}
+                      ></div>
+                    )}
+                  </button>
+                );
+              })}
+
+            {/* New Comment Form */}
+            {!loadError &&
+              tempMarker &&
+              (() => {
+                const isLowY = tempMarker.y < 25;
+                const isLeftX = tempMarker.x < 15;
+                const isRightX = tempMarker.x > 85;
+
+                return (
+                  <div
+                    className="absolute bg-white rounded-lg shadow-2xl p-4 w-80 z-30 border border-slate-200"
+                    style={{
+                      left: `${tempMarker.x}%`,
+                      top: `${tempMarker.y}%`,
+                      transform: `translate(${isLeftX ? "0%" : isRightX ? "-100%" : "-50%"}, ${isLowY ? "20px" : "calc(-100% - 20px)"})`,
+                    }}
+                  >
+                    {/* Arrow pointing to marker */}
+                    <div
+                      className={`absolute w-4 h-4 bg-white border-slate-200 transform rotate-45 ${
+                        isLowY
+                          ? "-top-2 border-t border-l"
+                          : "top-full -mt-2 border-b border-r"
+                      }`}
+                      style={{
+                        left: isLeftX
+                          ? "20px"
+                          : isRightX
+                            ? "calc(100% - 36px)"
+                            : "calc(50% - 8px)",
+                      }}
+                    ></div>
+
+                    <div className="flex justify-between items-center mb-2">
+                      <span className="text-xs font-semibold text-slate-500 uppercase tracking-wider">
+                        New Note
+                      </span>
+                      <button
+                        onClick={() => setTempMarker(null)}
+                        className="text-slate-400 hover:text-slate-600"
+                      >
+                        <X className="w-4 h-4" />
+                      </button>
+                    </div>
+
+                    <MentionInput
+                      autoFocus
+                      value={commentText}
+                      onChange={(val, newMentions) => {
+                        setCommentText(val);
+                        setPendingMentions(newMentions);
+                      }}
+                      collaborators={collaborators}
+                      placeholder="Type your feedback here... Use @ to mention"
+                      currentUserEmail={currentUserEmail}
+                      className="mb-3 text-sm"
+                      onKeyDown={(e) => {
+                        if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) {
+                          handleSubmitComment();
+                        }
+                      }}
+                      minHeight="80px"
+                    />
+
+                    <div className="flex items-center justify-between">
+                      <label
+                        className={`flex items-center gap-1.5 text-xs font-medium cursor-pointer select-none px-2 py-1.5 rounded transition-colors ${useAI ? "bg-indigo-50 text-indigo-700" : "text-slate-500 hover:bg-slate-50"}`}
+                      >
+                        <input
+                          type="checkbox"
+                          checked={useAI}
+                          onChange={(e) => setUseAI(e.target.checked)}
+                          className="hidden"
+                        />
+                        <Sparkles
+                          className={`w-3.5 h-3.5 ${useAI ? "text-indigo-500" : "text-slate-400"}`}
+                        />
+                        {useAI ? "AI Analysis On" : "AI Analysis Off"}
+                      </label>
+
+                      <button
+                        onClick={handleSubmitComment}
+                        disabled={!commentText.trim() || isAnalyzing}
+                        className="bg-indigo-600 text-white p-2 rounded-md hover:bg-indigo-700 disabled:opacity-50 flex items-center gap-2 text-xs font-medium"
+                      >
+                        {isAnalyzing ? (
+                          <>
+                            <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                            Analyzing...
+                          </>
+                        ) : (
+                          <>
+                            <Plus className="w-3.5 h-3.5" />
+                            Post
+                          </>
+                        )}
+                      </button>
+                    </div>
                   </div>
-                </div>
-              );
-            })()}
+                );
+              })()}
 
             {/* Indicator for creation point */}
             {!loadError && tempMarker && (

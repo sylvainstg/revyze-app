@@ -1,0 +1,639 @@
+
+> designsync-ai@0.0.0 format
+> prettier --write .
+
+ADMIN_FEATURES.md 28ms (unchanged)
+App.tsx 106ms (unchanged)
+components/admin/CampaignDocumentation.tsx 16ms (unchanged)
+components/admin/CampaignManager.tsx 24ms (unchanged)
+components/admin/PlanLimitsEditor.tsx 6ms (unchanged)
+components/AdminPage.tsx 48ms
+components/AuthPage.tsx 6ms (unchanged)
+components/CategorySelector.tsx 3ms (unchanged)
+components/CemeteryView.tsx 4ms (unchanged)
+components/CheckoutPage.tsx 5ms (unchanged)
+components/CollaborationPanel.tsx 10ms (unchanged)
+components/CollapsibleComingSoon.tsx 2ms (unchanged)
+components/CreateProjectModal.tsx 3ms (unchanged)
+components/Dashboard.tsx 12ms (unchanged)
+components/EngagementDashboard.tsx 7ms (unchanged)
+components/EnhancedDeleteDialog.tsx 3ms (unchanged)
+components/FeatureVoteAnalytics.tsx 6ms (unchanged)
+components/FeatureVoteModal.tsx 4ms (unchanged)
+components/FeedbackModal.tsx 4ms (unchanged)
+components/ImageWorkspace.tsx 13ms (unchanged)
+components/LandingPage.tsx 11ms (unchanged)
+components/LanguageSwitcher.tsx 1ms (unchanged)
+components/ManageVersionModal.tsx 4ms (unchanged)
+components/MentionInput.tsx 4ms (unchanged)
+components/MoodBoardWorkspace.tsx 8ms (unchanged)
+components/NotificationSettings.tsx 4ms (unchanged)
+components/OnboardingTooltip.tsx 4ms (unchanged)
+components/OnboardingWizard.tsx 7ms (unchanged)
+components/PDFWorkspace.tsx 14ms (unchanged)
+components/PricingPage.tsx 4ms (unchanged)
+components/ProjectSettingsModal.tsx 2ms (unchanged)
+components/ReferralDashboard.tsx 4ms (unchanged)
+components/ReferralLandingPage.tsx 3ms (unchanged)
+components/ReferralManagement.tsx 5ms (unchanged)
+components/ShareModal.tsx 9ms (unchanged)
+components/ThankYouPage.tsx 2ms (unchanged)
+components/ThumbnailPageSelector.tsx 2ms (unchanged)
+components/ui/Button.tsx 1ms (unchanged)
+components/ui/ConfirmDialog.tsx 2ms (unchanged)
+components/ui/Input.tsx 1ms (unchanged)
+components/ui/Toast.tsx 1ms (unchanged)
+components/VersionSelector.tsx 4ms (unchanged)
+components/VersionUploadModal.tsx 4ms (unchanged)
+components/WelcomeLandingPage.tsx 3ms (unchanged)
+constants.ts 2ms (unchanged)
+constants/onboardingSteps.ts 1ms (unchanged)
+contexts/AdminContext.tsx 1ms (unchanged)
+cors.json 1ms (unchanged)
+eslint.config.js 3ms (unchanged)
+FIREBASE_SETUP.md 5ms (unchanged)
+firebase.json 1ms (unchanged)
+firebaseConfig.ts 1ms (unchanged)
+firestore.indexes.json 1ms (unchanged)
+fix-category.js 3ms (unchanged)
+functions/fix-category-admin.js 3ms (unchanged)
+functions/lib/campaigns/api.js 12ms (unchanged)
+functions/lib/campaigns/emailFollowUp.js 4ms (unchanged)
+functions/lib/digest.js 2ms (unchanged)
+functions/lib/emailService.js 3ms (unchanged)
+functions/lib/engagement/analyticsDaily.js 5ms (unchanged)
+functions/lib/engagement/engagementScore.js 4ms (unchanged)
+functions/lib/feedback.js 9ms (unchanged)
+functions/lib/index.js 12ms (unchanged)
+functions/lib/notifications.js 2ms (unchanged)
+functions/lib/pdfProxy.js 1ms (unchanged)
+functions/lib/planLimits.js 2ms (unchanged)
+functions/lib/pricingService.js 1ms (unchanged)
+functions/lib/referralService.js 5ms (unchanged)
+functions/lib/scripts/feedbackSetup.js 1ms (unchanged)
+functions/lib/scripts/initCampaigns.js 1ms (unchanged)
+functions/lib/scripts/listAdmins.js 1ms (unchanged)
+functions/lib/scripts/listCampaigns.js 1ms (unchanged)
+functions/lib/stripeService.js 3ms (unchanged)
+functions/package-lock.json 15ms (unchanged)
+functions/package.json 0ms (unchanged)
+functions/src/campaigns/api.ts 12ms (unchanged)
+functions/src/campaigns/emailFollowUp.ts 4ms (unchanged)
+functions/src/digest.ts 3ms (unchanged)
+functions/src/emailService.ts 3ms (unchanged)
+functions/src/engagement/analyticsDaily.ts 8ms (unchanged)
+functions/src/engagement/engagementScore.ts 4ms (unchanged)
+functions/src/feedback.ts 11ms (unchanged)
+functions/src/index.ts 24ms (unchanged)
+functions/src/notifications.ts 4ms (unchanged)
+functions/src/pdfProxy.ts 2ms (unchanged)
+functions/src/planLimits.ts 3ms (unchanged)
+functions/src/pricingService.ts 1ms (unchanged)
+functions/src/referralService.ts 7ms (unchanged)
+functions/src/scripts/feedbackSetup.ts 2ms (unchanged)
+functions/src/scripts/initCampaigns.ts 1ms (unchanged)
+functions/src/scripts/listAdmins.ts 1ms (unchanged)
+functions/src/scripts/listCampaigns.ts 1ms (unchanged)
+functions/src/stripeService.ts 4ms (unchanged)
+functions/test-stripe-pricing.js 2ms (unchanged)
+functions/tsconfig.json 0ms (unchanged)
+hooks/useEngagement.ts 2ms (unchanged)
+hooks/useFeedback.ts 2ms (unchanged)
+hooks/useFeedbackCampaign.ts 3ms (unchanged)
+hooks/useOnboarding.ts 1ms (unchanged)
+i18n.ts 1ms (unchanged)
+index.html 18ms (unchanged)
+index.tsx 1ms (unchanged)
+metadata.json 0ms (unchanged)
+package-lock.json 13ms (unchanged)
+package.json 0ms
+public/locales/en/translation.json 1ms (unchanged)
+public/locales/fr/translation.json 1ms (unchanged)
+README.md 2ms (unchanged)
+services/analyticsAggregationService.ts 6ms (unchanged)
+services/analyticsService.ts 2ms (unchanged)
+services/authService.ts 4ms (unchanged)
+services/campaignService.ts 4ms (unchanged)
+services/featureVoteService.ts 3ms (unchanged)
+services/feedbackService.ts 1ms (unchanged)
+services/geminiService.ts 2ms (unchanged)
+services/paymentService.ts 1ms (unchanged)
+services/pricingService.ts 2ms (unchanged)
+services/referralService.ts 3ms (unchanged)
+services/storageService.ts 10ms (unchanged)
+src/App.css 2ms (unchanged)
+src/App.jsx 2ms (unchanged)
+src/index.css 1ms (unchanged)
+src/main.jsx 1ms (unchanged)
+tsconfig.json 0ms (unchanged)
+types.ts 3ms (unchanged)
+types/campaign.ts 2ms (unchanged)
+update-profile.js 1ms (unchanged)
+update-profile.mjs 1ms (unchanged)
+utils/categoryHelpers.ts 2ms (unchanged)
+utils/pdfUtils.ts 2ms (unchanged)
+utils/planHelpers.ts 1ms (unchanged)
+utils/projectRoleHelper.ts 1ms (unchanged)
+utils/sampleProject.ts 2ms (unchanged)
+vite.config.js 0ms (unchanged)
+vite.config.ts 1ms (unchanged)
+
+> designsync-ai@0.0.0 lint
+> eslint .
+
+
+/Users/sylvain/Dev/DSNG/my-dsng-app/App.tsx
+   287:61  error    Unexpected any. Specify a different type                                                               @typescript-eslint/no-explicit-any
+  2309:19  warning  Unused eslint-disable directive (no problems were reported from '@typescript-eslint/no-explicit-any')
+
+/Users/sylvain/Dev/DSNG/my-dsng-app/components/AdminPage.tsx
+   34:3   error  'ChevronDown' is defined but never used            @typescript-eslint/no-unused-vars
+   44:10  error  'listFeedbackCampaigns' is defined but never used  @typescript-eslint/no-unused-vars
+   70:55  error  Unexpected any. Specify a different type           @typescript-eslint/no-explicit-any
+   84:10  error  'analytics' is assigned a value but never used     @typescript-eslint/no-unused-vars
+  170:52  error  Unexpected any. Specify a different type           @typescript-eslint/no-explicit-any
+  237:45  error  Unexpected any. Specify a different type           @typescript-eslint/no-explicit-any
+  301:16  error  'e' is defined but never used                      @typescript-eslint/no-unused-vars
+  343:16  error  'e' is defined but never used                      @typescript-eslint/no-unused-vars
+  448:36  error  'u' is defined but never used                      @typescript-eslint/no-unused-vars
+  518:40  error  Unexpected any. Specify a different type           @typescript-eslint/no-explicit-any
+  528:21  error  Unexpected any. Specify a different type           @typescript-eslint/no-explicit-any
+  572:21  error  Unexpected any. Specify a different type           @typescript-eslint/no-explicit-any
+  588:32  error  Unexpected any. Specify a different type           @typescript-eslint/no-explicit-any
+  589:53  error  Unexpected any. Specify a different type           @typescript-eslint/no-explicit-any
+  607:54  error  Unexpected any. Specify a different type           @typescript-eslint/no-explicit-any
+  612:21  error  Unexpected any. Specify a different type           @typescript-eslint/no-explicit-any
+  613:34  error  Unexpected any. Specify a different type           @typescript-eslint/no-explicit-any
+  616:21  error  Unexpected any. Specify a different type           @typescript-eslint/no-explicit-any
+  617:34  error  Unexpected any. Specify a different type           @typescript-eslint/no-explicit-any
+  620:13  error  Unexpected any. Specify a different type           @typescript-eslint/no-explicit-any
+  624:67  error  Unexpected any. Specify a different type           @typescript-eslint/no-explicit-any
+  728:9   error  'maxSparkDau' is assigned a value but never used   @typescript-eslint/no-unused-vars
+
+/Users/sylvain/Dev/DSNG/my-dsng-app/components/AuthPage.tsx
+  5:10  error  'Layout' is defined but never used  @typescript-eslint/no-unused-vars
+  5:29  error  'Shield' is defined but never used  @typescript-eslint/no-unused-vars
+
+/Users/sylvain/Dev/DSNG/my-dsng-app/components/CategorySelector.tsx
+  3:10  error  'Input' is defined but never used  @typescript-eslint/no-unused-vars
+
+/Users/sylvain/Dev/DSNG/my-dsng-app/components/CemeteryView.tsx
+  28:5  error    Error: Cannot access variable before it is declared
+
+`loadDeletedProjects` is accessed before it is declared, which prevents the earlier access from updating when this value changes over time.
+
+/Users/sylvain/Dev/DSNG/my-dsng-app/components/CemeteryView.tsx:28:5
+  26 |
+  27 |   useEffect(() => {
+> 28 |     loadDeletedProjects();
+     |     ^^^^^^^^^^^^^^^^^^^ `loadDeletedProjects` accessed before it is declared
+  29 |   }, [currentUser]);
+  30 |
+  31 |   const loadDeletedProjects = async () => {
+
+/Users/sylvain/Dev/DSNG/my-dsng-app/components/CemeteryView.tsx:31:3
+  29 |   }, [currentUser]);
+  30 |
+> 31 |   const loadDeletedProjects = async () => {
+     |   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+> 32 |     setLoading(true);
+     | ^^^^^^^^^^^^^^^^^^^^^
+> 33 |     const projects = await storageService.getDeletedProjects(currentUser);
+     | ^^^^^^^^^^^^^^^^^^^^^
+> 34 |     setDeletedProjects(projects);
+     | ^^^^^^^^^^^^^^^^^^^^^
+> 35 |     setLoading(false);
+     | ^^^^^^^^^^^^^^^^^^^^^
+> 36 |   };
+     | ^^^^^ `loadDeletedProjects` is declared here
+  37 |
+  38 |   const handleRestore = async (project: Project) => {
+  39 |     const success = await storageService.restoreProject(project.id);  react-hooks/immutability
+  29:6  warning  React Hook useEffect has a missing dependency: 'loadDeletedProjects'. Either include it or remove the dependency array                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                         react-hooks/exhaustive-deps
+  62:8  error    Error: Cannot call impure function during render
+
+`Date.now` is an impure function. Calling an impure function can produce unstable results that update unpredictably when the component happens to re-render. (https://react.dev/reference/rules/components-and-hooks-must-be-pure#components-and-hooks-must-be-idempotent).
+
+/Users/sylvain/Dev/DSNG/my-dsng-app/components/CemeteryView.tsx:62:8
+  60 |   const getDaysUntilPermanentDelete = (deletedAt: number) => {
+  61 |     const daysSinceDelete = Math.floor(
+> 62 |       (Date.now() - deletedAt) / (1000 * 60 * 60 * 24),
+     |        ^^^^^^^^^^ Cannot call impure function
+  63 |     );
+  64 |     return Math.max(0, 30 - daysSinceDelete);
+  65 |   };                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                    react-hooks/purity
+
+/Users/sylvain/Dev/DSNG/my-dsng-app/components/CheckoutPage.tsx
+   5:35  error  'Loader2' is defined but never used   @typescript-eslint/no-unused-vars
+  15:3   error  'userRole' is defined but never used  @typescript-eslint/no-unused-vars
+
+/Users/sylvain/Dev/DSNG/my-dsng-app/components/CollaborationPanel.tsx
+    3:10  error  'Button' is defined but never used           @typescript-eslint/no-unused-vars
+   11:3   error  'ThumbsUp' is defined but never used         @typescript-eslint/no-unused-vars
+   17:13  error  'geminiService' is defined but never used    @typescript-eslint/no-unused-vars
+  279:44  error  'index' is defined but never used            @typescript-eslint/no-unused-vars
+  362:3   error  'currentUserRole' is defined but never used  @typescript-eslint/no-unused-vars
+  364:3   error  'currentUser' is defined but never used      @typescript-eslint/no-unused-vars
+
+/Users/sylvain/Dev/DSNG/my-dsng-app/components/CreateProjectModal.tsx
+  36:6  warning  React Hook useEffect has a missing dependency: 'clientName'. Either include it or remove the dependency array  react-hooks/exhaustive-deps
+
+/Users/sylvain/Dev/DSNG/my-dsng-app/components/Dashboard.tsx
+   13:3   error  'Upload' is defined but never used                    @typescript-eslint/no-unused-vars
+   18:3   error  'Play' is defined but never used                      @typescript-eslint/no-unused-vars
+   24:10  error  'BarChart3' is defined but never used                 @typescript-eslint/no-unused-vars
+   52:11  error  Unexpected any. Specify a different type              @typescript-eslint/no-explicit-any
+   68:3   error  'onRelaunchOnboarding' is defined but never used      @typescript-eslint/no-unused-vars
+   85:9   error  'fileInputRef' is assigned a value but never used     @typescript-eslint/no-unused-vars
+   87:11  error  'toggleAdminMode' is assigned a value but never used  @typescript-eslint/no-unused-vars
+  104:9   error  'activityPoints' is assigned a value but never used   @typescript-eslint/no-unused-vars
+  118:22  error  Unexpected any. Specify a different type              @typescript-eslint/no-explicit-any
+  656:37  error  Unexpected any. Specify a different type              @typescript-eslint/no-explicit-any
+
+/Users/sylvain/Dev/DSNG/my-dsng-app/components/EngagementDashboard.tsx
+   3:3  error    'BarChart' is defined but never used                                                                          @typescript-eslint/no-unused-vars
+   4:3  error    'Bar' is defined but never used                                                                               @typescript-eslint/no-unused-vars
+  15:3  error    'ComposedChart' is defined but never used                                                                     @typescript-eslint/no-unused-vars
+  19:3  error    'ArrowDown' is defined but never used                                                                         @typescript-eslint/no-unused-vars
+  20:3  error    'Users' is defined but never used                                                                             @typescript-eslint/no-unused-vars
+  22:3  error    'Zap' is defined but never used                                                                               @typescript-eslint/no-unused-vars
+  23:3  error    'Layers' is defined but never used                                                                            @typescript-eslint/no-unused-vars
+  24:3  error    'Filter' is defined but never used                                                                            @typescript-eslint/no-unused-vars
+  56:6  warning  React Hook useEffect has a missing dependency: 'fetchData'. Either include it or remove the dependency array  react-hooks/exhaustive-deps
+
+/Users/sylvain/Dev/DSNG/my-dsng-app/components/FeedbackModal.tsx
+  17:40  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+
+/Users/sylvain/Dev/DSNG/my-dsng-app/components/LandingPage.tsx
+   3:16  error  'UserRole' is defined but never used      @typescript-eslint/no-unused-vars
+   7:3   error  'Layout' is defined but never used        @typescript-eslint/no-unused-vars
+  23:18  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+
+/Users/sylvain/Dev/DSNG/my-dsng-app/components/ManageVersionModal.tsx
+   5:3  error  'Trash2' is defined but never used                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                          @typescript-eslint/no-unused-vars
+  44:7  error  Error: Calling setState synchronously within an effect can trigger cascading renders
+
+Effects are intended to synchronize state between React and external systems such as manually updating the DOM, state management libraries, or other platform APIs. In general, the body of an effect should do one or both of the following:
+* Update external systems with the latest state from React.
+* Subscribe for updates from some external system, calling setState in a callback function when external state changes.
+
+Calling setState synchronously within an effect body causes cascading renders that can hurt performance, and is not recommended. (https://react.dev/learn/you-might-not-need-an-effect).
+
+/Users/sylvain/Dev/DSNG/my-dsng-app/components/ManageVersionModal.tsx:44:7
+  42 |   useEffect(() => {
+  43 |     if (isOpen) {
+> 44 |       setName(currentName);
+     |       ^^^^^^^ Avoid calling setState() directly within an effect
+  45 |       setSelectedCategory(currentCategory);
+  46 |       setIsNewCategory(false);
+  47 |       setNewCategoryName("");  react-hooks/set-state-in-effect
+
+/Users/sylvain/Dev/DSNG/my-dsng-app/components/MentionInput.tsx
+  2:10  error  'User' is defined but never used      @typescript-eslint/no-unused-vars
+  2:16  error  'UserRole' is defined but never used  @typescript-eslint/no-unused-vars
+
+/Users/sylvain/Dev/DSNG/my-dsng-app/components/NotificationSettings.tsx
+   3:23  error    'Calendar' is defined but never used                                                                                                                                                                                             @typescript-eslint/no-unused-vars
+  31:6   warning  React Hook useEffect has a missing dependency: 'onChange'. Either include it or remove the dependency array. If 'onChange' changes too often, find the parent component that defines it and wrap that definition in useCallback  react-hooks/exhaustive-deps
+
+/Users/sylvain/Dev/DSNG/my-dsng-app/components/OnboardingTooltip.tsx
+  36:7  error  Error: Calling setState synchronously within an effect can trigger cascading renders
+
+Effects are intended to synchronize state between React and external systems such as manually updating the DOM, state management libraries, or other platform APIs. In general, the body of an effect should do one or both of the following:
+* Update external systems with the latest state from React.
+* Subscribe for updates from some external system, calling setState in a callback function when external state changes.
+
+Calling setState synchronously within an effect body causes cascading renders that can hurt performance, and is not recommended. (https://react.dev/learn/you-might-not-need-an-effect).
+
+/Users/sylvain/Dev/DSNG/my-dsng-app/components/OnboardingTooltip.tsx:36:7
+  34 |     if (targetElement) {
+  35 |       const rect = targetElement.getBoundingClientRect();
+> 36 |       setTargetRect(rect);
+     |       ^^^^^^^^^^^^^ Avoid calling setState() directly within an effect
+  37 |
+  38 |       // Scroll element into view if needed
+  39 |       targetElement.scrollIntoView({ behavior: "smooth", block: "center" });  react-hooks/set-state-in-effect
+
+/Users/sylvain/Dev/DSNG/my-dsng-app/components/OnboardingWizard.tsx
+  16:3  error  'ChevronRight' is defined but never used  @typescript-eslint/no-unused-vars
+
+/Users/sylvain/Dev/DSNG/my-dsng-app/components/PDFWorkspace.tsx
+  309:9   error  'handleLeave' is assigned a value but never used  @typescript-eslint/no-unused-vars
+  406:15  error  Unexpected any. Specify a different type          @typescript-eslint/no-explicit-any
+  406:23  error  Unexpected any. Specify a different type          @typescript-eslint/no-explicit-any
+
+/Users/sylvain/Dev/DSNG/my-dsng-app/components/PricingPage.tsx
+   7:18  error  Unexpected any. Specify a different type                                                                                                                                                                                                                                                                                                                                                                                                                                                                                      @typescript-eslint/no-explicit-any
+  28:7   error  Error: This value cannot be modified
+
+Modifying a variable defined outside a component or hook is not allowed. Consider using an effect.
+
+/Users/sylvain/Dev/DSNG/my-dsng-app/components/PricingPage.tsx:28:7
+  26 |     const url = await createCheckoutSession(priceId);
+  27 |     if (url) {
+> 28 |       window.location.href = url;
+     |       ^^^^^^^^^^^^^^^ value cannot be modified
+  29 |     } else {
+  30 |       alert("Failed to start checkout. Please try again.");
+  31 |       setLoadingPriceId(null);  react-hooks/immutability
+
+/Users/sylvain/Dev/DSNG/my-dsng-app/components/ProjectSettingsModal.tsx
+  38:7  error  Error: Calling setState synchronously within an effect can trigger cascading renders
+
+Effects are intended to synchronize state between React and external systems such as manually updating the DOM, state management libraries, or other platform APIs. In general, the body of an effect should do one or both of the following:
+* Update external systems with the latest state from React.
+* Subscribe for updates from some external system, calling setState in a callback function when external state changes.
+
+Calling setState synchronously within an effect body causes cascading renders that can hurt performance, and is not recommended. (https://react.dev/learn/you-might-not-need-an-effect).
+
+/Users/sylvain/Dev/DSNG/my-dsng-app/components/ProjectSettingsModal.tsx:38:7
+  36 |   useEffect(() => {
+  37 |     if (project) {
+> 38 |       setName(project.name || "");
+     |       ^^^^^^^ Avoid calling setState() directly within an effect
+  39 |       setDescription(project.description || "");
+  40 |     }
+  41 |   }, [project]);  react-hooks/set-state-in-effect
+
+/Users/sylvain/Dev/DSNG/my-dsng-app/components/ReferralDashboard.tsx
+   14:54  error  'currentUser' is defined but never used   @typescript-eslint/no-unused-vars
+   16:38  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  268:69  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+
+/Users/sylvain/Dev/DSNG/my-dsng-app/components/ReferralManagement.tsx
+   10:3   error  'Trash2' is defined but never used        @typescript-eslint/no-unused-vars
+  104:21  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+
+/Users/sylvain/Dev/DSNG/my-dsng-app/components/ShareModal.tsx
+   17:10  error    'format' is defined but never used                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                 @typescript-eslint/no-unused-vars
+   49:28  error    'setFromNameOverride' is assigned a value but never used                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                           @typescript-eslint/no-unused-vars
+   77:9   error    Error: Calling setState synchronously within an effect can trigger cascading renders
+
+Effects are intended to synchronize state between React and external systems such as manually updating the DOM, state management libraries, or other platform APIs. In general, the body of an effect should do one or both of the following:
+* Update external systems with the latest state from React.
+* Subscribe for updates from some external system, calling setState in a callback function when external state changes.
+
+Calling setState synchronously within an effect body causes cascading renders that can hurt performance, and is not recommended. (https://react.dev/learn/you-might-not-need-an-effect).
+
+/Users/sylvain/Dev/DSNG/my-dsng-app/components/ShareModal.tsx:77:9
+  75 |     if (project) {
+  76 |       if (project.shareSettings) {
+> 77 |         setShareEnabled(project.shareSettings.enabled);
+     |         ^^^^^^^^^^^^^^^ Avoid calling setState() directly within an effect
+  78 |         setAccessLevel(project.shareSettings.accessLevel);
+  79 |         setShareToken(project.shareSettings.shareToken);
+  80 |       } else {                                                                                                                                                                                                                                 react-hooks/set-state-in-effect
+  111:6   warning  React Hook useEffect has missing dependencies: 'collaboratorDetails' and 'project'. Either include them or remove the dependency array                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                             react-hooks/exhaustive-deps
+  113:39  error    Compilation Skipped: Existing memoization could not be preserved
+
+React Compiler has skipped optimizing this component because the existing manual memoization could not be preserved. The inferred dependencies did not match the manually specified dependencies, which could cause the value to change more or less frequently than expected. The inferred dependency was `project.ownerEmail`, but the source dependencies were [fromNameOverride, currentUser?.name, project?.ownerEmail]. Inferred different dependency than source.
+
+/Users/sylvain/Dev/DSNG/my-dsng-app/components/ShareModal.tsx:113:39
+  111 |   }, [project?.collaborators, isOpen]);
+  112 |
+> 113 |   const fallbackDisplayName = useMemo(() => {
+      |                                       ^^^^^^^
+> 114 |     const candidate = fromNameOverride || currentUser?.name || "";
+      | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+> 115 |     const isEmail = candidate.includes("@");
+      …
+      | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+> 126 |     return candidate;
+      | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+> 127 |   }, [fromNameOverride, currentUser?.name, project?.ownerEmail]);
+      | ^^^^ Could not preserve existing manual memoization
+  128 |
+  129 |   if (!isOpen || !project) return null;
+  130 |  react-hooks/preserve-manual-memoization
+  465:25  error    'isOwner' is assigned a value but never used                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                       @typescript-eslint/no-unused-vars
+
+/Users/sylvain/Dev/DSNG/my-dsng-app/components/VersionSelector.tsx
+  29:17  error  'unresolvedCount' is assigned a value but never used  @typescript-eslint/no-unused-vars
+
+/Users/sylvain/Dev/DSNG/my-dsng-app/components/WelcomeLandingPage.tsx
+   4:3  error  'Check' is defined but never used       @typescript-eslint/no-unused-vars
+   6:3  error  'Users' is defined but never used       @typescript-eslint/no-unused-vars
+   7:3  error  'Zap' is defined but never used         @typescript-eslint/no-unused-vars
+  29:3  error  'inviteRole' is defined but never used  @typescript-eslint/no-unused-vars
+
+/Users/sylvain/Dev/DSNG/my-dsng-app/components/admin/CampaignDocumentation.tsx
+  29:35  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+
+/Users/sylvain/Dev/DSNG/my-dsng-app/components/admin/CampaignManager.tsx
+    3:3   error  'MessageSquare' is defined but never used                   @typescript-eslint/no-unused-vars
+    5:3   error  'Settings' is defined but never used                        @typescript-eslint/no-unused-vars
+    8:3   error  'Trash2' is defined but never used                          @typescript-eslint/no-unused-vars
+   12:3   error  'MoreHorizontal' is defined but never used                  @typescript-eslint/no-unused-vars
+   13:3   error  'Edit' is defined but never used                            @typescript-eslint/no-unused-vars
+   14:3   error  'Save' is defined but never used                            @typescript-eslint/no-unused-vars
+   31:36  error  Unexpected any. Specify a different type                    @typescript-eslint/no-explicit-any
+   70:48  error  Unexpected any. Specify a different type                    @typescript-eslint/no-explicit-any
+   72:19  error  Unexpected any. Specify a different type                    @typescript-eslint/no-explicit-any
+   96:10  error  'showAnalytics' is assigned a value but never used          @typescript-eslint/no-unused-vars
+   96:25  error  'setShowAnalytics' is assigned a value but never used       @typescript-eslint/no-unused-vars
+   97:10  error  'analyticsData' is assigned a value but never used          @typescript-eslint/no-unused-vars
+  113:10  error  'segmentLoading' is assigned a value but never used         @typescript-eslint/no-unused-vars
+  116:10  error  'segmentUsers' is assigned a value but never used           @typescript-eslint/no-unused-vars
+  131:9   error  'loadCampaignAnalytics' is assigned a value but never used  @typescript-eslint/no-unused-vars
+  153:28  error  Unexpected any. Specify a different type                    @typescript-eslint/no-explicit-any
+  225:15  error  Unexpected any. Specify a different type                    @typescript-eslint/no-explicit-any
+  229:15  error  Unexpected any. Specify a different type                    @typescript-eslint/no-explicit-any
+  232:15  error  Unexpected any. Specify a different type                    @typescript-eslint/no-explicit-any
+  256:9   error  'fetchSegmentUsers' is assigned a value but never used      @typescript-eslint/no-unused-vars
+  261:32  error  Unexpected any. Specify a different type                    @typescript-eslint/no-explicit-any
+  283:42  error  Unexpected any. Specify a different type                    @typescript-eslint/no-explicit-any
+  487:43  error  Unexpected any. Specify a different type                    @typescript-eslint/no-explicit-any
+  488:44  error  Unexpected any. Specify a different type                    @typescript-eslint/no-explicit-any
+  592:39  error  Unexpected any. Specify a different type                    @typescript-eslint/no-explicit-any
+
+/Users/sylvain/Dev/DSNG/my-dsng-app/components/admin/PlanLimitsEditor.tsx
+  47:21  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  69:21  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  98:21  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+
+/Users/sylvain/Dev/DSNG/my-dsng-app/contexts/AdminContext.tsx
+  37:14  warning  Fast refresh only works when a file only exports components. Use a new file to share constants or functions between components  react-refresh/only-export-components
+
+/Users/sylvain/Dev/DSNG/my-dsng-app/functions/lib/feedback.js
+  66:40  warning  Unused eslint-disable directive (no problems were reported from 'eqeqeq')
+
+/Users/sylvain/Dev/DSNG/my-dsng-app/functions/src/campaigns/api.ts
+   65:19  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  120:19  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  177:19  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  220:21  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  298:51  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  365:19  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  440:21  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  481:21  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  504:21  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  529:19  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  567:44  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  598:15  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+
+/Users/sylvain/Dev/DSNG/my-dsng-app/functions/src/campaigns/emailFollowUp.ts
+   23:26  error  'context' is defined but never used       @typescript-eslint/no-unused-vars
+   93:17  error  'context' is defined but never used       @typescript-eslint/no-unused-vars
+  163:44  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+
+/Users/sylvain/Dev/DSNG/my-dsng-app/functions/src/digest.ts
+   32:39  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+   85:18  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  127:14  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+
+/Users/sylvain/Dev/DSNG/my-dsng-app/functions/src/emailService.ts
+   14:16  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  118:16  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  142:21  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  229:14  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  255:19  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  349:14  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  373:19  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+
+/Users/sylvain/Dev/DSNG/my-dsng-app/functions/src/engagement/analyticsDaily.ts
+    9:19  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  271:21  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  302:32  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  311:23  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+
+/Users/sylvain/Dev/DSNG/my-dsng-app/functions/src/engagement/engagementScore.ts
+  135:21  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  173:37  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  233:21  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+
+/Users/sylvain/Dev/DSNG/my-dsng-app/functions/src/feedback.ts
+   11:10  error    Unexpected any. Specify a different type                                   @typescript-eslint/no-explicit-any
+   67:40  warning  Unused eslint-disable directive (no problems were reported from 'eqeqeq')
+   80:30  error    Unexpected any. Specify a different type                                   @typescript-eslint/no-explicit-any
+  110:36  error    Unexpected any. Specify a different type                                   @typescript-eslint/no-explicit-any
+  172:32  error    Unexpected any. Specify a different type                                   @typescript-eslint/no-explicit-any
+  269:74  error    Unexpected any. Specify a different type                                   @typescript-eslint/no-explicit-any
+  291:20  error    Unexpected any. Specify a different type                                   @typescript-eslint/no-explicit-any
+  351:19  error    Unexpected any. Specify a different type                                   @typescript-eslint/no-explicit-any
+  389:26  error    Unexpected any. Specify a different type                                   @typescript-eslint/no-explicit-any
+  392:26  error    Unexpected any. Specify a different type                                   @typescript-eslint/no-explicit-any
+  501:40  error    Unexpected any. Specify a different type                                   @typescript-eslint/no-explicit-any
+
+/Users/sylvain/Dev/DSNG/my-dsng-app/functions/src/index.ts
+   40:19  error  Unexpected any. Specify a different type      @typescript-eslint/no-explicit-any
+   82:21  error  Unexpected any. Specify a different type      @typescript-eslint/no-explicit-any
+  123:21  error  Unexpected any. Specify a different type      @typescript-eslint/no-explicit-any
+  132:24  error  'data' is defined but never used              @typescript-eslint/no-unused-vars
+  132:30  error  'context' is defined but never used           @typescript-eslint/no-unused-vars
+  136:21  error  Unexpected any. Specify a different type      @typescript-eslint/no-explicit-any
+  159:21  error  Unexpected any. Specify a different type      @typescript-eslint/no-explicit-any
+  195:21  error  Unexpected any. Specify a different type      @typescript-eslint/no-explicit-any
+  226:21  error  Unexpected any. Specify a different type      @typescript-eslint/no-explicit-any
+  261:19  error  Unexpected any. Specify a different type      @typescript-eslint/no-explicit-any
+  315:21  error  Unexpected any. Specify a different type      @typescript-eslint/no-explicit-any
+  381:21  error  Unexpected any. Specify a different type      @typescript-eslint/no-explicit-any
+  394:24  error  'data' is defined but never used              @typescript-eslint/no-unused-vars
+  394:30  error  'context' is defined but never used           @typescript-eslint/no-unused-vars
+  405:21  error  Unexpected any. Specify a different type      @typescript-eslint/no-explicit-any
+  416:30  error  'context' is defined but never used           @typescript-eslint/no-unused-vars
+  428:21  error  Unexpected any. Specify a different type      @typescript-eslint/no-explicit-any
+  452:17  error  Unexpected any. Specify a different type      @typescript-eslint/no-explicit-any
+  461:7   error  Unexpected lexical declaration in case block  no-case-declarations
+  488:7   error  Unexpected lexical declaration in case block  no-case-declarations
+  556:36  error  Unexpected any. Specify a different type      @typescript-eslint/no-explicit-any
+  585:17  error  'context' is defined but never used           @typescript-eslint/no-unused-vars
+  596:17  error  'context' is defined but never used           @typescript-eslint/no-unused-vars
+  640:21  error  Unexpected any. Specify a different type      @typescript-eslint/no-explicit-any
+  703:13  error  Unexpected any. Specify a different type      @typescript-eslint/no-explicit-any
+  703:21  error  Unexpected any. Specify a different type      @typescript-eslint/no-explicit-any
+  709:13  error  Unexpected any. Specify a different type      @typescript-eslint/no-explicit-any
+  714:60  error  Unexpected any. Specify a different type      @typescript-eslint/no-explicit-any
+  742:21  error  Unexpected any. Specify a different type      @typescript-eslint/no-explicit-any
+  783:11  error  Unexpected any. Specify a different type      @typescript-eslint/no-explicit-any
+  783:19  error  Unexpected any. Specify a different type      @typescript-eslint/no-explicit-any
+  799:11  error  Unexpected any. Specify a different type      @typescript-eslint/no-explicit-any
+  804:58  error  Unexpected any. Specify a different type      @typescript-eslint/no-explicit-any
+  832:19  error  Unexpected any. Specify a different type      @typescript-eslint/no-explicit-any
+
+/Users/sylvain/Dev/DSNG/my-dsng-app/functions/src/notifications.ts
+  30:11  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  31:10  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+
+/Users/sylvain/Dev/DSNG/my-dsng-app/functions/src/planLimits.ts
+   39:60  error  'data' is defined but never used          @typescript-eslint/no-unused-vars
+   39:66  error  'context' is defined but never used       @typescript-eslint/no-unused-vars
+   44:19  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+   54:19  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  125:21  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  175:21  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+
+/Users/sylvain/Dev/DSNG/my-dsng-app/functions/src/pricingService.ts
+  64:19  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+
+/Users/sylvain/Dev/DSNG/my-dsng-app/functions/src/stripeService.ts
+  40:14  error  'error' is defined but never used  @typescript-eslint/no-unused-vars
+
+/Users/sylvain/Dev/DSNG/my-dsng-app/hooks/useEngagement.ts
+    2:32  error    'FeedbackAnswer' is defined but never used                                                                      @typescript-eslint/no-unused-vars
+   18:20  error    Unexpected any. Specify a different type                                                                        @typescript-eslint/no-explicit-any
+  127:6   warning  React Hook useEffect has a missing dependency: 'fetchActive'. Either include it or remove the dependency array  react-hooks/exhaustive-deps
+  143:33  error    Unexpected any. Specify a different type                                                                        @typescript-eslint/no-explicit-any
+  149:22  error    Unexpected any. Specify a different type                                                                        @typescript-eslint/no-explicit-any
+
+/Users/sylvain/Dev/DSNG/my-dsng-app/hooks/useFeedback.ts
+  16:20  error    Unexpected any. Specify a different type                                                                        @typescript-eslint/no-explicit-any
+  79:6   warning  React Hook useEffect has a missing dependency: 'fetchActive'. Either include it or remove the dependency array  react-hooks/exhaustive-deps
+  89:33  error    Unexpected any. Specify a different type                                                                        @typescript-eslint/no-explicit-any
+  93:22  error    Unexpected any. Specify a different type                                                                        @typescript-eslint/no-explicit-any
+
+/Users/sylvain/Dev/DSNG/my-dsng-app/hooks/useFeedbackCampaign.ts
+   4:3  error    'FeedbackCampaign' is defined but never used                                                                            @typescript-eslint/no-unused-vars
+  41:6  warning  React Hook useEffect has a missing dependency: 'fetchActiveCampaign'. Either include it or remove the dependency array  react-hooks/exhaustive-deps
+
+/Users/sylvain/Dev/DSNG/my-dsng-app/services/analyticsAggregationService.ts
+    9:3   error  'Timestamp' is defined but never used                                      @typescript-eslint/no-unused-vars
+   10:3   error  'writeBatch' is defined but never used                                     @typescript-eslint/no-unused-vars
+   86:17  error  Do not access Object.prototype method 'hasOwnProperty' from target object  no-prototype-builtins
+  270:9   error  'endDate' is assigned a value but never used                               @typescript-eslint/no-unused-vars
+
+/Users/sylvain/Dev/DSNG/my-dsng-app/services/analyticsService.ts
+  12:10  error  'updateUserEngagementScore' is defined but never used  @typescript-eslint/no-unused-vars
+  18:14  error  Unexpected any. Specify a different type               @typescript-eslint/no-explicit-any
+  20:15  error  Unexpected any. Specify a different type               @typescript-eslint/no-explicit-any
+  44:13  error  Unexpected any. Specify a different type               @typescript-eslint/no-explicit-any
+
+/Users/sylvain/Dev/DSNG/my-dsng-app/services/authService.ts
+    8:11  error  'FirebaseUser' is defined but never used  @typescript-eslint/no-unused-vars
+   57:19  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  135:19  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  154:19  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+
+/Users/sylvain/Dev/DSNG/my-dsng-app/services/campaignService.ts
+    7:3   error  'getDoc' is defined but never used               @typescript-eslint/no-unused-vars
+   18:3   error  'CampaignAttribution' is defined but never used  @typescript-eslint/no-unused-vars
+   20:3   error  'CampaignAnalytics' is defined but never used    @typescript-eslint/no-unused-vars
+  188:14  error  Unexpected any. Specify a different type         @typescript-eslint/no-explicit-any
+  215:27  error  Unexpected any. Specify a different type         @typescript-eslint/no-explicit-any
+
+/Users/sylvain/Dev/DSNG/my-dsng-app/services/feedbackService.ts
+  12:34  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  22:11  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  35:55  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  41:67  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  56:33  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+
+/Users/sylvain/Dev/DSNG/my-dsng-app/services/pricingService.ts
+  53:17  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  56:24  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+
+/Users/sylvain/Dev/DSNG/my-dsng-app/services/referralService.ts
+   38:19  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+   78:19  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  139:19  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+
+/Users/sylvain/Dev/DSNG/my-dsng-app/types/campaign.ts
+   51:14  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+   62:12  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  110:11  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+
+/Users/sylvain/Dev/DSNG/my-dsng-app/utils/categoryHelpers.ts
+  95:27  error  'index' is defined but never used  @typescript-eslint/no-unused-vars
+
+✖ 252 problems (240 errors, 12 warnings)
+  0 errors and 3 warnings potentially fixable with the `--fix` option.
+

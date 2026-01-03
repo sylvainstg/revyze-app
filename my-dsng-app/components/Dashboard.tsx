@@ -1,15 +1,39 @@
-import React, { useState, useRef, Suspense } from 'react';
-import { Project, User, UserRole } from '../types';
-import { Button } from './ui/Button';
-import { Plus, Search, FileText, Clock, FolderOpen, LogOut, Share2, Users, Upload, MessageSquare, Settings, Shield, Gift, Play, Trash2 } from 'lucide-react';
-import { PLANS } from '../constants';
-import { getProjectRole, canSeeComment } from '../utils/projectRoleHelper';
-import { getSubscriptionStatusDisplay } from '../utils/planHelpers';
-import { BarChart3 } from 'lucide-react';
-import { useAdmin } from '../contexts/AdminContext';
+import React, { useState, useRef, Suspense } from "react";
+import { Project, User, UserRole } from "../types";
+import { Button } from "./ui/Button";
+import {
+  Plus,
+  Search,
+  FileText,
+  Clock,
+  FolderOpen,
+  LogOut,
+  Share2,
+  Users,
+  Upload,
+  MessageSquare,
+  Settings,
+  Shield,
+  Gift,
+  Play,
+  Trash2,
+} from "lucide-react";
+import { PLANS } from "../constants";
+import { getProjectRole, canSeeComment } from "../utils/projectRoleHelper";
+import { getSubscriptionStatusDisplay } from "../utils/planHelpers";
+import { BarChart3 } from "lucide-react";
+import { useAdmin } from "../contexts/AdminContext";
 
-const ReferralDashboardLazy = React.lazy(() => import('./ReferralDashboard').then(module => ({ default: module.ReferralDashboard })));
-const NotificationSettingsLazy = React.lazy(() => import('./NotificationSettings').then(module => ({ default: module.NotificationSettings })));
+const ReferralDashboardLazy = React.lazy(() =>
+  import("./ReferralDashboard").then((module) => ({
+    default: module.ReferralDashboard,
+  })),
+);
+const NotificationSettingsLazy = React.lazy(() =>
+  import("./NotificationSettings").then((module) => ({
+    default: module.NotificationSettings,
+  })),
+);
 
 interface DashboardProps {
   user: User;
@@ -42,40 +66,46 @@ export const Dashboard: React.FC<DashboardProps> = ({
   onOpenAdmin,
   onOpenCemetery,
   onRelaunchOnboarding,
-  limits
+  limits,
 }) => {
-  const [search, setSearch] = useState('');
+  const [search, setSearch] = useState("");
   const [isEditProfileOpen, setIsEditProfileOpen] = useState(false);
   const [isProfileMenuOpen, setIsProfileMenuOpen] = useState(false);
   const [editName, setEditName] = useState(user.name);
   const [isSavingProfile, setIsSavingProfile] = useState(false);
   const [showReferralDashboard, setShowReferralDashboard] = useState(false);
-  const [activeStatsTab, setActiveStatsTab] = useState<'profile' | 'notifications'>('profile');
-  const notificationUpdateRef = useRef<{ prefs: User['notificationPreferences'], digest: User['digestSettings'] } | null>(null);
+  const [activeStatsTab, setActiveStatsTab] = useState<
+    "profile" | "notifications"
+  >("profile");
+  const notificationUpdateRef = useRef<{
+    prefs: User["notificationPreferences"];
+    digest: User["digestSettings"];
+  } | null>(null);
 
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const { toggleAdminMode, impersonatedRole } = useAdmin();
 
   // Use passed limits or fallback to constants
-  const currentPlan = PLANS[user.plan || 'free'];
-  const planLimits = limits?.[user.plan || 'free'] || currentPlan.limits;
+  const currentPlan = PLANS[user.plan || "free"];
+  const planLimits = limits?.[user.plan || "free"] || currentPlan.limits;
 
-  const filteredProjects = projects.filter(p =>
-    p.name.toLowerCase().includes(search.toLowerCase()) ||
-    p.clientName.toLowerCase().includes(search.toLowerCase())
+  const filteredProjects = projects.filter(
+    (p) =>
+      p.name.toLowerCase().includes(search.toLowerCase()) ||
+      p.clientName.toLowerCase().includes(search.toLowerCase()),
   );
 
-  const ownedProjects = projects.filter(p => p.ownerId === user.id);
+  const ownedProjects = projects.filter((p) => p.ownerId === user.id);
   const totalShares = (user.shareCountGuest || 0) + (user.shareCountPro || 0);
-  const sharedWith = Array.from(new Set(
-    ownedProjects.flatMap(p => p.collaborators || [])
-  )).length;
+  const sharedWith = Array.from(
+    new Set(ownedProjects.flatMap((p) => p.collaborators || [])),
+  ).length;
   const activityPoints = [
     user.loginCount || 0,
     totalShares,
     user.commentCount || 0,
-    ownedProjects.length
+    ownedProjects.length,
   ];
 
   const handleUpdateProfile = async () => {
@@ -83,7 +113,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
     setIsSavingProfile(true);
 
     try {
-      const { updateUserProfile } = await import('../services/authService');
+      const { updateUserProfile } = await import("../services/authService");
 
       const updates: any = { name: editName };
 
@@ -115,8 +145,15 @@ export const Dashboard: React.FC<DashboardProps> = ({
         <div className="mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex justify-between items-center h-16">
             <div className="flex items-center gap-3">
-              <button onClick={onGoToLanding} className="hover:opacity-80 transition-opacity">
-                <img src="/revyze-logo.png" alt="Revyze" className="h-16 w-auto object-contain" />
+              <button
+                onClick={onGoToLanding}
+                className="hover:opacity-80 transition-opacity"
+              >
+                <img
+                  src="/revyze-logo.png"
+                  alt="Revyze"
+                  className="h-16 w-auto object-contain"
+                />
               </button>
               <h1 className="text-2xl font-bold text-slate-900">Dashboard</h1>
             </div>
@@ -134,9 +171,16 @@ export const Dashboard: React.FC<DashboardProps> = ({
               </Button>
 
               {/* Show Upgrade button for Free users OR Trial users */}
-              {(currentPlan.id === 'free' || user.subscriptionStatus === 'trialing') && (
-                <Button size="sm" onClick={onUpgrade} className="hidden md:flex bg-gradient-to-r from-indigo-600 to-purple-600 border-none">
-                  {user.subscriptionStatus === 'trialing' ? 'Upgrade Trial' : 'Upgrade to Pro'}
+              {(currentPlan.id === "free" ||
+                user.subscriptionStatus === "trialing") && (
+                <Button
+                  size="sm"
+                  onClick={onUpgrade}
+                  className="hidden md:flex bg-gradient-to-r from-indigo-600 to-purple-600 border-none"
+                >
+                  {user.subscriptionStatus === "trialing"
+                    ? "Upgrade Trial"
+                    : "Upgrade to Pro"}
                 </Button>
               )}
 
@@ -145,22 +189,35 @@ export const Dashboard: React.FC<DashboardProps> = ({
                   className="flex items-center gap-3 cursor-pointer hover:opacity-80"
                   onClick={() => setIsProfileMenuOpen(!isProfileMenuOpen)}
                 >
-                  <div className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-bold text-white ${user.role === UserRole.DESIGNER ? 'bg-purple-600' : 'bg-blue-600'}`}>
+                  <div
+                    className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-bold text-white ${user.role === UserRole.DESIGNER ? "bg-purple-600" : "bg-blue-600"}`}
+                  >
                     {user.name.charAt(0)}
                   </div>
                   <div className="hidden md:block">
-                    <p className="text-sm font-medium text-slate-900">{user.name}</p>
-                    <p className="text-xs text-slate-500 capitalize">{getSubscriptionStatusDisplay(user)} Plan</p>
+                    <p className="text-sm font-medium text-slate-900">
+                      {user.name}
+                    </p>
+                    <p className="text-xs text-slate-500 capitalize">
+                      {getSubscriptionStatusDisplay(user)} Plan
+                    </p>
                   </div>
                 </div>
 
                 {isProfileMenuOpen && (
                   <>
-                    <div className="fixed inset-0 z-10" onClick={() => setIsProfileMenuOpen(false)} />
+                    <div
+                      className="fixed inset-0 z-10"
+                      onClick={() => setIsProfileMenuOpen(false)}
+                    />
                     <div className="absolute right-0 mt-2 w-48 bg-white rounded-xl shadow-lg border border-slate-100 py-1 z-20 animate-in fade-in zoom-in-95 duration-100">
                       <div className="px-4 py-2 border-b border-slate-50 md:hidden">
-                        <p className="text-sm font-medium text-slate-900">{user.name}</p>
-                        <p className="text-xs text-slate-500 capitalize">{getSubscriptionStatusDisplay(user)} Plan</p>
+                        <p className="text-sm font-medium text-slate-900">
+                          {user.name}
+                        </p>
+                        <p className="text-xs text-slate-500 capitalize">
+                          {getSubscriptionStatusDisplay(user)} Plan
+                        </p>
                       </div>
 
                       <button
@@ -228,21 +285,34 @@ export const Dashboard: React.FC<DashboardProps> = ({
           </div>
           <div className="flex items-center gap-4 w-full md:w-auto">
             {(() => {
-              const isUnlimited = (val: number) => val === -1 || val === Infinity;
-              const showLimits = !isUnlimited(planLimits.ownedProjects) || !isUnlimited(planLimits.totalProjects);
+              const isUnlimited = (val: number) =>
+                val === -1 || val === Infinity;
+              const showLimits =
+                !isUnlimited(planLimits.ownedProjects) ||
+                !isUnlimited(planLimits.totalProjects);
 
               if (!showLimits) return null;
 
               return (
                 <div className="text-sm text-slate-600 bg-slate-100 px-3 py-2 rounded-lg">
-                  <span className="font-medium">{projects.filter(p => p.ownerId === user.id).length}/{planLimits.ownedProjects}</span> owned
+                  <span className="font-medium">
+                    {projects.filter((p) => p.ownerId === user.id).length}/
+                    {planLimits.ownedProjects}
+                  </span>{" "}
+                  owned
                   <span className="mx-2">·</span>
-                  <span className="font-medium">{projects.length}/{planLimits.totalProjects}</span> total
+                  <span className="font-medium">
+                    {projects.length}/{planLimits.totalProjects}
+                  </span>{" "}
+                  total
                 </div>
               );
             })()}
             <div className="flex items-center gap-2">
-              <Button onClick={onCreateProject} icon={<Plus className="w-4 h-4" />}>
+              <Button
+                onClick={onCreateProject}
+                icon={<Plus className="w-4 h-4" />}
+              >
                 New Project
               </Button>
             </div>
@@ -255,8 +325,12 @@ export const Dashboard: React.FC<DashboardProps> = ({
             <div className="w-16 h-16 bg-slate-50 rounded-full flex items-center justify-center mx-auto mb-4">
               <FolderOpen className="w-8 h-8 text-slate-300" />
             </div>
-            <h3 className="text-lg font-medium text-slate-900 mb-1">No projects found</h3>
-            <p className="text-slate-500 mb-6">Create a new project or import one to get started.</p>
+            <h3 className="text-lg font-medium text-slate-900 mb-1">
+              No projects found
+            </h3>
+            <p className="text-slate-500 mb-6">
+              Create a new project or import one to get started.
+            </p>
             <div className="flex items-center justify-center gap-3">
               <Button onClick={onCreateProject}>Create Project</Button>
             </div>
@@ -266,10 +340,18 @@ export const Dashboard: React.FC<DashboardProps> = ({
             {filteredProjects.map((project) => {
               const isOwner = project.ownerId === user.id;
               const isShared = !isOwner;
-              const userProjectRole = getProjectRole(project, user, false, impersonatedRole);
+              const userProjectRole = getProjectRole(
+                project,
+                user,
+                false,
+                impersonatedRole,
+              );
 
               // Get active version's comments
-              const activeVersion = project.versions.find(v => v.id === project.currentVersionId) || project.versions[project.versions.length - 1];
+              const activeVersion =
+                project.versions.find(
+                  (v) => v.id === project.currentVersionId,
+                ) || project.versions[project.versions.length - 1];
               const allComments = activeVersion?.comments || [];
 
               let unresolvedCount = 0;
@@ -279,14 +361,25 @@ export const Dashboard: React.FC<DashboardProps> = ({
               if (isOwner) {
                 // For owners, count guest and pro comments separately
                 // Ensure we filter out deleted comments
-                const unresolvedComments = allComments.filter(comment => !comment.resolved && !comment.deleted);
-                guestUnresolvedCount = unresolvedComments.filter(c => c.audience === 'guest-owner').length;
-                proUnresolvedCount = unresolvedComments.filter(c => c.audience === 'pro-owner').length;
+                const unresolvedComments = allComments.filter(
+                  (comment) => !comment.resolved && !comment.deleted,
+                );
+                guestUnresolvedCount = unresolvedComments.filter(
+                  (c) => c.audience === "guest-owner",
+                ).length;
+                proUnresolvedCount = unresolvedComments.filter(
+                  (c) => c.audience === "pro-owner",
+                ).length;
               } else {
                 // For non-owners, show total visible comments
                 // Ensure we filter out deleted comments
-                const visibleComments = allComments.filter(comment => canSeeComment(comment, userProjectRole) && !comment.deleted);
-                unresolvedCount = visibleComments.filter(comment => !comment.resolved).length;
+                const visibleComments = allComments.filter(
+                  (comment) =>
+                    canSeeComment(comment, userProjectRole) && !comment.deleted,
+                );
+                unresolvedCount = visibleComments.filter(
+                  (comment) => !comment.resolved,
+                ).length;
               }
 
               return (
@@ -317,9 +410,14 @@ export const Dashboard: React.FC<DashboardProps> = ({
 
                     {/* Comment Status Badge */}
                     {(() => {
-                      const currentVersion = project.versions.find(v => v.id === project.currentVersionId);
+                      const currentVersion = project.versions.find(
+                        (v) => v.id === project.currentVersionId,
+                      );
                       // Filter out deleted comments here as well
-                      const unresolvedCount = currentVersion?.comments.filter(c => !c.resolved && !c.deleted).length || 0;
+                      const unresolvedCount =
+                        currentVersion?.comments.filter(
+                          (c) => !c.resolved && !c.deleted,
+                        ).length || 0;
 
                       if (unresolvedCount > 0) {
                         return (
@@ -339,8 +437,13 @@ export const Dashboard: React.FC<DashboardProps> = ({
                         <h3 className="font-bold text-slate-900 group-hover:text-indigo-600 transition-colors truncate pr-2">
                           {project.name}
                         </h3>
-                        <p className="text-xs text-slate-500 font-medium truncate pr-2 mt-0.5" title={project.ownerName || project.ownerEmail}>
-                          Projet de {project.ownerName || project.ownerEmail.split('@')[0]}
+                        <p
+                          className="text-xs text-slate-500 font-medium truncate pr-2 mt-0.5"
+                          title={project.ownerName || project.ownerEmail}
+                        >
+                          Projet de{" "}
+                          {project.ownerName ||
+                            project.ownerEmail.split("@")[0]}
                         </p>
                       </div>
 
@@ -385,7 +488,9 @@ export const Dashboard: React.FC<DashboardProps> = ({
                       </div>
                     </div>
 
-                    <p className="text-sm text-slate-500 mb-4 line-clamp-2">{project.description}</p>
+                    <p className="text-sm text-slate-500 mb-4 line-clamp-2">
+                      {project.description}
+                    </p>
 
                     <div className="mt-auto flex items-center justify-between text-xs text-slate-400 border-t border-slate-50 pt-4">
                       <div className="flex items-center gap-3">
@@ -399,14 +504,20 @@ export const Dashboard: React.FC<DashboardProps> = ({
                           <>
                             {/* Guest comments badge (blue) */}
                             {guestUnresolvedCount > 0 && (
-                              <span className="flex items-center gap-1 px-2 py-0.5 bg-blue-100 text-blue-700 rounded-full font-medium" title={`${guestUnresolvedCount} unresolved guest comment${guestUnresolvedCount > 1 ? 's' : ''}`}>
+                              <span
+                                className="flex items-center gap-1 px-2 py-0.5 bg-blue-100 text-blue-700 rounded-full font-medium"
+                                title={`${guestUnresolvedCount} unresolved guest comment${guestUnresolvedCount > 1 ? "s" : ""}`}
+                              >
                                 <MessageSquare className="w-3 h-3" />
                                 {guestUnresolvedCount} Guest
                               </span>
                             )}
                             {/* Pro comments badge (purple) */}
                             {proUnresolvedCount > 0 && (
-                              <span className="flex items-center gap-1 px-2 py-0.5 bg-purple-100 text-purple-700 rounded-full font-medium" title={`${proUnresolvedCount} unresolved pro comment${proUnresolvedCount > 1 ? 's' : ''}`}>
+                              <span
+                                className="flex items-center gap-1 px-2 py-0.5 bg-purple-100 text-purple-700 rounded-full font-medium"
+                                title={`${proUnresolvedCount} unresolved pro comment${proUnresolvedCount > 1 ? "s" : ""}`}
+                              >
                                 <MessageSquare className="w-3 h-3" />
                                 {proUnresolvedCount} Pro
                               </span>
@@ -415,7 +526,10 @@ export const Dashboard: React.FC<DashboardProps> = ({
                         ) : (
                           /* Non-owner: single badge */
                           unresolvedCount > 0 && (
-                            <span className="flex items-center gap-1 px-2 py-0.5 bg-amber-100 text-amber-700 rounded-full font-medium" title={`${unresolvedCount} unresolved comment${unresolvedCount > 1 ? 's' : ''}`}>
+                            <span
+                              className="flex items-center gap-1 px-2 py-0.5 bg-amber-100 text-amber-700 rounded-full font-medium"
+                              title={`${unresolvedCount} unresolved comment${unresolvedCount > 1 ? "s" : ""}`}
+                            >
                               <MessageSquare className="w-3 h-3" />
                               {unresolvedCount}
                             </span>
@@ -423,12 +537,16 @@ export const Dashboard: React.FC<DashboardProps> = ({
                         )}
                       </div>
                       <div className="flex items-center gap-3">
-                        {project.collaborators && project.collaborators.length > 0 && (
-                          <span className="flex items-center gap-1 text-slate-500" title={`${project.collaborators.length} collaborators`}>
-                            <Users className="w-3 h-3" />
-                            {project.collaborators.length}
-                          </span>
-                        )}
+                        {project.collaborators &&
+                          project.collaborators.length > 0 && (
+                            <span
+                              className="flex items-center gap-1 text-slate-500"
+                              title={`${project.collaborators.length} collaborators`}
+                            >
+                              <Users className="w-3 h-3" />
+                              {project.collaborators.length}
+                            </span>
+                          )}
                         <div className="font-medium text-slate-500">
                           {project.versions.length} Ver
                         </div>
@@ -446,34 +564,40 @@ export const Dashboard: React.FC<DashboardProps> = ({
       {isEditProfileOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm">
           <div className="bg-white rounded-xl shadow-xl w-full max-w-md p-6">
-            <h2 className="text-xl font-bold text-slate-900 mb-4">Account Settings</h2>
+            <h2 className="text-xl font-bold text-slate-900 mb-4">
+              Account Settings
+            </h2>
             <div className="flex border-b border-slate-200 mb-4">
               <button
-                className={`px-4 py-2 text-sm font-medium border-b-2 transition-colors ${activeStatsTab === 'profile' ? 'border-indigo-600 text-indigo-600' : 'border-transparent text-slate-500 hover:text-slate-700'}`}
-                onClick={() => setActiveStatsTab('profile')}
+                className={`px-4 py-2 text-sm font-medium border-b-2 transition-colors ${activeStatsTab === "profile" ? "border-indigo-600 text-indigo-600" : "border-transparent text-slate-500 hover:text-slate-700"}`}
+                onClick={() => setActiveStatsTab("profile")}
               >
                 Profile
               </button>
               <button
-                className={`px-4 py-2 text-sm font-medium border-b-2 transition-colors ${activeStatsTab === 'notifications' ? 'border-indigo-600 text-indigo-600' : 'border-transparent text-slate-500 hover:text-slate-700'}`}
-                onClick={() => setActiveStatsTab('notifications')}
+                className={`px-4 py-2 text-sm font-medium border-b-2 transition-colors ${activeStatsTab === "notifications" ? "border-indigo-600 text-indigo-600" : "border-transparent text-slate-500 hover:text-slate-700"}`}
+                onClick={() => setActiveStatsTab("notifications")}
               >
                 Notifications
               </button>
             </div>
 
             <div className="space-y-6">
-              {activeStatsTab === 'profile' ? (
+              {activeStatsTab === "profile" ? (
                 <>
                   <div>
-                    <label className="block text-sm font-medium text-slate-700 mb-1">Full Name</label>
+                    <label className="block text-sm font-medium text-slate-700 mb-1">
+                      Full Name
+                    </label>
                     <input
                       type="text"
                       value={editName}
                       onChange={(e) => setEditName(e.target.value)}
                       className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 bg-white text-slate-900"
                     />
-                    <label className="block text-sm font-medium text-slate-700 mb-1 mt-4">Email</label>
+                    <label className="block text-sm font-medium text-slate-700 mb-1 mt-4">
+                      Email
+                    </label>
                     <input
                       type="email"
                       value={user.email}
@@ -484,31 +608,53 @@ export const Dashboard: React.FC<DashboardProps> = ({
                   </div>
 
                   <div className="pt-4 border-t border-slate-100">
-                    <h3 className="text-sm font-medium text-slate-900 mb-2">Analytics</h3>
+                    <h3 className="text-sm font-medium text-slate-900 mb-2">
+                      Analytics
+                    </h3>
                     <div className="grid grid-cols-2 md:grid-cols-3 gap-2 mb-2">
                       <div className="p-2 rounded-lg border border-slate-200 bg-slate-50">
-                        <div className="text-[11px] text-slate-500">Engagement</div>
-                        <div className="text-base font-semibold text-slate-900">{user.engagementScore ?? '—'}</div>
+                        <div className="text-[11px] text-slate-500">
+                          Engagement
+                        </div>
+                        <div className="text-base font-semibold text-slate-900">
+                          {user.engagementScore ?? "—"}
+                        </div>
                       </div>
                       <div className="p-2 rounded-lg border border-slate-200 bg-slate-50">
                         <div className="text-[11px] text-slate-500">Owned</div>
-                        <div className="text-base font-semibold text-slate-900">{ownedProjects.length}</div>
+                        <div className="text-base font-semibold text-slate-900">
+                          {ownedProjects.length}
+                        </div>
                       </div>
                       <div className="p-2 rounded-lg border border-slate-200 bg-slate-50">
                         <div className="text-[11px] text-slate-500">Shares</div>
-                        <div className="text-base font-semibold text-slate-900">{totalShares}</div>
+                        <div className="text-base font-semibold text-slate-900">
+                          {totalShares}
+                        </div>
                       </div>
                       <div className="p-2 rounded-lg border border-slate-200 bg-slate-50">
-                        <div className="text-[11px] text-slate-500">Shared with</div>
-                        <div className="text-base font-semibold text-slate-900">{sharedWith}</div>
+                        <div className="text-[11px] text-slate-500">
+                          Shared with
+                        </div>
+                        <div className="text-base font-semibold text-slate-900">
+                          {sharedWith}
+                        </div>
                       </div>
                       <div className="p-2 rounded-lg border border-slate-200 bg-slate-50">
-                        <div className="text-[11px] text-slate-500">Comments</div>
-                        <div className="text-base font-semibold text-slate-900">{user.commentCount ?? 0}</div>
+                        <div className="text-[11px] text-slate-500">
+                          Comments
+                        </div>
+                        <div className="text-base font-semibold text-slate-900">
+                          {user.commentCount ?? 0}
+                        </div>
                       </div>
                       <div className="p-2 rounded-lg border border-slate-200 bg-slate-50">
-                        <div className="text-[11px] text-slate-500">Replies</div>
-                        <div className="text-base font-semibold text-slate-900">{(user as any).replyCount ?? 0}</div>
+                        <div className="text-[11px] text-slate-500">
+                          Replies
+                        </div>
+                        <div className="text-base font-semibold text-slate-900">
+                          {(user as any).replyCount ?? 0}
+                        </div>
                       </div>
                     </div>
                     {/* Activity visualizer is hidden when not enough data */}
@@ -527,8 +673,18 @@ export const Dashboard: React.FC<DashboardProps> = ({
               )}
 
               <div className="flex justify-end gap-3 pt-4 border-t border-slate-100 mt-4">
-                <Button variant="secondary" onClick={() => setIsEditProfileOpen(false)}>Cancel</Button>
-                <Button onClick={handleUpdateProfile} isLoading={isSavingProfile}>Save Changes</Button>
+                <Button
+                  variant="secondary"
+                  onClick={() => setIsEditProfileOpen(false)}
+                >
+                  Cancel
+                </Button>
+                <Button
+                  onClick={handleUpdateProfile}
+                  isLoading={isSavingProfile}
+                >
+                  Save Changes
+                </Button>
               </div>
             </div>
           </div>
@@ -540,21 +696,30 @@ export const Dashboard: React.FC<DashboardProps> = ({
         <div className="fixed inset-0 z-50 bg-black/50 backdrop-blur-sm flex items-start justify-center p-4 overflow-y-auto">
           <div className="bg-white rounded-xl shadow-xl w-full max-w-4xl my-8">
             <div className="p-6 border-b border-slate-100 flex items-center justify-between sticky top-0 bg-white rounded-t-xl">
-              <h2 className="text-xl font-bold text-slate-900">Referral Program</h2>
-              <Button variant="secondary" onClick={() => setShowReferralDashboard(false)}>
+              <h2 className="text-xl font-bold text-slate-900">
+                Referral Program
+              </h2>
+              <Button
+                variant="secondary"
+                onClick={() => setShowReferralDashboard(false)}
+              >
                 Close
               </Button>
             </div>
             <div className="p-6">
-              <Suspense fallback={<div className="text-sm text-slate-500">Loading referral data…</div>}>
+              <Suspense
+                fallback={
+                  <div className="text-sm text-slate-500">
+                    Loading referral data…
+                  </div>
+                }
+              >
                 <ReferralDashboardLazy currentUser={user} />
               </Suspense>
             </div>
           </div>
         </div>
       )}
-
-
     </div>
   );
 };
