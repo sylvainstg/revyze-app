@@ -1037,6 +1037,12 @@ export const AdminPage: React.FC<AdminPageProps> = ({
                             Logins
                           </th>
                           <th
+                            className="px-6 py-3 cursor-pointer hover:text-indigo-600 whitespace-nowrap"
+                            onClick={() => handleSort("lastLogin")}
+                          >
+                            Days Idle
+                          </th>
+                          <th
                             className="px-6 py-3 cursor-pointer hover:text-indigo-600"
                             onClick={() => handleSort("projectCount")}
                           >
@@ -1122,6 +1128,14 @@ export const AdminPage: React.FC<AdminPageProps> = ({
                               </td>
                               <td className="px-6 py-4 text-slate-600">
                                 {user.loginCount || 0}
+                              </td>
+                              <td className="px-6 py-4 text-slate-600">
+                                {user.lastLogin
+                                  ? Math.floor(
+                                    (Date.now() - user.lastLogin) /
+                                    (1000 * 60 * 60 * 24),
+                                  )
+                                  : "—"}
                               </td>
                               <td className="px-6 py-4 text-slate-600">
                                 {user.projectCount || 0}
