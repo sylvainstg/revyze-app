@@ -3,33 +3,29 @@ import * as admin from "firebase-admin";
 
 const db = admin.firestore();
 
-interface CampaignShownEvent {
-  userId: string;
-  eventName: string;
-  metadata: {
-    campaignId: string;
-    variantId?: string;
-    timestamp: number;
-  };
-  timestamp: number;
-}
+
 
 /**
  * Triggered when a campaign is shown to a user.
  * Schedules an email follow-up if the user doesn't answer within the specified time.
  */
-export const onCampaignShown = functions.firestore
-  .document("user_activity/{activityId}")
+export const onCampaignShown = functions
+  .region("us-central1")
+  .firestore.document("user_activity/{activityId}")
   .onCreate(async (snap, context) => {
-    const data = snap.data() as CampaignShownEvent;
+    const data = snap.data();
+    console.log(`[onCampaignShown] Triggered for activity ${context.params.activityId}, event: ${data?.eventName}`);
 
     // Only process campaign_shown events
-    if (data.eventName !== "feedback_campaign_shown") {
+    if (data?.eventName !== "feedback_campaign_shown") {
       return null;
     }
 
     const { userId, metadata } = data;
-    const { campaignId, variantId } = metadata;
+    const campaignId = metadata?.campaignId;
+    const variantId = metadata?.variantId;
+
+    console.log(`[onCampaignShown] Processing campaign ${campaignId} for user ${userId}`);
 
     try {
       // Get campaign details
@@ -88,8 +84,9 @@ export const onCampaignShown = functions.firestore
  * Scheduled function to process pending email follow-ups.
  * Runs every hour to check for emails that need to be sent.
  */
-export const processEmailFollowUps = functions.pubsub
-  .schedule("every 1 hours")
+export const processEmailFollowUps = functions
+  .region("us-central1")
+  .pubsub.schedule("every 1 hours")
   .onRun(async (context) => {
     const now = admin.firestore.Timestamp.now();
 

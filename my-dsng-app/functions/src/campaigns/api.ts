@@ -74,6 +74,7 @@ export const createCampaign = functions.https.onCall(async (data, context) => {
  * Callable Function
  */
 export const listCampaigns = functions.https.onCall(async (data, context) => {
+  console.log(`[DEPLOY_VERIFY_99] listCampaigns triggered at: ${new Date().toISOString()}`);
   // Check authentication
   if (!context.auth) {
     throw new functions.https.HttpsError(
@@ -106,6 +107,7 @@ export const listCampaigns = functions.https.onCall(async (data, context) => {
         const campaignId = doc.id;
 
         // Get analytics for this campaign
+        console.log(`[listCampaigns] Processing campaign: ${campaignId}`);
         const analytics = await getCampaignAnalytics(campaignId);
 
         return {
@@ -536,16 +538,28 @@ export const listSampleAdmins = functions.https.onRequest(async (req, res) => {
  * Helper function to calculate campaign analytics
  */
 async function getCampaignAnalytics(campaignId: string) {
-  // Get all attribution records for this campaign
+  // Get all attribution records for this campaign (impressions)
   const attributions = await db
     .collection("campaign_attribution")
     .where("campaignId", "==", campaignId)
     .get();
 
+  // Get responses from feedback_answers (canonical source of truth)
+  const answersSnapshot = await db
+    .collection("feedback_answers")
+    .where("campaignId", "==", campaignId)
+    .get();
+
+  // DEBUG: Let's see what's actually in that collection
+  const allAnswers = await db.collection("feedback_answers").get();
+  const uniqueIdsInDb = [...new Set(allAnswers.docs.map(d => d.data().campaignId))];
+  console.log(`[getCampaignAnalytics] Checking ID: "${campaignId}"`);
+  console.log(`[getCampaignAnalytics] Unique IDs in feedback_answers: ${JSON.stringify(uniqueIdsInDb)}`);
+  console.log(`[getCampaignAnalytics] Match found for "${campaignId}": ${uniqueIdsInDb.includes(campaignId)}`);
+  console.log(`[getCampaignAnalytics] Query size: ${answersSnapshot.size}`);
+
   const impressions = attributions.size;
-  const responses = attributions.docs.filter(
-    (doc) => doc.data().answeredAt,
-  ).length;
+  const responses = answersSnapshot.size;
   const responseRate = impressions > 0 ? (responses / impressions) * 100 : 0;
 
   // Get email metrics
