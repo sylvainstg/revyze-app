@@ -40,7 +40,13 @@ export function getVersionsByCategory(
 ): ProjectVersion[] {
   return versions
     .filter((v) => (v.category || DEFAULT_CATEGORY) === category)
-    .sort((a, b) => b.categoryVersionNumber - a.categoryVersionNumber);
+    .sort((a, b) => {
+      // Primary sort: Timestamp (newest first)
+      const timeDiff = (b.timestamp || 0) - (a.timestamp || 0);
+      if (timeDiff !== 0) return timeDiff;
+      // Secondary sort: Category Version Number (highest first)
+      return b.categoryVersionNumber - a.categoryVersionNumber;
+    });
 }
 
 /**

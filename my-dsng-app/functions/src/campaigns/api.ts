@@ -74,7 +74,6 @@ export const createCampaign = functions.https.onCall(async (data, context) => {
  * Callable Function
  */
 export const listCampaigns = functions.https.onCall(async (data, context) => {
-  console.log(`[DEPLOY_VERIFY_99] listCampaigns triggered at: ${new Date().toISOString()}`);
   // Check authentication
   if (!context.auth) {
     throw new functions.https.HttpsError(
@@ -550,15 +549,10 @@ async function getCampaignAnalytics(campaignId: string) {
     .where("campaignId", "==", campaignId)
     .get();
 
-  // DEBUG: Let's see what's actually in that collection
-  const allAnswers = await db.collection("feedback_answers").get();
-  const uniqueIdsInDb = [...new Set(allAnswers.docs.map(d => d.data().campaignId))];
-  console.log(`[getCampaignAnalytics] Checking ID: "${campaignId}"`);
-  console.log(`[getCampaignAnalytics] Unique IDs in feedback_answers: ${JSON.stringify(uniqueIdsInDb)}`);
-  console.log(`[getCampaignAnalytics] Match found for "${campaignId}": ${uniqueIdsInDb.includes(campaignId)}`);
-  console.log(`[getCampaignAnalytics] Query size: ${answersSnapshot.size}`);
 
-  const impressions = attributions.size;
+
+  // Ensure impressions is at least equal to responses to avoid negative dismissals/incoherent data
+  const impressions = Math.max(attributions.size, answersSnapshot.size);
   const responses = answersSnapshot.size;
   const responseRate = impressions > 0 ? (responses / impressions) * 100 : 0;
 

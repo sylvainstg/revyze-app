@@ -13,6 +13,7 @@ import {
   ChevronLeft,
   ChevronRight,
   Share,
+  UserPlus,
 } from "lucide-react";
 import * as geminiService from "../services/geminiService";
 import * as featureVoteService from "../services/featureVoteService";
@@ -46,6 +47,9 @@ interface CollaborationPanelProps {
   pageCount?: number | null;
   collaborators?: string[];
   currentUserEmail?: string;
+  isGuest?: boolean;
+  onSignUpClick?: () => void;
+  accessLevel?: "view" | "comment";
 }
 
 export const CollaborationPanel: React.FC<CollaborationPanelProps> = ({
@@ -68,6 +72,9 @@ export const CollaborationPanel: React.FC<CollaborationPanelProps> = ({
   pageCount,
   collaborators = [],
   currentUserEmail = "",
+  isGuest = false,
+  onSignUpClick,
+  accessLevel = "comment",
 }) => {
   const [localIsCollapsed, setLocalIsCollapsed] = useState(false);
 
@@ -170,11 +177,10 @@ export const CollaborationPanel: React.FC<CollaborationPanelProps> = ({
                     onClick={() => {
                       onPageChange?.(m.page);
                     }}
-                    className={`relative w-10 h-10 rounded-full flex flex-col items-center justify-center text-sm font-bold transition-colors border ${
-                      pageNumber === m.page
+                    className={`relative w-10 h-10 rounded-full flex flex-col items-center justify-center text-sm font-bold transition-colors border ${pageNumber === m.page
                         ? "bg-indigo-100 text-indigo-800 border-indigo-300"
                         : "bg-slate-100 text-slate-600 border-slate-200 hover:bg-indigo-50 hover:text-indigo-700"
-                    }`}
+                      }`}
                     title={`Page ${m.page} • ${m.count} comment${m.count > 1 ? "s" : ""}`}
                   >
                     <span className="block leading-none">{m.page}</span>
@@ -241,6 +247,28 @@ export const CollaborationPanel: React.FC<CollaborationPanelProps> = ({
               </button>
             </div>
           </div>
+
+          {/* Guest Sign-up Banner */}
+          {isGuest && onSignUpClick && (
+            <div className="mx-4 mt-3 p-3 bg-gradient-to-r from-indigo-600 to-purple-600 rounded-xl shadow-sm">
+              <div className="flex items-center gap-2 mb-2">
+                <div className="p-1.5 bg-white/20 rounded-lg">
+                  <UserPlus className="w-4 h-4 text-white" />
+                </div>
+                <p className="text-white font-medium text-sm">
+                  {accessLevel === "comment"
+                    ? "Create account to comment"
+                    : "Create account for full features"}
+                </p>
+              </div>
+              <button
+                onClick={onSignUpClick}
+                className="w-full px-3 py-2 bg-white text-indigo-600 text-sm font-semibold rounded-lg hover:bg-indigo-50 transition-colors"
+              >
+                Create Free Account
+              </button>
+            </div>
+          )}
 
           {/* Coming Soon Panel */}
           {comments.length > 0 && (
@@ -365,224 +393,223 @@ const CommentCard: React.FC<{
   collaborators,
   currentUserEmail,
 }) => {
-  const [replyText, setReplyText] = useState("");
-  const [showReplyBox, setShowReplyBox] = useState(false);
-  const [isExpanded, setIsExpanded] = useState(!comment.resolved); // Resolved comments start collapsed
-  const [pendingMentions, setPendingMentions] = useState<string[]>([]);
+    const [replyText, setReplyText] = useState("");
+    const [showReplyBox, setShowReplyBox] = useState(false);
+    const [isExpanded, setIsExpanded] = useState(!comment.resolved); // Resolved comments start collapsed
+    const [pendingMentions, setPendingMentions] = useState<string[]>([]);
 
-  const handleReplySubmit = () => {
-    if (replyText.trim()) {
-      onReply(comment.id, replyText, pendingMentions);
-      setReplyText("");
-      setPendingMentions([]);
-      setShowReplyBox(false);
-    }
-  };
+    const handleReplySubmit = () => {
+      if (replyText.trim()) {
+        onReply(comment.id, replyText, pendingMentions);
+        setReplyText("");
+        setPendingMentions([]);
+        setShowReplyBox(false);
+      }
+    };
 
-  return (
-    <div
-      id={`comment-${comment.id}`}
-      className={`group rounded-xl border transition-all duration-200 ${
-        isActive
-          ? "border-indigo-500 ring-1 ring-indigo-500 shadow-md bg-indigo-50/30"
-          : comment.resolved
-            ? "border-slate-200 bg-slate-50/50"
-            : "border-slate-200 bg-white hover:border-indigo-300"
-      }`}
-    >
+    return (
       <div
-        className="p-3 cursor-pointer"
-        onClick={() => {
-          if (comment.resolved) {
-            setIsExpanded(!isExpanded);
-          } else {
-            onClick();
-          }
-        }}
+        id={`comment-${comment.id}`}
+        className={`group rounded-xl border transition-all duration-200 ${isActive
+            ? "border-indigo-500 ring-1 ring-indigo-500 shadow-md bg-indigo-50/30"
+            : comment.resolved
+              ? "border-slate-200 bg-slate-50/50"
+              : "border-slate-200 bg-white hover:border-indigo-300"
+          }`}
       >
-        <div className="flex justify-between items-start mb-2">
-          <div className="flex items-center gap-2">
-            {/* Marker Number Badge */}
-            <span className="flex items-center justify-center w-5 h-5 rounded-full bg-indigo-600 text-white text-[10px] font-bold">
-              {markerNumber}
-            </span>
-            <span
-              className={`w-2 h-2 rounded-full ${comment.author === UserRole.DESIGNER ? "bg-purple-500" : "bg-blue-500"}`}
-            />
-            <span
-              className="text-xs font-semibold text-slate-700 truncate max-w-[120px]"
-              title={comment.authorName || comment.author}
-            >
-              {comment.authorName
-                ? comment.authorName.length > 15
-                  ? `${comment.authorName.substring(0, 15)}...`
-                  : comment.authorName
-                : comment.author}
-              {comment.authorName && (
-                <span className="ml-1 text-[10px] text-slate-400 font-normal">
-                  ({comment.author})
+        <div
+          className="p-3 cursor-pointer"
+          onClick={() => {
+            if (comment.resolved) {
+              setIsExpanded(!isExpanded);
+            } else {
+              onClick();
+            }
+          }}
+        >
+          <div className="flex justify-between items-start mb-2">
+            <div className="flex items-center gap-2">
+              {/* Marker Number Badge */}
+              <span className="flex items-center justify-center w-5 h-5 rounded-full bg-indigo-600 text-white text-[10px] font-bold">
+                {markerNumber}
+              </span>
+              <span
+                className={`w-2 h-2 rounded-full ${comment.author === UserRole.DESIGNER ? "bg-purple-500" : "bg-blue-500"}`}
+              />
+              <span
+                className="text-xs font-semibold text-slate-700 truncate max-w-[120px]"
+                title={comment.authorName || comment.author}
+              >
+                {comment.authorName
+                  ? comment.authorName.length > 15
+                    ? `${comment.authorName.substring(0, 15)}...`
+                    : comment.authorName
+                  : comment.author}
+                {comment.authorName && (
+                  <span className="ml-1 text-[10px] text-slate-400 font-normal">
+                    ({comment.author})
+                  </span>
+                )}
+              </span>
+              <span className="text-[10px] text-slate-400">
+                {new Date(comment.timestamp).toLocaleTimeString([], {
+                  hour: "2-digit",
+                  minute: "2-digit",
+                })}
+              </span>
+              {comment.pushedFromGuestComment && (
+                <span
+                  className="ml-1 px-1.5 py-0.5 bg-green-100 text-green-700 text-[10px] font-medium rounded-full flex items-center gap-1"
+                  title="Promoted from Guest comment"
+                >
+                  <Share className="w-2 h-2" />
+                  Promoted
                 </span>
               )}
-            </span>
-            <span className="text-[10px] text-slate-400">
-              {new Date(comment.timestamp).toLocaleTimeString([], {
-                hour: "2-digit",
-                minute: "2-digit",
-              })}
-            </span>
-            {comment.pushedFromGuestComment && (
-              <span
-                className="ml-1 px-1.5 py-0.5 bg-green-100 text-green-700 text-[10px] font-medium rounded-full flex items-center gap-1"
-                title="Promoted from Guest comment"
-              >
-                <Share className="w-2 h-2" />
-                Promoted
-              </span>
-            )}
-          </div>
-          <div className="flex items-center gap-1">
-            {!comment.resolved && projectRole === "owner" && (
-              <button
-                onClick={(e) => {
-                  e.stopPropagation();
-                  onResolve(comment.id);
-                }}
-                className="opacity-0 group-hover:opacity-100 transition-opacity p-1.5 rounded hover:bg-green-50"
-                title="Mark as resolved"
-              >
-                <CheckCircle className="w-4 h-4 text-green-600" />
-              </button>
-            )}
-            {(projectRole === "owner" ||
-              (currentUserEmail &&
-                comment.authorName === currentUserEmail)) && (
-              <button
-                onClick={(e) => {
-                  e.stopPropagation();
-                  onDelete(comment.id);
-                }}
-                className="opacity-0 group-hover:opacity-100 transition-opacity p-1.5 rounded hover:bg-red-50"
-                title="Delete comment"
-              >
-                <Trash2 className="w-4 h-4 text-red-600" />
-              </button>
-            )}
-          </div>
-        </div>
-
-        <div className="text-sm text-slate-700 mb-2">{comment.text}</div>
-
-        {comment.aiAnalysis && (
-          <div className="mt-2 p-2 bg-purple-50 rounded-lg border border-purple-100">
-            <div className="flex items-start gap-2">
-              <Bot className="w-4 h-4 text-purple-600 mt-0.5 flex-shrink-0" />
-              <div className="text-xs text-purple-900 leading-relaxed">
-                {comment.aiAnalysis}
-              </div>
+            </div>
+            <div className="flex items-center gap-1">
+              {!comment.resolved && projectRole === "owner" && (
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    onResolve(comment.id);
+                  }}
+                  className="opacity-0 group-hover:opacity-100 transition-opacity p-1.5 rounded hover:bg-green-50"
+                  title="Mark as resolved"
+                >
+                  <CheckCircle className="w-4 h-4 text-green-600" />
+                </button>
+              )}
+              {(projectRole === "owner" ||
+                (currentUserEmail &&
+                  comment.authorName === currentUserEmail)) && (
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      onDelete(comment.id);
+                    }}
+                    className="opacity-0 group-hover:opacity-100 transition-opacity p-1.5 rounded hover:bg-red-50"
+                    title="Delete comment"
+                  >
+                    <Trash2 className="w-4 h-4 text-red-600" />
+                  </button>
+                )}
             </div>
           </div>
-        )}
 
-        {comment.replies && comment.replies.length > 0 && (
-          <div className="mt-3 space-y-2 pl-4 border-l-2 border-slate-200">
-            {comment.replies.map((reply) => (
-              <div key={reply.id} className="text-xs">
-                <div className="flex items-center gap-2 mb-1">
-                  <span
-                    className={`w-1.5 h-1.5 rounded-full ${reply.author === UserRole.DESIGNER ? "bg-purple-400" : "bg-blue-400"}`}
-                  />
-                  <span className="font-medium text-slate-600">
-                    {reply.authorName || reply.author}
-                    {reply.authorName && (
-                      <span className="ml-1 text-[10px] text-slate-400 font-normal">
-                        ({reply.author})
-                      </span>
-                    )}
-                  </span>
-                  <span className="text-[10px] text-slate-400">
-                    {new Date(reply.timestamp).toLocaleTimeString([], {
-                      hour: "2-digit",
-                      minute: "2-digit",
-                    })}
-                  </span>
+          <div className="text-sm text-slate-700 mb-2">{comment.text}</div>
+
+          {comment.aiAnalysis && (
+            <div className="mt-2 p-2 bg-purple-50 rounded-lg border border-purple-100">
+              <div className="flex items-start gap-2">
+                <Bot className="w-4 h-4 text-purple-600 mt-0.5 flex-shrink-0" />
+                <div className="text-xs text-purple-900 leading-relaxed">
+                  {comment.aiAnalysis}
                 </div>
-                <p className="text-slate-600 ml-3.5">{reply.text}</p>
               </div>
-            ))}
-          </div>
-        )}
-
-        <div className="mt-2 flex items-center gap-2">
-          {projectRole === "owner" &&
-            comment.audience === "guest-owner" &&
-            onPushToProfessional && (
-              <button
-                onClick={(e) => {
-                  e.stopPropagation();
-                  if (onPushToProfessional) {
-                    onPushToProfessional(comment.id);
-                  }
-                }}
-                className="mt-2 w-full flex items-center justify-center gap-2 px-3 py-1.5 bg-green-50 text-green-700 text-xs font-medium rounded-md hover:bg-green-100 transition-colors border border-green-200"
-                title="Promote this guest comment to professional view"
-              >
-                <Share className="w-3 h-3" />
-                Promote to Professional
-              </button>
-            )}
-
-          {!showReplyBox ? (
-            <button
-              onClick={(e) => {
-                e.stopPropagation();
-                setShowReplyBox(true);
-              }}
-              className="text-xs text-indigo-600 hover:text-indigo-700 flex items-center gap-1"
-            >
-              <CornerDownRight className="w-3 h-3" />
-              Reply
-            </button>
-          ) : (
-            <div
-              className="flex-1 flex gap-2"
-              onClick={(e) => e.stopPropagation()}
-            >
-              <div className="flex-1">
-                <MentionInput
-                  value={replyText}
-                  onChange={(val, newMentions) => {
-                    setReplyText(val);
-                    setPendingMentions(newMentions);
-                  }}
-                  collaborators={collaborators}
-                  currentUserEmail={currentUserEmail}
-                  placeholder="Write a reply..."
-                  className="flex-1 text-xs px-2 py-1 border border-slate-200 rounded focus:outline-none focus:border-indigo-400 bg-white text-slate-900"
-                  autoFocus
-                  onKeyDown={(e) => {
-                    if (
-                      e.key === "Enter" &&
-                      !e.shiftKey &&
-                      !e.defaultPrevented
-                    ) {
-                      handleReplySubmit();
-                    }
-                    if (e.key === "Escape") setShowReplyBox(false);
-                  }}
-                  minHeight="36px"
-                />
-              </div>
-              <button
-                onClick={handleReplySubmit}
-                className="p-1 rounded bg-indigo-600 text-white hover:bg-indigo-700 h-fit mt-1"
-                title="Send reply"
-              >
-                <Send className="w-3 h-3" />
-              </button>
             </div>
           )}
+
+          {comment.replies && comment.replies.length > 0 && (
+            <div className="mt-3 space-y-2 pl-4 border-l-2 border-slate-200">
+              {comment.replies.map((reply) => (
+                <div key={reply.id} className="text-xs">
+                  <div className="flex items-center gap-2 mb-1">
+                    <span
+                      className={`w-1.5 h-1.5 rounded-full ${reply.author === UserRole.DESIGNER ? "bg-purple-400" : "bg-blue-400"}`}
+                    />
+                    <span className="font-medium text-slate-600">
+                      {reply.authorName || reply.author}
+                      {reply.authorName && (
+                        <span className="ml-1 text-[10px] text-slate-400 font-normal">
+                          ({reply.author})
+                        </span>
+                      )}
+                    </span>
+                    <span className="text-[10px] text-slate-400">
+                      {new Date(reply.timestamp).toLocaleTimeString([], {
+                        hour: "2-digit",
+                        minute: "2-digit",
+                      })}
+                    </span>
+                  </div>
+                  <p className="text-slate-600 ml-3.5">{reply.text}</p>
+                </div>
+              ))}
+            </div>
+          )}
+
+          <div className="mt-2 flex items-center gap-2">
+            {projectRole === "owner" &&
+              comment.audience === "guest-owner" &&
+              onPushToProfessional && (
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    if (onPushToProfessional) {
+                      onPushToProfessional(comment.id);
+                    }
+                  }}
+                  className="mt-2 w-full flex items-center justify-center gap-2 px-3 py-1.5 bg-green-50 text-green-700 text-xs font-medium rounded-md hover:bg-green-100 transition-colors border border-green-200"
+                  title="Promote this guest comment to professional view"
+                >
+                  <Share className="w-3 h-3" />
+                  Promote to Professional
+                </button>
+              )}
+
+            {!showReplyBox ? (
+              <button
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setShowReplyBox(true);
+                }}
+                className="text-xs text-indigo-600 hover:text-indigo-700 flex items-center gap-1"
+              >
+                <CornerDownRight className="w-3 h-3" />
+                Reply
+              </button>
+            ) : (
+              <div
+                className="flex-1 flex gap-2"
+                onClick={(e) => e.stopPropagation()}
+              >
+                <div className="flex-1">
+                  <MentionInput
+                    value={replyText}
+                    onChange={(val, newMentions) => {
+                      setReplyText(val);
+                      setPendingMentions(newMentions);
+                    }}
+                    collaborators={collaborators}
+                    currentUserEmail={currentUserEmail}
+                    placeholder="Write a reply..."
+                    className="flex-1 text-xs px-2 py-1 border border-slate-200 rounded focus:outline-none focus:border-indigo-400 bg-white text-slate-900"
+                    autoFocus
+                    onKeyDown={(e) => {
+                      if (
+                        e.key === "Enter" &&
+                        !e.shiftKey &&
+                        !e.defaultPrevented
+                      ) {
+                        handleReplySubmit();
+                      }
+                      if (e.key === "Escape") setShowReplyBox(false);
+                    }}
+                    minHeight="36px"
+                  />
+                </div>
+                <button
+                  onClick={handleReplySubmit}
+                  className="p-1 rounded bg-indigo-600 text-white hover:bg-indigo-700 h-fit mt-1"
+                  title="Send reply"
+                >
+                  <Send className="w-3 h-3" />
+                </button>
+              </div>
+            )}
+          </div>
         </div>
       </div>
-    </div>
-  );
-};
+    );
+  };

@@ -76,8 +76,11 @@ export const sendInvitationEmail = functions.https.onCall(
                             <p style="margin: 0 0 20px 0; color: #475569; font-size: 16px; line-height: 1.6;">
                                 <strong>${inviterName}</strong> has invited you to collaborate on the project <strong>${projectName}</strong>.
                             </p>
-                            <p style="margin: 0 0 30px 0; color: #64748b; font-size: 15px; line-height: 1.6;">
-                                Click the button below to access the design and start collaborating!
+                            <p style="margin: 0 0 15px 0; color: #64748b; font-size: 15px; line-height: 1.6;">
+                                Click the button below to <strong>instantly view the design</strong> – no login required!
+                            </p>
+                            <p style="margin: 0 0 30px 0; color: #94a3b8; font-size: 14px; line-height: 1.6;">
+                                Want to add comments? You can create a free account in seconds.
                             </p>
                             
                             <!-- CTA Button -->
@@ -85,7 +88,7 @@ export const sendInvitationEmail = functions.https.onCall(
                                 <tr>
                                     <td align="center" style="padding: 20px 0;">
                                         <a href="${url}" style="display: inline-block; padding: 16px 32px; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: #ffffff; text-decoration: none; border-radius: 8px; font-weight: 600; font-size: 16px; box-shadow: 0 4px 6px rgba(102, 126, 234, 0.4);">
-                                            Access the Design
+                                            View Now – No Login Needed
                                         </a>
                                     </td>
                                 </tr>

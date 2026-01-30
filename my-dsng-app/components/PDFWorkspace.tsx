@@ -2,7 +2,7 @@ import React, { useState, useRef, useEffect } from "react";
 import { Document, Page, pdfjs } from "react-pdf";
 import { Comment, UserRole } from "../types";
 import { PDF_WORKER_URL } from "../constants";
-import { Plus, Loader2, Sparkles, X, AlertCircle, Upload } from "lucide-react";
+import { Plus, Loader2, Sparkles, X, AlertCircle, Upload, UserPlus } from "lucide-react";
 import * as geminiService from "../services/geminiService";
 import { getPDFObjectURL, revokePDFObjectURL } from "../utils/pdfUtils";
 import { VersionSelectorDetailed } from "./VersionSelector";
@@ -56,6 +56,10 @@ interface PDFWorkspaceProps {
   collaborators?: string[];
   currentUserEmail?: string;
   isOwner?: boolean;
+  // Guest banner props
+  isGuest?: boolean;
+  accessLevel?: "view" | "comment";
+  onSignUpClick?: () => void;
 }
 
 export const PDFWorkspace: React.FC<PDFWorkspaceProps> = ({
@@ -90,6 +94,9 @@ export const PDFWorkspace: React.FC<PDFWorkspaceProps> = ({
   collaborators = [],
   currentUserEmail = "",
   isOwner = false,
+  isGuest = false,
+  accessLevel = "comment",
+  onSignUpClick,
 }) => {
   const [numPages, setNumPages] = useState<number | null>(null);
   const [tempMarker, setTempMarker] = useState<{ x: number; y: number } | null>(
@@ -403,8 +410,8 @@ export const PDFWorkspace: React.FC<PDFWorkspaceProps> = ({
     // Determine ordering of versions (latest first)
     let versionsOrdered = versions
       ? [...versions].sort(
-          (a: any, b: any) => (b.timestamp || 0) - (a.timestamp || 0),
-        )
+        (a: any, b: any) => (b.timestamp || 0) - (a.timestamp || 0),
+      )
       : [];
     const currentIdx = versionsOrdered.findIndex(
       (v) => v.id === currentVersionId,
@@ -565,11 +572,10 @@ export const PDFWorkspace: React.FC<PDFWorkspaceProps> = ({
                           setTimeout(() => setDefaultPageSet(false), 2000);
                         }
                       }}
-                      className={`w-full px-4 py-2 text-left text-sm transition-colors flex items-center gap-2 ${
-                        defaultPageSet || isDefaultPage
-                          ? "bg-green-50 text-green-700"
-                          : "text-slate-700 hover:bg-indigo-50 hover:text-indigo-600"
-                      }`}
+                      className={`w-full px-4 py-2 text-left text-sm transition-colors flex items-center gap-2 ${defaultPageSet || isDefaultPage
+                        ? "bg-green-50 text-green-700"
+                        : "text-slate-700 hover:bg-indigo-50 hover:text-indigo-600"
+                        }`}
                     >
                       <svg
                         className="w-4 h-4 text-indigo-700"
@@ -598,11 +604,10 @@ export const PDFWorkspace: React.FC<PDFWorkspaceProps> = ({
                           setTimeout(() => setThumbnailSet(false), 2000);
                         }
                       }}
-                      className={`w-full px-4 py-2 text-left text-sm transition-colors flex items-center gap-2 ${
-                        thumbnailSet
-                          ? "bg-green-50 text-green-700"
-                          : "text-slate-700 hover:bg-indigo-50 hover:text-indigo-600"
-                      }`}
+                      className={`w-full px-4 py-2 text-left text-sm transition-colors flex items-center gap-2 ${thumbnailSet
+                        ? "bg-green-50 text-green-700"
+                        : "text-slate-700 hover:bg-indigo-50 hover:text-indigo-600"
+                        }`}
                     >
                       <svg
                         className="w-4 h-4 text-indigo-700"
@@ -748,11 +753,9 @@ export const PDFWorkspace: React.FC<PDFWorkspaceProps> = ({
                       setActiveCommentId(comment.id);
                       onFocusComment?.(comment.id);
                     }}
-                    className={`absolute w-8 h-8 -ml-4 -mt-8 transform transition-all duration-200 hover:scale-110 z-10 group ${
-                      activeCommentId === comment.id ? "scale-150 z-30" : ""
-                    } ${comment.deleted ? "opacity-50 grayscale" : ""} ${
-                      isDraggable ? "cursor-move" : "cursor-pointer"
-                    }`}
+                    className={`absolute w-8 h-8 -ml-4 -mt-8 transform transition-all duration-200 hover:scale-110 z-10 group ${activeCommentId === comment.id ? "scale-150 z-30" : ""
+                      } ${comment.deleted ? "opacity-50 grayscale" : ""} ${isDraggable ? "cursor-move" : "cursor-pointer"
+                      }`}
                     style={{
                       left: `${displayX}%`,
                       top: `${displayY}%`,
@@ -761,17 +764,16 @@ export const PDFWorkspace: React.FC<PDFWorkspaceProps> = ({
                   >
                     <div
                       className={`relative flex items-center justify-center w-full h-full rounded-full shadow-lg border-2 transition-all duration-200 
-                  ${
-                    comment.deleted
-                      ? "bg-red-100 border-red-200"
-                      : comment.resolved
-                        ? "bg-slate-400 border-slate-500"
-                        : comment.author === currentUserRole
-                          ? "bg-indigo-600 border-indigo-200 ring-2 ring-indigo-400" // Emphasis for own comments
-                          : comment.author === UserRole.DESIGNER
-                            ? "bg-purple-600 border-white"
-                            : "bg-blue-500 border-white"
-                  } ${activeCommentId === comment.id ? "ring-4 ring-indigo-300/50 shadow-xl" : ""}`}
+                  ${comment.deleted
+                          ? "bg-red-100 border-red-200"
+                          : comment.resolved
+                            ? "bg-slate-400 border-slate-500"
+                            : comment.author === currentUserRole
+                              ? "bg-indigo-600 border-indigo-200 ring-2 ring-indigo-400" // Emphasis for own comments
+                              : comment.author === UserRole.DESIGNER
+                                ? "bg-purple-600 border-white"
+                                : "bg-blue-500 border-white"
+                        } ${activeCommentId === comment.id ? "ring-4 ring-indigo-300/50 shadow-xl" : ""}`}
                       style={{ opacity: fade }}
                     >
                       {comment.deleted ? (
@@ -791,13 +793,12 @@ export const PDFWorkspace: React.FC<PDFWorkspaceProps> = ({
                     {/* Arrow pointer */}
                     {!comment.deleted && (
                       <div
-                        className={`absolute top-full left-1/2 -ml-1 -mt-1 w-0 h-0 border-l-4 border-l-transparent border-r-4 border-r-transparent border-t-4 ${
-                          comment.resolved
-                            ? "border-t-slate-400"
-                            : comment.author === UserRole.DESIGNER
-                              ? "border-t-purple-600"
-                              : "border-t-indigo-600"
-                        }`}
+                        className={`absolute top-full left-1/2 -ml-1 -mt-1 w-0 h-0 border-l-4 border-l-transparent border-r-4 border-r-transparent border-t-4 ${comment.resolved
+                          ? "border-t-slate-400"
+                          : comment.author === UserRole.DESIGNER
+                            ? "border-t-purple-600"
+                            : "border-t-indigo-600"
+                          }`}
                         style={{ opacity: fade }}
                       ></div>
                     )}
@@ -824,11 +825,10 @@ export const PDFWorkspace: React.FC<PDFWorkspaceProps> = ({
                   >
                     {/* Arrow pointing to marker */}
                     <div
-                      className={`absolute w-4 h-4 bg-white border-slate-200 transform rotate-45 ${
-                        isLowY
-                          ? "-top-2 border-t border-l"
-                          : "top-full -mt-2 border-b border-r"
-                      }`}
+                      className={`absolute w-4 h-4 bg-white border-slate-200 transform rotate-45 ${isLowY
+                        ? "-top-2 border-t border-l"
+                        : "top-full -mt-2 border-b border-r"
+                        }`}
                       style={{
                         left: isLeftX
                           ? "20px"

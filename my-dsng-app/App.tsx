@@ -81,6 +81,7 @@ import { ManageVersionModal } from "./components/ManageVersionModal";
 import { EnhancedDeleteDialog } from "./components/EnhancedDeleteDialog";
 import { CemeteryView } from "./components/CemeteryView";
 import { FeedbackModal } from "./components/FeedbackModal";
+import { GuestWelcomeModal } from "./components/GuestWelcomeModal";
 import { useEngagement } from "./hooks/useEngagement";
 import { doc, updateDoc, increment } from "firebase/firestore";
 
@@ -95,6 +96,7 @@ const App: React.FC = () => {
   const [currentUser, setCurrentUser] = useState<User | null>(null);
   const [authLoading, setAuthLoading] = useState(true);
   const [isGuest, setIsGuest] = useState(false);
+  const [showGuestWelcome, setShowGuestWelcome] = useState(false);
 
   // Projects State
   const [projects, setProjects] = useState<Project[]>([]);
@@ -207,8 +209,9 @@ const App: React.FC = () => {
     });
   }, [isGuest]);
 
+  // Don't show standard onboarding for guests - they get a custom welcome modal
   const showOnboarding =
-    currentUser && !currentUser.hasCompletedOnboarding && view === "workspace";
+    currentUser && !currentUser.hasCompletedOnboarding && view === "workspace" && !isGuest;
 
   const handleOnboardingNext = async () => {
     if (onboardingStep < filteredOnboardingSteps.length - 1) {
@@ -230,7 +233,8 @@ const App: React.FC = () => {
   };
 
   const recordSessionDuration = useCallback(async () => {
-    if (!currentUser || !sessionStartRef.current) return;
+    // Skip for guests - they don't have real user documents
+    if (!currentUser || !sessionStartRef.current || isGuest) return;
     const duration = Date.now() - sessionStartRef.current;
     sessionStartRef.current = Date.now(); // reset so we don't double count
     try {
@@ -240,7 +244,7 @@ const App: React.FC = () => {
     } catch (err) {
       console.error("Failed to update session duration", err);
     }
-  }, [currentUser]);
+  }, [currentUser, isGuest]);
 
   // Collaborators helper
   const collaborators: string[] = activeProject
@@ -254,7 +258,8 @@ const App: React.FC = () => {
 
   const incrementUserField = useCallback(
     async (field: string, amount: number = 1) => {
-      if (!currentUser) return;
+      // Skip for guests - they don't have real user documents
+      if (!currentUser || isGuest) return;
       try {
         await updateDoc(doc(db, "users", currentUser.id), {
           [field]: increment(amount),
@@ -263,7 +268,7 @@ const App: React.FC = () => {
         console.error(`Failed to increment ${field} `, err);
       }
     },
-    [currentUser],
+    [currentUser, isGuest],
   );
 
   const setPdfScale = (newScale: number | ((prev: number) => number)) => {
@@ -380,23 +385,8 @@ const App: React.FC = () => {
       return;
     }
 
-    if (inviterName || projectName || role || projectId) {
-      setInviteDetails({
-        inviterName: inviterName || undefined,
-        projectName: projectName || undefined,
-        role: role || undefined,
-        inviteeName: inviteeName || undefined,
-        inviteeEmail:
-          params.get("inviteeEmail") || params.get("email") || undefined,
-      });
-      // Show welcome landing page for project invitations and deep links too
-      if (!currentUser && !authLoading) {
-        if (view === "auth" || view === "landing") return;
-        setView("landing");
-        return;
-      }
-    }
-
+    // Handle share links with token FIRST (guest access)
+    // This must come before the early return below
     if (projectId && token) {
       const loadSharedProject = async () => {
         const project = await storageService.getSharedProject(projectId, token);
@@ -412,15 +402,35 @@ const App: React.FC = () => {
               project.shareSettings?.accessLevel === "comment"
                 ? "collaborator"
                 : "viewer";
+
+            // Extract invited user details from URL params
+            const guestEmail = inviteeName
+              ? (params.get("inviteeEmail") || "guest@designsync.ai")
+              : "guest@designsync.ai";
+            const guestName = inviteeName || "Guest User";
+
             setCurrentUser({
               id: "guest-" + uuidv4(),
-              email: "guest@designsync.ai",
-              name: "Guest User",
+              email: guestEmail,
+              name: guestName,
               role: guestRole as UserRole,
               plan: "free",
               createdAt: Date.now(),
               subscriptionStatus: "active",
             });
+
+            // Store invite details for account creation flow
+            // Use project ownerName as fallback for inviterName if URL param is missing
+            setInviteDetails({
+              inviterName: inviterName || project.ownerName || undefined,
+              projectName: projectName || project.name || undefined,
+              role: role || undefined,
+              inviteeName: inviteeName || undefined,
+              inviteeEmail: guestEmail !== "guest@designsync.ai" ? guestEmail : undefined,
+            });
+
+            // Show guest welcome modal
+            setShowGuestWelcome(true);
           }
         } else {
           alert("Invalid or expired share link");
@@ -429,6 +439,24 @@ const App: React.FC = () => {
         }
       };
       loadSharedProject();
+      return; // Don't process other logic when handling share link
+    }
+
+    if (inviterName || projectName || role || projectId) {
+      setInviteDetails({
+        inviterName: inviterName || undefined,
+        projectName: projectName || undefined,
+        role: role || undefined,
+        inviteeName: inviteeName || undefined,
+        inviteeEmail:
+          params.get("inviteeEmail") || params.get("email") || undefined,
+      });
+      // Show welcome landing page for project invitations and deep links (non-share-link cases)
+      if (!currentUser && !authLoading) {
+        if (view === "auth" || view === "landing") return;
+        setView("landing");
+        return;
+      }
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [currentUser, authLoading]);
@@ -702,7 +730,8 @@ const App: React.FC = () => {
   // Save zoom level to Firestore when it changes (debounced)
   // Save zoom level to Firestore when it changes (debounced)
   useEffect(() => {
-    if (!activeProject || !currentUser) return;
+    // Skip zoom persistence for guests
+    if (!activeProject || !currentUser || isGuest) return;
 
     // Only save if the change came from user interaction
     if (!isUserZooming.current) {
@@ -748,9 +777,12 @@ const App: React.FC = () => {
       prev.map((p) => (p.id === updatedProject.id ? updatedProject : p)),
     );
 
-    // 2. Persist to "DB"
-    // If guest, we might not be able to save unless rules allow it.
-    // For now assuming rules allow writes if token is valid (handled in storage service/rules)
+    // 2. Skip persistence for guests - they only get local state updates
+    if (isGuest) {
+      return; // Guests cannot persist changes to Firestore
+    }
+
+    // 3. Persist to DB for authenticated users
     const success = await storageService.saveProject(updatedProject);
     if (!success) {
       alert(
@@ -1339,7 +1371,10 @@ const App: React.FC = () => {
 
     try {
       // Upload file to Firebase Storage
-      const globalVersionNumber = activeProject.versions.length + 1;
+      const globalVersionNumber =
+        activeProject.versions.length > 0
+          ? Math.max(...activeProject.versions.map((v) => v.versionNumber)) + 1
+          : 1;
       const categoryVersionNumber = getNextCategoryVersion(
         activeProject.versions,
         category,
@@ -1651,10 +1686,35 @@ const App: React.FC = () => {
         params.append("role", role);
         if (name) params.append("inviteeName", name);
         if (code) params.append("ref", code);
+        // Include invitee email to pre-fill registration form
+        params.append("inviteeEmail", email);
 
-        if (projectToShare.shareSettings?.enabled) {
-          params.append("token", projectToShare.shareSettings.shareToken);
+        // Auto-enable sharing if not already enabled
+        let shareToken = projectToShare.shareSettings?.shareToken;
+        if (!projectToShare.shareSettings?.enabled || !shareToken) {
+          shareToken = storageService.generateShareToken();
+          const newShareSettings = {
+            enabled: true,
+            accessLevel: "comment" as const,
+            shareToken: shareToken,
+          };
+          await storageService.updateProjectShareSettings(
+            projectToShare.id,
+            newShareSettings,
+          );
+          // Update local projects state with new share settings
+          setProjects((prev) =>
+            prev.map((p) =>
+              p.id === projectToShare.id
+                ? { ...p, shareSettings: newShareSettings }
+                : p,
+            ),
+          );
+          console.log("[handleInviteUser] Auto-enabled sharing for frictionless guest access");
         }
+
+        // Always include the share token for frictionless access
+        params.append("token", shareToken);
 
         const shareUrl = `${window.location.origin}?${params.toString()}`;
 
@@ -2003,6 +2063,16 @@ const App: React.FC = () => {
     };
 
     await updateProjectState(updatedProject);
+  };
+
+  // Handle guest clicking "Create Account" from workspace banner
+  const handleGuestSignUp = () => {
+    // Store current project context for after signup
+    if (activeProject) {
+      setPendingProjectId(activeProject.id);
+    }
+    // Switch to auth view with registration mode
+    setView("auth");
   };
 
   // --- View Router ---
@@ -2565,6 +2635,9 @@ const App: React.FC = () => {
                           onPageCountChange={setPageCount}
                           collaborators={collaborators}
                           currentUserEmail={currentUser.email}
+                          isGuest={isGuest}
+                          accessLevel={activeProject.shareSettings?.accessLevel || "comment"}
+                          onSignUpClick={isGuest ? handleGuestSignUp : undefined}
                         />
                       ) : (
                         <ImageWorkspace
@@ -2608,6 +2681,9 @@ const App: React.FC = () => {
                           onTogglePreviousComments={
                             setShowPreviousVersionComments
                           }
+                          isGuest={isGuest}
+                          accessLevel={activeProject.shareSettings?.accessLevel || "comment"}
+                          onSignUpClick={isGuest ? handleGuestSignUp : undefined}
                         />
                       )}
                     </div>
@@ -2647,6 +2723,9 @@ const App: React.FC = () => {
                 onToggleCollapse={(collapsed) => setIsSidebarOpen(!collapsed)}
                 collaborators={collaborators}
                 currentUserEmail={currentUser.email}
+                isGuest={isGuest}
+                onSignUpClick={isGuest ? handleGuestSignUp : undefined}
+                accessLevel={activeProject?.shareSettings?.accessLevel || "comment"}
               />
             )}
           </main>
@@ -2781,6 +2860,21 @@ const App: React.FC = () => {
             campaign={engagementCampaign}
             onSubmit={submitEngagementAnswer}
             onDismiss={dismissEngagement}
+          />
+        )}
+
+        {/* Guest Welcome Modal */}
+        {showGuestWelcome && activeProject && (
+          <GuestWelcomeModal
+            inviterName={inviteDetails?.inviterName}
+            projectName={inviteDetails?.projectName || activeProject.name}
+            guestName={currentUser?.name}
+            accessLevel={activeProject.shareSettings?.accessLevel || "comment"}
+            onClose={() => setShowGuestWelcome(false)}
+            onSignUp={() => {
+              setShowGuestWelcome(false);
+              handleGuestSignUp();
+            }}
           />
         )}
       </React.Fragment>

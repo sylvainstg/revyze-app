@@ -13,12 +13,16 @@ export const VersionSelector: React.FC<VersionSelectorProps> = ({
   currentVersionId,
   onVersionChange,
 }) => {
-  const sortedVersions = [...versions].sort(
-    (a, b) => b.versionNumber - a.versionNumber,
-  );
+  const sortedVersions = [...versions].sort((a, b) => {
+    // Primary sort: Timestamp (newest first)
+    const timeDiff = (b.timestamp || 0) - (a.timestamp || 0);
+    if (timeDiff !== 0) return timeDiff;
+    // Secondary sort: Version Number (highest first)
+    return b.versionNumber - a.versionNumber;
+  });
 
   return (
-    <div className="relative inline-block">
+    <div className="relative inline-block" >
       <select
         value={currentVersionId}
         onChange={(e) => onVersionChange(e.target.value)}
@@ -40,7 +44,7 @@ export const VersionSelector: React.FC<VersionSelectorProps> = ({
       </select>
 
       {/* Custom dropdown arrow */}
-      <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center px-3 text-slate-500">
+      <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center px-3 text-slate-500" >
         <svg
           className="w-4 h-4"
           fill="none"
@@ -54,8 +58,8 @@ export const VersionSelector: React.FC<VersionSelectorProps> = ({
             d="M19 9l-7 7-7-7"
           />
         </svg>
-      </div>
-    </div>
+      </div >
+    </div >
   );
 };
 
@@ -78,9 +82,13 @@ export const VersionSelectorDetailed: React.FC<
     currentVersionId,
     onEditVersionDefined: !!onEditVersion,
   });
-  const sortedVersions = [...versions].sort(
-    (a, b) => b.versionNumber - a.versionNumber,
-  );
+  const sortedVersions = [...versions].sort((a, b) => {
+    // Primary sort: Timestamp (newest first)
+    const timeDiff = (b.timestamp || 0) - (a.timestamp || 0);
+    if (timeDiff !== 0) return timeDiff;
+    // Secondary sort: Version Number (highest first)
+    return b.versionNumber - a.versionNumber;
+  });
   const currentVersion = versions.find((v) => v.id === currentVersionId);
 
   return (
@@ -131,9 +139,8 @@ export const VersionSelectorDetailed: React.FC<
               return (
                 <div
                   key={version.id}
-                  className={`w-full text-left px-4 py-3 hover:bg-slate-50 transition-colors group flex items-start justify-between gap-3 ${
-                    isActive ? "bg-indigo-50 border-l-4 border-indigo-600" : ""
-                  }`}
+                  className={`w-full text-left px-4 py-3 hover:bg-slate-50 transition-colors group flex items-start justify-between gap-3 ${isActive ? "bg-indigo-50 border-l-4 border-indigo-600" : ""
+                    }`}
                 >
                   <button
                     onClick={() => {

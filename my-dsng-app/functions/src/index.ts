@@ -433,9 +433,16 @@ export const getReferrerInfoFunction = functions
 
 // ========== STRIPE WEBHOOK ==========
 
-export const initStripe = functions.https.onRequest(async (req, res) => {
+export const initStripe = functions.https.onCall(async (data, context) => {
+  if (!context.auth) {
+    throw new functions.https.HttpsError("unauthenticated", "Auth required.");
+  }
+  const callerDoc = await admin.firestore().collection("users").doc(context.auth.uid).get();
+  if (!callerDoc.data()?.isAdmin) {
+    throw new functions.https.HttpsError("permission-denied", "Admin only.");
+  }
   await initializeStripeProducts();
-  res.send("Stripe products initialized.");
+  return { message: "Stripe products initialized." };
 });
 
 export const stripeWebhook = functions.https.onRequest(async (req, res) => {
@@ -746,94 +753,7 @@ export const fixProjectVersionCategory = functions.https.onCall(
   },
 );
 
-// One-time HTTP function to fix category (no auth required for this admin task)
-export const fixCategoryHttp = functions.https.onRequest(async (req, res) => {
-  try {
-    const db = admin.firestore();
 
-    // Get category from request body or query parameter
-    const newCategory =
-      req.body?.newCategory || req.query?.newCategory || "Electrique";
-
-    console.log('Searching for project "Maison à Irlande"...');
-    console.log("Target category:", newCategory);
-
-    // Query for the project by name
-    const projectsSnapshot = await db
-      .collection("projects")
-      .where("name", "==", "Maison à Irlande")
-      .limit(1)
-      .get();
-
-    if (projectsSnapshot.empty) {
-      res.status(404).send('Project "Maison à Irlande" not found');
-      return;
-    }
-
-    const projectDoc = projectsSnapshot.docs[0];
-    const projectData = projectDoc.data();
-
-    if (!projectData.versions || projectData.versions.length === 0) {
-      res.status(400).send("No versions found in project");
-      return;
-    }
-
-    // Sort versions by timestamp to find the latest
-    const sortedVersions = [...projectData.versions].sort(
-      (a: any, b: any) => b.timestamp - a.timestamp,
-    );
-    const latestVersion = sortedVersions[0];
-
-    // Check if already in target category
-    if (latestVersion.category === newCategory) {
-      res.send({
-        success: true,
-        message: `Version is already in "${newCategory}" category`,
-        version: latestVersion.fileName,
-      });
-      return;
-    }
-
-    // Calculate the next category version number for target category
-    const categoryVersions = projectData.versions.filter(
-      (v: any) => v.category === newCategory,
-    );
-    const nextCategoryVersion = categoryVersions.length + 1;
-
-    // Update the latest version's category
-    const updatedVersions = projectData.versions.map((v: any) => {
-      if (v.id === latestVersion.id) {
-        return {
-          ...v,
-          category: newCategory,
-          categoryVersionNumber: nextCategoryVersion,
-        };
-      }
-      return v;
-    });
-
-    // Update the project
-    await projectDoc.ref.update({
-      versions: updatedVersions,
-      activeCategory: newCategory,
-      lastModified: Date.now(),
-    });
-
-    res.send({
-      success: true,
-      message: `Successfully updated version "${latestVersion.fileName}" to category "${newCategory}"`,
-      details: {
-        fileName: latestVersion.fileName,
-        oldCategory: latestVersion.category || "Main Plans",
-        newCategory: newCategory,
-        categoryVersionNumber: nextCategoryVersion,
-      },
-    });
-  } catch (error: any) {
-    console.error("Error fixing category:", error);
-    res.status(500).send({ error: error.message });
-  }
-});
 
 // ========== CAMPAIGN MANAGER FUNCTIONS ==========
 
