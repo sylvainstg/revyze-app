@@ -14,6 +14,7 @@ import {
   ChevronRight,
   Share,
   UserPlus,
+  FileDown,
 } from "lucide-react";
 import * as geminiService from "../services/geminiService";
 import * as featureVoteService from "../services/featureVoteService";
@@ -50,6 +51,7 @@ interface CollaborationPanelProps {
   isGuest?: boolean;
   onSignUpClick?: () => void;
   accessLevel?: "view" | "comment";
+  onExportComments?: () => void | Promise<void>;
 }
 
 export const CollaborationPanel: React.FC<CollaborationPanelProps> = ({
@@ -75,6 +77,7 @@ export const CollaborationPanel: React.FC<CollaborationPanelProps> = ({
   isGuest = false,
   onSignUpClick,
   accessLevel = "comment",
+  onExportComments,
 }) => {
   const [localIsCollapsed, setLocalIsCollapsed] = useState(false);
 
@@ -95,6 +98,17 @@ export const CollaborationPanel: React.FC<CollaborationPanelProps> = ({
     id: string;
     show: boolean;
   }>({ id: "", show: false });
+  const [isExporting, setIsExporting] = useState(false);
+
+  const handleExport = async () => {
+    if (!onExportComments) return;
+    setIsExporting(true);
+    try {
+      await onExportComments();
+    } finally {
+      setIsExporting(false);
+    }
+  };
 
   // Check if user has already voted
   useEffect(() => {
@@ -217,6 +231,22 @@ export const CollaborationPanel: React.FC<CollaborationPanelProps> = ({
                   {visibleComments.length}
                 </span>
               </h2>
+
+              {onExportComments && comments.length > 0 && (
+                <button
+                  onClick={handleExport}
+                  disabled={isExporting}
+                  className={`ml-auto bg-white border border-slate-200 rounded-lg px-2 py-1.5 transition-colors shadow-sm flex items-center gap-1 text-xs ${isExporting ? "opacity-50 cursor-not-allowed text-slate-400" : "text-slate-600 hover:text-indigo-600 hover:bg-slate-50"}`}
+                  title="Export comments as PDF"
+                >
+                  {isExporting ? (
+                    <div className="w-3.5 h-3.5 border-2 border-slate-300 border-t-indigo-600 rounded-full animate-spin" />
+                  ) : (
+                    <FileDown className="w-3.5 h-3.5" />
+                  )}
+                  {isExporting ? "Exporting..." : "Export"}
+                </button>
+              )}
             </div>
 
             {/* Filter Toggles */}

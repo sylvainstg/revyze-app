@@ -57,6 +57,7 @@ import {
   getCommentAudience,
   canSeeComment,
 } from "./utils/projectRoleHelper";
+import { exportCommentsPdf } from "./utils/exportCommentsPdf";
 import {
   getCategories,
   getVersionsByCategory,
@@ -2019,6 +2020,28 @@ const App: React.FC = () => {
     if (activeCommentId === id) setActiveCommentId(null);
   };
 
+  const handleExportComments = async () => {
+    if (!activeProject || !activeVersion) return;
+
+    const isPDF = activeVersion.fileName.toLowerCase().endsWith(".pdf");
+    const comments = activeVersion.comments || [];
+    if (comments.filter((c) => !c.deleted).length === 0) return;
+
+    try {
+      await exportCommentsPdf({
+        comments,
+        projectName: activeProject.name,
+        versionName: activeVersion.name || `v${activeVersion.versionNumber}`,
+        category: activeVersion.category,
+        fileUrl: activeVersion.fileUrl,
+        isPdf: isPDF,
+        pageCount: pageCount || 1,
+      });
+    } catch (err) {
+      console.error("[Export] Failed to export comments PDF:", err);
+    }
+  };
+
   const handleUpdateMoodBoardElements = async (
     elements: MoodBoardElement[],
   ) => {
@@ -2550,7 +2573,7 @@ const App: React.FC = () => {
 
                 return (
                   <div className="h-full flex flex-col">
-                    {!isLatestVersion && (
+                    {!isLatestVersion && activeCategory !== "Mood Board" && (
                       <div className="bg-amber-50 border border-amber-200 text-amber-800 px-4 py-2 flex items-center justify-between text-sm">
                         <div className="flex items-center gap-2">
                           <AlertCircle className="w-4 h-4" />
@@ -2578,6 +2601,7 @@ const App: React.FC = () => {
                           currentUser={currentUser}
                           scale={moodBoardScale}
                           setScale={setMoodBoardScale}
+                          projectId={activeProject.id}
                         />
                       ) : isPDF ? (
                         <PDFWorkspace
@@ -2726,6 +2750,7 @@ const App: React.FC = () => {
                 isGuest={isGuest}
                 onSignUpClick={isGuest ? handleGuestSignUp : undefined}
                 accessLevel={activeProject?.shareSettings?.accessLevel || "comment"}
+                onExportComments={handleExportComments}
               />
             )}
           </main>

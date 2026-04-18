@@ -10,8 +10,11 @@ import {
   ZoomIn,
   ZoomOut,
   Move,
+  Upload,
+  Loader2,
 } from "lucide-react";
 import { v4 as uuidv4 } from "uuid";
+import { uploadFile } from "../services/storageService";
 
 interface MoodBoardWorkspaceProps {
   elements: MoodBoardElement[];
@@ -19,6 +22,7 @@ interface MoodBoardWorkspaceProps {
   currentUser: User;
   scale: number;
   setScale: (scale: number) => void;
+  projectId: string;
 }
 
 export const MoodBoardWorkspace: React.FC<MoodBoardWorkspaceProps> = ({
@@ -27,6 +31,7 @@ export const MoodBoardWorkspace: React.FC<MoodBoardWorkspaceProps> = ({
   currentUser,
   scale,
   setScale,
+  projectId,
 }) => {
   const [panOffset, setPanOffset] = useState({ x: 0, y: 0 });
   const [isPanning, setIsPanning] = useState(false);
@@ -40,9 +45,17 @@ export const MoodBoardWorkspace: React.FC<MoodBoardWorkspaceProps> = ({
     null,
   );
   const [dragStart, setDragStart] = useState({ x: 0, y: 0 });
+  const [uploadingElementIds, setUploadingElementIds] = useState<Set<string>>(
+    new Set(),
+  );
 
   const containerRef = useRef<HTMLDivElement>(null);
   const canvasRef = useRef<HTMLDivElement>(null);
+  const toolbarFileInputRef = useRef<HTMLInputElement>(null);
+  const inlineFileInputRef = useRef<HTMLInputElement>(null);
+  const [inlineUploadTargetId, setInlineUploadTargetId] = useState<
+    string | null
+  >(null);
 
   // Handle zooming with scroll wheel
   useEffect(() => {
@@ -108,10 +121,10 @@ export const MoodBoardWorkspace: React.FC<MoodBoardWorkspaceProps> = ({
         const updatedElements = elements.map((el) =>
           el.id === resizingElementId
             ? {
-                ...el,
-                width: Math.max(50, el.width + dx),
-                height: Math.max(50, el.height + dy),
-              }
+              ...el,
+              width: Math.max(50, el.width + dx),
+              height: Math.max(50, el.height + dy),
+            }
             : el,
         );
         onUpdateElements(updatedElements);
@@ -154,6 +167,104 @@ export const MoodBoardWorkspace: React.FC<MoodBoardWorkspaceProps> = ({
     );
   };
 
+  // Upload an image file and create (or update) a moodboard element
+  const handleImageUpload = async (
+    file: File,
+    existingElementId?: string,
+  ) => {
+    const elementId = existingElementId || uuidv4();
+
+    // If creating a new element, add it immediately with a placeholder
+    if (!existingElementId) {
+      const newElement: MoodBoardElement = {
+        id: elementId,
+        type: "image",
+        x: (window.innerWidth / 2 - panOffset.x) / scale - 100,
+        y: (window.innerHeight / 2 - panOffset.y) / scale - 100,
+        width: 200,
+        height: 200,
+        content: "", // Will be filled after upload
+        ownerId: currentUser.id,
+        ownerName: currentUser.name,
+        timestamp: Date.now(),
+      };
+      onUpdateElements([...elements, newElement]);
+      setSelectedElementId(elementId);
+    }
+
+    // Mark as uploading
+    setUploadingElementIds((prev) => new Set(prev).add(elementId));
+
+    try {
+      const storagePath = `projects/${projectId}/moodboard/${elementId}_${file.name}`;
+      const downloadURL = await uploadFile(file, storagePath);
+
+      if (downloadURL) {
+        // We need to use the latest elements — use a functional style via onUpdateElements
+        // Since onUpdateElements replaces the full array, we read the current elements
+        // at the time of update. We'll rely on the parent providing the latest `elements`
+        // via a callback approach. For now, update optimistically:
+        onUpdateElements(
+          (existingElementId ? elements : [...elements, {
+            id: elementId,
+            type: "image" as const,
+            x: (window.innerWidth / 2 - panOffset.x) / scale - 100,
+            y: (window.innerHeight / 2 - panOffset.y) / scale - 100,
+            width: 200,
+            height: 200,
+            content: "",
+            ownerId: currentUser.id,
+            ownerName: currentUser.name,
+            timestamp: Date.now(),
+          }]).map((el) =>
+            el.id === elementId ? { ...el, content: downloadURL } : el,
+          ),
+        );
+      } else {
+        // Upload failed — remove the element if it was freshly created
+        if (!existingElementId) {
+          onUpdateElements(elements.filter((el) => el.id !== elementId));
+        }
+        console.error("Upload failed: no download URL returned");
+      }
+    } catch (err) {
+      console.error("Error uploading moodboard image:", err);
+      if (!existingElementId) {
+        onUpdateElements(elements.filter((el) => el.id !== elementId));
+      }
+    } finally {
+      setUploadingElementIds((prev) => {
+        const next = new Set(prev);
+        next.delete(elementId);
+        return next;
+      });
+    }
+  };
+
+  // Toolbar upload handler
+  const handleToolbarFileChange = (
+    e: React.ChangeEvent<HTMLInputElement>,
+  ) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      handleImageUpload(file);
+    }
+    // Reset the input so the same file can be re-selected
+    e.target.value = "";
+  };
+
+  // Inline (per-element) upload handler
+  const handleInlineFileChange = (
+    e: React.ChangeEvent<HTMLInputElement>,
+  ) => {
+    const file = e.target.files?.[0];
+    if (file && inlineUploadTargetId) {
+      handleImageUpload(file, inlineUploadTargetId);
+    }
+    e.target.value = "";
+    setInlineUploadTargetId(null);
+  };
+
   return (
     <div
       ref={containerRef}
@@ -163,6 +274,22 @@ export const MoodBoardWorkspace: React.FC<MoodBoardWorkspaceProps> = ({
       onMouseUp={handleMouseUp}
       onMouseLeave={handleMouseUp}
     >
+      {/* Hidden file inputs */}
+      <input
+        ref={toolbarFileInputRef}
+        type="file"
+        accept="image/*"
+        className="hidden"
+        onChange={handleToolbarFileChange}
+      />
+      <input
+        ref={inlineFileInputRef}
+        type="file"
+        accept="image/*"
+        className="hidden"
+        onChange={handleInlineFileChange}
+      />
+
       {/* Canvas */}
       <div
         ref={canvasRef}
@@ -180,11 +307,10 @@ export const MoodBoardWorkspace: React.FC<MoodBoardWorkspaceProps> = ({
         {elements.map((el) => (
           <div
             key={el.id}
-            className={`absolute rounded-lg shadow-sm border-2 transition-shadow group ${
-              selectedElementId === el.id
+            className={`absolute rounded-lg shadow-sm border-2 transition-shadow group ${selectedElementId === el.id
                 ? "border-indigo-500 ring-4 ring-indigo-200 shadow-xl"
                 : "border-white"
-            }`}
+              }`}
             style={{
               left: el.x,
               top: el.y,
@@ -204,15 +330,24 @@ export const MoodBoardWorkspace: React.FC<MoodBoardWorkspaceProps> = ({
             {/* Content Rendering */}
             <div className="w-full h-full overflow-hidden p-2 relative">
               {el.type === "image" &&
-                (el.content && el.content.startsWith("http") ? (
+                (uploadingElementIds.has(el.id) ? (
+                  /* Upload in progress */
+                  <div className="w-full h-full flex flex-col items-center justify-center text-indigo-500 bg-indigo-50 rounded border-2 border-dashed border-indigo-200">
+                    <Loader2 className="w-8 h-8 mb-2 animate-spin" />
+                    <span className="text-[10px] font-semibold">
+                      Uploading…
+                    </span>
+                  </div>
+                ) : el.content && el.content.startsWith("http") ? (
                   <img
                     src={el.content}
                     alt=""
                     className="w-full h-full object-cover rounded"
                   />
                 ) : (
-                  <div className="w-full h-full flex flex-col items-center justify-center text-slate-400 bg-slate-100 rounded border-2 border-dashed border-slate-200">
-                    <ImageIcon className="w-8 h-8 mb-2" />
+                  /* Empty image — URL input + upload button */
+                  <div className="w-full h-full flex flex-col items-center justify-center text-slate-400 bg-slate-100 rounded border-2 border-dashed border-slate-200 gap-2">
+                    <ImageIcon className="w-8 h-8" />
                     <input
                       className="w-[80%] bg-transparent border-none text-[10px] text-center focus:ring-0"
                       placeholder="Paste Image URL"
@@ -222,6 +357,18 @@ export const MoodBoardWorkspace: React.FC<MoodBoardWorkspaceProps> = ({
                       }
                       onMouseDown={(e) => e.stopPropagation()}
                     />
+                    <button
+                      className="flex items-center gap-1 px-2.5 py-1 bg-indigo-500 hover:bg-indigo-600 text-white text-[10px] font-semibold rounded-md transition-colors shadow-sm"
+                      onMouseDown={(e) => e.stopPropagation()}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setInlineUploadTargetId(el.id);
+                        inlineFileInputRef.current?.click();
+                      }}
+                    >
+                      <Upload className="w-3 h-3" />
+                      Upload
+                    </button>
                   </div>
                 ))}
 
@@ -320,6 +467,15 @@ export const MoodBoardWorkspace: React.FC<MoodBoardWorkspaceProps> = ({
           className="hover:bg-blue-50"
         >
           Image
+        </Button>
+        <Button
+          variant="secondary"
+          size="sm"
+          icon={<Upload className="w-4 h-4 text-emerald-500" />}
+          onClick={() => toolbarFileInputRef.current?.click()}
+          className="hover:bg-emerald-50"
+        >
+          Upload
         </Button>
         <Button
           variant="secondary"
