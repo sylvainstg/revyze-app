@@ -132,6 +132,9 @@ export const FurnitureLayer: React.FC<FurnitureLayerProps> = ({
     if (!active || !selectedId || !canEdit) return;
     const onKey = (e: KeyboardEvent) => {
       if (e.key === "Delete" || e.key === "Backspace") {
+        // Don't delete when user is typing in an input/textarea (e.g. inspector)
+        const tag = (e.target as HTMLElement)?.tagName;
+        if (tag === "INPUT" || tag === "TEXTAREA" || tag === "SELECT") return;
         const target = items.find((it) => it.id === selectedId);
         if (!target) return;
         // Soft-delete to mirror Comment behavior.
