@@ -29,6 +29,8 @@ import {
   ShareSettings,
   ProjectVersion,
   MoodBoardElement,
+  FurnitureItem,
+  ProjectScale,
 } from "./types";
 import {
   Upload,
@@ -43,6 +45,9 @@ import {
   STANDARD_CATEGORIES,
 } from "./constants";
 import { v4 as uuidv4 } from "uuid";
+import { FurniturePalette, PlaceRequest } from "./components/FurniturePalette";
+import { generatePlaceholderImage } from "./data/furnitureLibrary";
+import { pagePercentToCm } from "./utils/scaleConversion";
 import { ShareModal } from "./components/ShareModal";
 import { ProjectSettingsModal } from "./components/ProjectSettingsModal";
 import { CreateProjectModal } from "./components/CreateProjectModal";
@@ -161,6 +166,15 @@ const App: React.FC = () => {
   const isUserZooming = useRef(false);
   const [showPreviousVersionComments, setShowPreviousVersionComments] =
     useState(false);
+
+  // Furniture layer — mode + selection live here so the right sidebar can swap
+  // between Feedback and Furniture panels in lockstep with PDFWorkspace's tools.
+  const [furnitureMode, setFurnitureMode] = useState<
+    "comment" | "furniture" | "calibrate"
+  >("comment");
+  const [selectedFurnitureId, setSelectedFurnitureId] = useState<string | null>(
+    null,
+  );
 
   useEffect(() => {
     // Reset known page count when switching documents/versions
@@ -2057,6 +2071,93 @@ const App: React.FC = () => {
     await updateProjectState(updatedProject);
   };
 
+  const handleUpdateFurnitureItems = async (items: FurnitureItem[]) => {
+    if (!activeProject || !activeVersion) return;
+
+    const updatedProject = {
+      ...activeProject,
+      versions: activeProject.versions.map((v) =>
+        v.id === activeVersion.id ? { ...v, furnitureItems: items } : v,
+      ),
+    };
+
+    await updateProjectState(updatedProject);
+  };
+
+  const handleUpdateProjectScale = async (scale: ProjectScale) => {
+    if (!activeProject) return;
+    const updatedProject = { ...activeProject, scale };
+    await updateProjectState(updatedProject);
+  };
+
+  // Place a new furniture item from the palette. Default position is the
+  // center of the current page (in cm), and zIndex is the top of the stack.
+  const handlePlaceFurniture = (req: PlaceRequest) => {
+    if (!activeProject || !activeVersion || !currentUser) return;
+    const scale = activeProject.scale;
+    if (!scale) return;
+
+    const items = activeVersion.furnitureItems || [];
+    const maxZ = items.reduce(
+      (m, it) => (it.deleted ? m : Math.max(m, it.zIndex)),
+      0,
+    );
+
+    const xCm = pagePercentToCm(50, "x", scale);
+    const yCm = pagePercentToCm(50, "y", scale);
+
+    const base = {
+      id: uuidv4(),
+      pageNumber,
+      xCm,
+      yCm,
+      rotation: 0,
+      zIndex: maxZ + 1,
+      createdBy: currentUser.id,
+      createdByName: currentUser.name,
+      createdAt: Date.now(),
+      updatedAt: Date.now(),
+    };
+
+    let newItem: FurnitureItem;
+    if (req.kind === "library") {
+      const li = req.libraryItem;
+      newItem = {
+        ...base,
+        widthCm: li.defaultWidthCm,
+        heightCm: li.defaultHeightCm,
+        source: "library",
+        imageUrl: generatePlaceholderImage(li),
+        label: li.label,
+        category: li.category,
+        libraryItemId: li.id,
+      };
+    } else if (req.kind === "search") {
+      newItem = {
+        ...base,
+        widthCm: req.widthCm,
+        heightCm: req.heightCm,
+        source: "search",
+        imageUrl: req.imageUrl,
+        label: req.label,
+        searchQuery: req.searchQuery,
+        attribution: req.attribution,
+      };
+    } else {
+      newItem = {
+        ...base,
+        widthCm: req.widthCm,
+        heightCm: req.heightCm,
+        source: "upload",
+        imageUrl: req.imageUrl,
+        label: req.label,
+      };
+    }
+
+    handleUpdateFurnitureItems([...items, newItem]);
+    setSelectedFurnitureId(newItem.id);
+  };
+
   const handlePushToProfessional = async (commentId: string) => {
     if (!activeProject || !activeVersion || !currentUser) return;
 
@@ -2662,6 +2763,17 @@ const App: React.FC = () => {
                           isGuest={isGuest}
                           accessLevel={activeProject.shareSettings?.accessLevel || "comment"}
                           onSignUpClick={isGuest ? handleGuestSignUp : undefined}
+                          currentUser={currentUser}
+                          projectId={activeProject.id}
+                          projectScale={activeProject.scale}
+                          onUpdateProjectScale={handleUpdateProjectScale}
+                          furnitureItems={activeVersion.furnitureItems || []}
+                          onUpdateFurnitureItems={handleUpdateFurnitureItems}
+                          lengthSystem={currentUser.lengthSystem || "metric"}
+                          mode={furnitureMode}
+                          onModeChange={setFurnitureMode}
+                          selectedFurnitureId={selectedFurnitureId}
+                          onSelectFurniture={setSelectedFurnitureId}
                         />
                       ) : (
                         <ImageWorkspace
@@ -2716,42 +2828,54 @@ const App: React.FC = () => {
               })()}
             </div>
 
-            {/* Collaboration Panel - hidden for Mood Board, else shrinks/grows based on collapse state */}
+            {/* Right sidebar — Feedback (CollaborationPanel) or Furniture
+                (FurniturePalette), driven by furnitureMode. Hidden for Mood Board. */}
             {activeCategory !== "Mood Board" && (
-              <CollaborationPanel
-                comments={activeVersion.comments}
-                onResolveComment={handleResolveComment}
-                onDeleteComment={handleDeleteComment}
-                onReplyComment={handleReplyComment}
-                onPushToProfessional={
-                  !isGuest && activeProject?.ownerId === currentUser?.id
-                    ? handlePushToProfessional
-                    : undefined
-                }
-                activeCommentId={activeCommentId}
-                setActiveCommentId={setActiveCommentId}
-                currentUserRole={currentUser.role}
-                projectRole={getProjectRole(
-                  activeProject,
-                  currentUser,
-                  isGuest,
-                  impersonatedRole,
-                )}
-                pageNumber={pageNumber}
-                onPageChange={(page) => setPageNumber(page)}
-                pageCount={pageCount}
-                currentUser={currentUser}
-                filter={commentFilter}
-                onUpdateFilter={setCommentFilter}
-                isCollapsed={!isSidebarOpen}
-                onToggleCollapse={(collapsed) => setIsSidebarOpen(!collapsed)}
-                collaborators={collaborators}
-                currentUserEmail={currentUser.email}
-                isGuest={isGuest}
-                onSignUpClick={isGuest ? handleGuestSignUp : undefined}
-                accessLevel={activeProject?.shareSettings?.accessLevel || "comment"}
-                onExportComments={handleExportComments}
-              />
+              furnitureMode === "furniture" && activeProject ? (
+                <FurniturePalette
+                  visible
+                  projectId={activeProject.id}
+                  hasScale={!!activeProject.scale}
+                  lengthSystem={currentUser.lengthSystem || "metric"}
+                  onPlace={handlePlaceFurniture}
+                  onClose={() => setFurnitureMode("comment")}
+                />
+              ) : (
+                <CollaborationPanel
+                  comments={activeVersion.comments}
+                  onResolveComment={handleResolveComment}
+                  onDeleteComment={handleDeleteComment}
+                  onReplyComment={handleReplyComment}
+                  onPushToProfessional={
+                    !isGuest && activeProject?.ownerId === currentUser?.id
+                      ? handlePushToProfessional
+                      : undefined
+                  }
+                  activeCommentId={activeCommentId}
+                  setActiveCommentId={setActiveCommentId}
+                  currentUserRole={currentUser.role}
+                  projectRole={getProjectRole(
+                    activeProject,
+                    currentUser,
+                    isGuest,
+                    impersonatedRole,
+                  )}
+                  pageNumber={pageNumber}
+                  onPageChange={(page) => setPageNumber(page)}
+                  pageCount={pageCount}
+                  currentUser={currentUser}
+                  filter={commentFilter}
+                  onUpdateFilter={setCommentFilter}
+                  isCollapsed={!isSidebarOpen}
+                  onToggleCollapse={(collapsed) => setIsSidebarOpen(!collapsed)}
+                  collaborators={collaborators}
+                  currentUserEmail={currentUser.email}
+                  isGuest={isGuest}
+                  onSignUpClick={isGuest ? handleGuestSignUp : undefined}
+                  accessLevel={activeProject?.shareSettings?.accessLevel || "comment"}
+                  onExportComments={handleExportComments}
+                />
+              )
             )}
           </main>
         </div>

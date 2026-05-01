@@ -41,6 +41,8 @@ export interface User {
   tokenBalance?: number;
   totalReferrals?: number;
   hasCompletedOnboarding?: boolean;
+  // Display preferences
+  lengthSystem?: LengthSystem; // "metric" | "imperial", default "metric"
   // Notifications
   notificationPreferences?: {
     mentions: "instant" | "daily" | "weekly" | "none";
@@ -101,6 +103,68 @@ export interface MoodBoardElement {
   timestamp: number;
 }
 
+// --- Furniture Layer ---
+
+export type LengthUnit = "mm" | "cm" | "m" | "in" | "ft";
+export type LengthSystem = "metric" | "imperial";
+
+// Project-wide scale calibration. Furniture is stored in cm; this is how we
+// convert cm to/from page-percent at render time.
+export interface ProjectScale {
+  // cm per pixel on the rendered PDF page at native (scale=1) render.
+  // Derived from two-click calibration assuming isotropic scaling.
+  cmPerPx: number;
+  // Page natural pixel dims at calibration time (scale=1). Used to convert
+  // cm <-> page-percent without depending on current zoom.
+  pageWidthPx: number;
+  pageHeightPx: number;
+  // The two reference points the user clicked, kept for re-calibration UX.
+  calibrationLine: {
+    pointA: { x: number; y: number }; // page-percent
+    pointB: { x: number; y: number }; // page-percent
+    pageNumber: number;
+  };
+  // What the user typed during calibration (source of truth for display).
+  calibratedDistance: number;
+  calibratedUnit: LengthUnit;
+  calibratedAt: number;
+  calibratedBy: string; // user id
+}
+
+export type FurnitureSource = "library" | "upload" | "url" | "search";
+
+export interface FurnitureItem {
+  id: string;
+  pageNumber: number;
+  // Center position of the item in cm, measured from the page top-left.
+  // Center (not corner) so rotation pivots intuitively.
+  xCm: number;
+  yCm: number;
+  widthCm: number;
+  heightCm: number;
+  rotation: number; // degrees, 0–360, clockwise
+  zIndex: number;
+
+  source: FurnitureSource;
+  // Always a Firebase Storage URL once persisted (we never hotlink).
+  imageUrl: string;
+  thumbnailUrl?: string;
+
+  label?: string;
+  note?: string;
+  category?: string;
+  libraryItemId?: string; // if source === "library"
+  searchQuery?: string; // if source === "search"
+  attribution?: { source: string; pageUrl?: string };
+  backgroundRemoved?: boolean;
+
+  createdBy: string;
+  createdByName: string;
+  createdAt: number;
+  updatedAt: number;
+  deleted?: boolean;
+}
+
 export interface ProjectVersion {
   id: string;
   versionNumber: number; // Global version number across all categories
@@ -114,6 +178,7 @@ export interface ProjectVersion {
   timestamp: number;
   comments: Comment[];
   moodBoardElements?: MoodBoardElement[];
+  furnitureItems?: FurnitureItem[];
 }
 
 export interface ShareSettings {
@@ -139,6 +204,7 @@ export interface Project {
   activeCategory?: string; // Currently selected document category
   categorySettings?: Record<string, CategorySettings>; // Settings per category
   zoomLevel?: number; // User's preferred zoom level for this project (default 1.0)
+  scale?: ProjectScale; // Calibrated real-world scale for furniture placement
   createdAt: number;
   lastModified: number;
   shareSettings?: ShareSettings;

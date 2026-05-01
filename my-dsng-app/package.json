@@ -10,7 +10,8 @@
     "type-check": "tsc --noEmit",
     "format": "prettier --write .",
     "preview": "vite preview",
-    "deploy:staging": "npm run build && firebase hosting:channel:deploy staging"
+    "deploy:staging": "npm run build && firebase hosting:channel:deploy staging",
+    "deploy:prod": "npm run build && firebase deploy --only hosting"
   },
   "dependencies": {
     "@google/genai": "^1.30.0",

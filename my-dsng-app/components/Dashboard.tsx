@@ -72,6 +72,9 @@ export const Dashboard: React.FC<DashboardProps> = ({
   const [isEditProfileOpen, setIsEditProfileOpen] = useState(false);
   const [isProfileMenuOpen, setIsProfileMenuOpen] = useState(false);
   const [editName, setEditName] = useState(user.name);
+  const [editLengthSystem, setEditLengthSystem] = useState<
+    "metric" | "imperial"
+  >(user.lengthSystem || "metric");
   const [isSavingProfile, setIsSavingProfile] = useState(false);
   const [showReferralDashboard, setShowReferralDashboard] = useState(false);
   const [activeStatsTab, setActiveStatsTab] = useState<
@@ -115,7 +118,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
     try {
       const { updateUserProfile } = await import("../services/authService");
 
-      const updates: any = { name: editName };
+      const updates: any = { name: editName, lengthSystem: editLengthSystem };
 
       // Include notification pref updates if present
       if (notificationUpdateRef.current) {
@@ -223,6 +226,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
                       <button
                         onClick={() => {
                           setEditName(user.name);
+                          setEditLengthSystem(user.lengthSystem || "metric");
                           setIsEditProfileOpen(true);
                           setIsProfileMenuOpen(false);
                         }}
@@ -605,6 +609,27 @@ export const Dashboard: React.FC<DashboardProps> = ({
                       className="w-full px-3 py-2 border border-slate-200 rounded-lg bg-slate-50 text-slate-500 cursor-not-allowed"
                       aria-readonly
                     />
+                    <label className="block text-sm font-medium text-slate-700 mb-1 mt-4">
+                      Measurement units
+                    </label>
+                    <div className="flex gap-2">
+                      {(["metric", "imperial"] as const).map((sys) => (
+                        <button
+                          key={sys}
+                          onClick={() => setEditLengthSystem(sys)}
+                          className={`flex-1 px-3 py-2 text-sm font-medium rounded-lg transition-colors capitalize ${
+                            editLengthSystem === sys
+                              ? "bg-indigo-600 text-white shadow-sm"
+                              : "bg-white text-slate-600 border border-slate-200 hover:bg-slate-100"
+                          }`}
+                        >
+                          {sys === "metric" ? "Metric (cm, m)" : "Imperial (in, ft)"}
+                        </button>
+                      ))}
+                    </div>
+                    <p className="text-xs text-slate-500 mt-1">
+                      How furniture sizes are displayed.
+                    </p>
                   </div>
 
                   <div className="pt-4 border-t border-slate-100">

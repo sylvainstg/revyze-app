@@ -1,12 +1,35 @@
 import React, { useState, useRef, useEffect } from "react";
 import { Document, Page, pdfjs } from "react-pdf";
-import { Comment, UserRole } from "../types";
+import {
+  Comment,
+  FurnitureItem,
+  LengthSystem,
+  ProjectScale,
+  User,
+  UserRole,
+} from "../types";
 import { PDF_WORKER_URL } from "../constants";
-import { Plus, Loader2, Sparkles, X, AlertCircle, Upload, UserPlus } from "lucide-react";
+import {
+  Plus,
+  Loader2,
+  Sparkles,
+  X,
+  AlertCircle,
+  Upload,
+  UserPlus,
+  MessageSquare,
+  Sofa,
+  Ruler,
+  Eye,
+  EyeOff,
+} from "lucide-react";
 import * as geminiService from "../services/geminiService";
 import { getPDFObjectURL, revokePDFObjectURL } from "../utils/pdfUtils";
 import { VersionSelectorDetailed } from "./VersionSelector";
 import { MentionInput } from "./MentionInput";
+import { FurnitureLayer } from "./FurnitureLayer";
+import { FurnitureInspector } from "./FurnitureInspector";
+import { CalibrationOverlay } from "./CalibrationOverlay";
 
 // Set worker
 pdfjs.GlobalWorkerOptions.workerSrc = PDF_WORKER_URL;
@@ -60,6 +83,19 @@ interface PDFWorkspaceProps {
   isGuest?: boolean;
   accessLevel?: "view" | "comment";
   onSignUpClick?: () => void;
+  // Furniture layer props
+  currentUser?: User;
+  projectId?: string;
+  projectScale?: ProjectScale;
+  onUpdateProjectScale?: (scale: ProjectScale) => void;
+  furnitureItems?: FurnitureItem[];
+  onUpdateFurnitureItems?: (items: FurnitureItem[]) => void;
+  lengthSystem?: LengthSystem;
+  // Lifted state — App owns mode + selection to coordinate with right sidebar.
+  mode?: "comment" | "furniture" | "calibrate";
+  onModeChange?: (mode: "comment" | "furniture" | "calibrate") => void;
+  selectedFurnitureId?: string | null;
+  onSelectFurniture?: (id: string | null) => void;
 }
 
 export const PDFWorkspace: React.FC<PDFWorkspaceProps> = ({
@@ -97,6 +133,17 @@ export const PDFWorkspace: React.FC<PDFWorkspaceProps> = ({
   isGuest = false,
   accessLevel = "comment",
   onSignUpClick,
+  currentUser,
+  projectId,
+  projectScale,
+  onUpdateProjectScale,
+  furnitureItems = [],
+  onUpdateFurnitureItems,
+  lengthSystem = "metric",
+  mode: modeProp,
+  onModeChange,
+  selectedFurnitureId: selectedFurnitureIdProp,
+  onSelectFurniture,
 }) => {
   const [numPages, setNumPages] = useState<number | null>(null);
   const [tempMarker, setTempMarker] = useState<{ x: number; y: number } | null>(
@@ -129,6 +176,31 @@ export const PDFWorkspace: React.FC<PDFWorkspaceProps> = ({
 
   const hasDraggedRef = useRef(false); // Track if actual movement occurred
   const viewportRef = useRef<HTMLDivElement>(null);
+
+  // Furniture layer state. Mode + selection are lifted to App so the right
+  // sidebar can swap between Feedback and Furniture panels in lockstep.
+  type Mode = "comment" | "furniture" | "calibrate";
+  const [internalMode, setInternalMode] = useState<Mode>("comment");
+  const [internalSelectedId, setInternalSelectedId] = useState<string | null>(null);
+  const mode = modeProp ?? internalMode;
+  const setMode = (m: Mode) => {
+    if (onModeChange) onModeChange(m);
+    else setInternalMode(m);
+  };
+  const selectedFurnitureId = selectedFurnitureIdProp ?? internalSelectedId;
+  const setSelectedFurnitureId = (id: string | null) => {
+    if (onSelectFurniture) onSelectFurniture(id);
+    else setInternalSelectedId(id);
+  };
+
+  const [commentsVisible, setCommentsVisible] = useState(true);
+  const [furnitureVisible, setFurnitureVisible] = useState(true);
+
+  const canEditFurniture =
+    !!currentUser && !!onUpdateFurnitureItems && !isGuest;
+  const hasScale = !!projectScale;
+  const selectedFurniture =
+    furnitureItems.find((it) => it.id === selectedFurnitureId) || null;
 
   // Update pan offset when initialPanOffset changes (e.g. when category switches)
   useEffect(() => {
@@ -324,6 +396,10 @@ export const PDFWorkspace: React.FC<PDFWorkspaceProps> = ({
       return;
     }
 
+    // Only the comment tool creates comments. Other modes have their own
+    // overlays which intercept clicks before they reach here.
+    if (mode !== "comment" || !commentsVisible) return;
+
     if (!pdfWrapperRef.current) return;
 
     // Check if commenting is allowed
@@ -405,6 +481,72 @@ export const PDFWorkspace: React.FC<PDFWorkspaceProps> = ({
     setPendingMentions([]);
   };
 
+  // --- Furniture handlers ---
+
+  const handleCommitScale = (scale: ProjectScale) => {
+    onUpdateProjectScale?.(scale);
+    setMode("comment");
+  };
+
+  const handleCancelCalibrate = () => {
+    setMode("comment");
+  };
+
+  // Compute next zIndex (top of stack) for new items.
+  const nextZIndex = () => {
+    const max = furnitureItems.reduce(
+      (m, it) => (it.deleted ? m : Math.max(m, it.zIndex)),
+      0,
+    );
+    return max + 1;
+  };
+
+  const handleUpdateSelectedFurniture = (next: FurnitureItem) => {
+    if (!onUpdateFurnitureItems) return;
+    onUpdateFurnitureItems(
+      furnitureItems.map((it) => (it.id === next.id ? next : it)),
+    );
+  };
+
+  const handleDeleteSelectedFurniture = () => {
+    if (!onUpdateFurnitureItems || !selectedFurnitureId) return;
+    onUpdateFurnitureItems(
+      furnitureItems.map((it) =>
+        it.id === selectedFurnitureId
+          ? { ...it, deleted: true, updatedAt: Date.now() }
+          : it,
+      ),
+    );
+    setSelectedFurnitureId(null);
+  };
+
+  const handleBringToFront = () => {
+    if (!onUpdateFurnitureItems || !selectedFurnitureId) return;
+    const top = nextZIndex();
+    onUpdateFurnitureItems(
+      furnitureItems.map((it) =>
+        it.id === selectedFurnitureId
+          ? { ...it, zIndex: top, updatedAt: Date.now() }
+          : it,
+      ),
+    );
+  };
+
+  const handleSendToBack = () => {
+    if (!onUpdateFurnitureItems || !selectedFurnitureId) return;
+    const min = furnitureItems.reduce(
+      (m, it) => (it.deleted ? m : Math.min(m, it.zIndex)),
+      0,
+    );
+    onUpdateFurnitureItems(
+      furnitureItems.map((it) =>
+        it.id === selectedFurnitureId
+          ? { ...it, zIndex: min - 1, updatedAt: Date.now() }
+          : it,
+      ),
+    );
+  };
+
   // Build combined comment list (current + previous versions when enabled)
   const buildVisibleComments = () => {
     // Determine ordering of versions (latest first)
@@ -447,7 +589,7 @@ export const PDFWorkspace: React.FC<PDFWorkspaceProps> = ({
   const visibleComments = buildVisibleComments();
 
   return (
-    <div className="flex-1 bg-slate-200/50 flex flex-col h-full">
+    <div className="flex-1 bg-slate-200/50 flex flex-col h-full relative">
       {/* Version Toolbar */}
       {(versions && versions.length > 0) || canUploadVersion ? (
         <div className="bg-white border-b border-slate-200 px-4 py-3 flex items-center justify-between gap-4">
@@ -659,6 +801,94 @@ export const PDFWorkspace: React.FC<PDFWorkspaceProps> = ({
         </div>
       ) : null}
 
+      {/* Layer/tool toolbar */}
+      <div className="bg-white border-b border-slate-200 px-4 py-2 flex items-center gap-2 text-sm">
+        <span className="text-xs font-semibold text-slate-500 uppercase tracking-wide mr-1">
+          Tools
+        </span>
+        <button
+          onClick={() => setMode("comment")}
+          className={`flex items-center gap-1.5 px-2.5 py-1 rounded-full transition-colors ${
+            mode === "comment"
+              ? "bg-indigo-600 text-white"
+              : "bg-slate-100 text-slate-700 hover:bg-slate-200"
+          }`}
+        >
+          <MessageSquare className="w-3.5 h-3.5" />
+          Comment
+        </button>
+        <button
+          onClick={() => setMode(mode === "furniture" ? "comment" : "furniture")}
+          disabled={!canEditFurniture}
+          className={`flex items-center gap-1.5 px-2.5 py-1 rounded-full transition-colors disabled:opacity-50 disabled:cursor-not-allowed ${
+            mode === "furniture"
+              ? "bg-indigo-600 text-white"
+              : "bg-slate-100 text-slate-700 hover:bg-slate-200"
+          }`}
+          title={
+            !canEditFurniture
+              ? "Sign in with edit access to place furniture"
+              : ""
+          }
+        >
+          <Sofa className="w-3.5 h-3.5" />
+          Furniture
+        </button>
+        <button
+          onClick={() => setMode(mode === "calibrate" ? "comment" : "calibrate")}
+          disabled={!canEditFurniture}
+          className={`flex items-center gap-1.5 px-2.5 py-1 rounded-full transition-colors disabled:opacity-50 disabled:cursor-not-allowed ${
+            mode === "calibrate"
+              ? "bg-emerald-600 text-white"
+              : hasScale
+                ? "bg-slate-100 text-slate-700 hover:bg-slate-200"
+                : "bg-amber-100 text-amber-800 hover:bg-amber-200"
+          }`}
+          title={hasScale ? "Recalibrate scale" : "Calibrate the plan's scale"}
+        >
+          <Ruler className="w-3.5 h-3.5" />
+          {hasScale ? "Recalibrate" : "Calibrate"}
+        </button>
+
+        <div className="w-px h-5 bg-slate-200 mx-2" />
+
+        <span className="text-xs font-semibold text-slate-500 uppercase tracking-wide mr-1">
+          Layers
+        </span>
+        <button
+          onClick={() => setCommentsVisible((v) => !v)}
+          className={`flex items-center gap-1.5 px-2.5 py-1 rounded-full transition-colors ${
+            commentsVisible
+              ? "bg-slate-100 text-slate-700 hover:bg-slate-200"
+              : "bg-slate-100 text-slate-400 line-through"
+          }`}
+          title={commentsVisible ? "Hide comments" : "Show comments"}
+        >
+          {commentsVisible ? (
+            <Eye className="w-3.5 h-3.5" />
+          ) : (
+            <EyeOff className="w-3.5 h-3.5" />
+          )}
+          Comments
+        </button>
+        <button
+          onClick={() => setFurnitureVisible((v) => !v)}
+          className={`flex items-center gap-1.5 px-2.5 py-1 rounded-full transition-colors ${
+            furnitureVisible
+              ? "bg-slate-100 text-slate-700 hover:bg-slate-200"
+              : "bg-slate-100 text-slate-400 line-through"
+          }`}
+          title={furnitureVisible ? "Hide furniture" : "Show furniture"}
+        >
+          {furnitureVisible ? (
+            <Eye className="w-3.5 h-3.5" />
+          ) : (
+            <EyeOff className="w-3.5 h-3.5" />
+          )}
+          Furniture
+        </button>
+      </div>
+
       {/* PDF Card - Fixed height container with scroll */}
       <div className="flex-1 bg-white shadow-2xl border-l border-slate-200 overflow-hidden flex flex-col">
         {/* PDF Viewport - Scrollable area */}
@@ -718,8 +948,38 @@ export const PDFWorkspace: React.FC<PDFWorkspaceProps> = ({
               </Document>
             )}
 
+            {/* Furniture Layer */}
+            {!loadError && (
+              <FurnitureLayer
+                pdfWrapperRef={pdfWrapperRef}
+                pdfScale={scale}
+                scale={projectScale}
+                pageNumber={pageNumber}
+                items={furnitureItems}
+                visible={furnitureVisible}
+                active={mode === "furniture"}
+                selectedId={selectedFurnitureId}
+                onSelect={setSelectedFurnitureId}
+                onUpdate={onUpdateFurnitureItems || (() => {})}
+                canEdit={canEditFurniture}
+              />
+            )}
+
+            {/* Calibration Overlay */}
+            {!loadError && mode === "calibrate" && currentUser && (
+              <CalibrationOverlay
+                pdfWrapperRef={pdfWrapperRef}
+                pdfScale={scale}
+                pageNumber={pageNumber}
+                currentUser={currentUser}
+                lengthSystem={lengthSystem}
+                onCommit={handleCommitScale}
+                onCancel={handleCancelCalibrate}
+              />
+            )}
+
             {/* Existing Comment Pins - Only show if not error */}
-            {!loadError &&
+            {!loadError && commentsVisible &&
               visibleComments.map(({ comment, distance }, idx) => {
                 const fade = Math.max(0.25, 1 - distance * 0.2);
                 const isDraggable =
@@ -917,6 +1177,19 @@ export const PDFWorkspace: React.FC<PDFWorkspaceProps> = ({
           </div>
         </div>
       </div>
+
+      {/* Furniture inspector (top-left) */}
+      {selectedFurniture && canEditFurniture && (
+        <FurnitureInspector
+          item={selectedFurniture}
+          lengthSystem={lengthSystem}
+          onChange={handleUpdateSelectedFurniture}
+          onDelete={handleDeleteSelectedFurniture}
+          onClose={() => setSelectedFurnitureId(null)}
+          onBringToFront={handleBringToFront}
+          onSendToBack={handleSendToBack}
+        />
+      )}
     </div>
   );
 };

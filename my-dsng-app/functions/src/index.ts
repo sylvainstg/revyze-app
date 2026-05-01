@@ -31,6 +31,8 @@ import {
 } from "./referralService";
 import { getPDF } from "./pdfProxy";
 import { sendDigestEmails } from "./digest";
+import { searchFurnitureImages } from "./furniture/searchImages";
+import { fetchAndStoreFurnitureImage } from "./furniture/fetchAndStoreImage";
 import Stripe from "stripe";
 
 const initAdminApp = () => {
@@ -653,6 +655,9 @@ export const adminTriggerDigest = functions.https.onCall(
 
 // Export PDF proxy function
 export { getPDF };
+
+// Furniture layer
+export { searchFurnitureImages, fetchAndStoreFurnitureImage };
 
 // Export Email service
 export * from "./emailService";

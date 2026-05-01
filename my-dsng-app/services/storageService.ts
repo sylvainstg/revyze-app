@@ -37,6 +37,9 @@ const sanitizeProject = (data: any): Project => {
         moodBoardElements: v.moodBoardElementsJson
           ? JSON.parse(v.moodBoardElementsJson)
           : v.moodBoardElements || [],
+        furnitureItems: v.furnitureItemsJson
+          ? JSON.parse(v.furnitureItemsJson)
+          : v.furnitureItems || [],
       })) || [],
     collaborators: data.collaborators || [],
   } as Project;
@@ -112,12 +115,17 @@ export const saveProject = async (project: Project): Promise<boolean> => {
     const projectData = {
       ...project,
       versions: project.versions.map((version) => {
-        const { comments, moodBoardElements, ...versionWithoutComments } =
-          version;
+        const {
+          comments,
+          moodBoardElements,
+          furnitureItems,
+          ...versionWithoutNestedArrays
+        } = version;
         return {
-          ...versionWithoutComments, // Preserve ALL fields except comments
+          ...versionWithoutNestedArrays, // Preserve ALL fields except nested arrays
           commentsJson: JSON.stringify(comments || []),
           moodBoardElementsJson: JSON.stringify(moodBoardElements || []),
+          furnitureItemsJson: JSON.stringify(furnitureItems || []),
         };
       }),
     };
@@ -362,7 +370,7 @@ export const getSharedProject = async (
       projectData.shareSettings?.enabled &&
       projectData.shareSettings.shareToken === shareToken
     ) {
-      // Deserialize comments from JSON if stored that way
+      // Deserialize nested-array fields from JSON if stored that way
       if (projectData.versions) {
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         projectData.versions = projectData.versions.map((v: any) => ({
@@ -370,6 +378,12 @@ export const getSharedProject = async (
           comments: v.commentsJson
             ? JSON.parse(v.commentsJson)
             : v.comments || [],
+          moodBoardElements: v.moodBoardElementsJson
+            ? JSON.parse(v.moodBoardElementsJson)
+            : v.moodBoardElements || [],
+          furnitureItems: v.furnitureItemsJson
+            ? JSON.parse(v.furnitureItemsJson)
+            : v.furnitureItems || [],
         }));
       }
 
