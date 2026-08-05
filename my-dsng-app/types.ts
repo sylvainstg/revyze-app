@@ -165,6 +165,53 @@ export interface FurnitureItem {
   deleted?: boolean;
 }
 
+// --- Wall Change Layer ---
+// Ad-hoc wall changes a Designer draws on top of a plan version to
+// communicate to the GC. Scoped per ProjectVersion, same as FurnitureItem,
+// so switching versions naturally switches the change layer too.
+
+export interface WallItem {
+  id: string;
+  pageNumber: number;
+  // Endpoints in cm, measured from the page top-left.
+  x1Cm: number;
+  y1Cm: number;
+  x2Cm: number;
+  y2Cm: number;
+  thicknessCm: number;
+  zIndex: number;
+
+  label?: string;
+  note?: string;
+
+  createdBy: string;
+  createdByName: string;
+  createdAt: number;
+  updatedAt: number;
+  deleted?: boolean;
+}
+
+// A white-out rectangle used to mask obsolete plan content under a wall
+// change, so the reader isn't confused by overlapping old/new geometry.
+// Same center/size/rotation shape as FurnitureItem so it reuses
+// cmToPagePercent and the existing drag/resize/rotate math as-is.
+export interface MaskItem {
+  id: string;
+  pageNumber: number;
+  xCm: number;
+  yCm: number;
+  widthCm: number;
+  heightCm: number;
+  rotation: number; // degrees, 0–360, clockwise
+  zIndex: number;
+
+  createdBy: string;
+  createdByName: string;
+  createdAt: number;
+  updatedAt: number;
+  deleted?: boolean;
+}
+
 export interface ProjectVersion {
   id: string;
   versionNumber: number; // Global version number across all categories
@@ -179,6 +226,8 @@ export interface ProjectVersion {
   comments: Comment[];
   moodBoardElements?: MoodBoardElement[];
   furnitureItems?: FurnitureItem[];
+  wallItems?: WallItem[];
+  maskItems?: MaskItem[];
 }
 
 export interface ShareSettings {

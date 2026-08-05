@@ -30,8 +30,11 @@ import {
   ProjectVersion,
   MoodBoardElement,
   FurnitureItem,
+  WallItem,
+  MaskItem,
   ProjectScale,
 } from "./types";
+import { WallTool, WallSelection } from "./components/WallLayer";
 import {
   Upload,
   FileText,
@@ -170,11 +173,15 @@ const App: React.FC = () => {
   // Furniture layer — mode + selection live here so the right sidebar can swap
   // between Feedback and Furniture panels in lockstep with PDFWorkspace's tools.
   const [furnitureMode, setFurnitureMode] = useState<
-    "comment" | "furniture" | "calibrate"
+    "comment" | "furniture" | "calibrate" | "wall"
   >("comment");
   const [selectedFurnitureId, setSelectedFurnitureId] = useState<string | null>(
     null,
   );
+
+  // Wall change layer — mirrors the furniture mode/selection lift above.
+  const [wallTool, setWallTool] = useState<WallTool>("select");
+  const [selectedWall, setSelectedWall] = useState<WallSelection>(null);
 
   useEffect(() => {
     // Reset known page count when switching documents/versions
@@ -2084,6 +2091,32 @@ const App: React.FC = () => {
     await updateProjectState(updatedProject);
   };
 
+  const handleUpdateWallItems = async (items: WallItem[]) => {
+    if (!activeProject || !activeVersion) return;
+
+    const updatedProject = {
+      ...activeProject,
+      versions: activeProject.versions.map((v) =>
+        v.id === activeVersion.id ? { ...v, wallItems: items } : v,
+      ),
+    };
+
+    await updateProjectState(updatedProject);
+  };
+
+  const handleUpdateMaskItems = async (items: MaskItem[]) => {
+    if (!activeProject || !activeVersion) return;
+
+    const updatedProject = {
+      ...activeProject,
+      versions: activeProject.versions.map((v) =>
+        v.id === activeVersion.id ? { ...v, maskItems: items } : v,
+      ),
+    };
+
+    await updateProjectState(updatedProject);
+  };
+
   const handleUpdateProjectScale = async (scale: ProjectScale) => {
     if (!activeProject) return;
     const updatedProject = { ...activeProject, scale };
@@ -2774,6 +2807,14 @@ const App: React.FC = () => {
                           onModeChange={setFurnitureMode}
                           selectedFurnitureId={selectedFurnitureId}
                           onSelectFurniture={setSelectedFurnitureId}
+                          wallItems={activeVersion.wallItems || []}
+                          onUpdateWallItems={handleUpdateWallItems}
+                          maskItems={activeVersion.maskItems || []}
+                          onUpdateMaskItems={handleUpdateMaskItems}
+                          wallTool={wallTool}
+                          onWallToolChange={setWallTool}
+                          selectedWall={selectedWall}
+                          onSelectWall={setSelectedWall}
                         />
                       ) : (
                         <ImageWorkspace
