@@ -206,7 +206,9 @@ export const WallLayer: React.FC<WallLayerProps> = ({
       const p = cmPointFromEvent(e);
       const rectState = newMaskRectRef.current;
       if (!p || !rectState) return;
-      setNewMaskRect({ start: rectState.start, current: p });
+      const updated = { start: rectState.start, current: p };
+      newMaskRectRef.current = updated;
+      setNewMaskRect(updated);
     };
     const onUp = () => {
       const rectState = newMaskRectRef.current;
@@ -328,6 +330,9 @@ export const WallLayer: React.FC<WallLayerProps> = ({
 
   const handleLayerMouseDown = (e: React.MouseEvent) => {
     if (e.target !== e.currentTarget) return;
+    // Stop the pan handler on the ancestor viewport from also engaging —
+    // this layer owns pointer interaction over the plan while active.
+    e.stopPropagation();
     if (tool !== "mask" || !canEdit) return;
     const p = cmPointFromEvent(e);
     if (!p) return;
@@ -338,7 +343,11 @@ export const WallLayer: React.FC<WallLayerProps> = ({
   return (
     <div
       className="absolute inset-0"
-      style={{ zIndex: 3, pointerEvents: active ? "auto" : "none" }}
+      style={{
+        zIndex: 3,
+        pointerEvents: active ? "auto" : "none",
+        cursor: tool === "wall" || tool === "mask" ? "crosshair" : "default",
+      }}
       onClick={handleLayerClick}
       onMouseDown={handleLayerMouseDown}
     >
