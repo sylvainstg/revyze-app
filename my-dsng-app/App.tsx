@@ -32,6 +32,7 @@ import {
   FurnitureItem,
   WallItem,
   MaskItem,
+  ElementItem,
   ProjectScale,
 } from "./types";
 import { WallTool, WallSelection } from "./components/WallLayer";
@@ -2117,6 +2118,19 @@ const App: React.FC = () => {
     await updateProjectState(updatedProject);
   };
 
+  const handleUpdateElementItems = async (items: ElementItem[]) => {
+    if (!activeProject || !activeVersion) return;
+
+    const updatedProject = {
+      ...activeProject,
+      versions: activeProject.versions.map((v) =>
+        v.id === activeVersion.id ? { ...v, elementItems: items } : v,
+      ),
+    };
+
+    await updateProjectState(updatedProject);
+  };
+
   const handleUpdateProjectScale = async (scale: ProjectScale) => {
     if (!activeProject) return;
     const updatedProject = { ...activeProject, scale };
@@ -2811,6 +2825,8 @@ const App: React.FC = () => {
                           onUpdateWallItems={handleUpdateWallItems}
                           maskItems={activeVersion.maskItems || []}
                           onUpdateMaskItems={handleUpdateMaskItems}
+                          elementItems={activeVersion.elementItems || []}
+                          onUpdateElementItems={handleUpdateElementItems}
                           wallTool={wallTool}
                           onWallToolChange={setWallTool}
                           selectedWall={selectedWall}

@@ -1,10 +1,10 @@
 import React, { useState, useRef, useEffect } from "react";
-import { WallItem, MaskItem, ProjectScale, User } from "../types";
+import { WallItem, MaskItem, ElementItem, ProjectScale, User } from "../types";
 import { cmToPagePercent, pagePercentToCm } from "../utils/scaleConversion";
-import { Trash2 } from "lucide-react";
+import { Trash2, FlipHorizontal2, FlipVertical2 } from "lucide-react";
 
-export type WallTool = "select" | "wall" | "mask";
-export type WallSelection = { id: string; kind: "wall" | "mask" } | null;
+export type WallTool = "select" | "wall" | "mask" | "door";
+export type WallSelection = { id: string; kind: "wall" | "mask" | "door" } | null;
 
 interface WallLayerProps {
   pdfWrapperRef: React.RefObject<HTMLDivElement | null>;
@@ -13,6 +13,7 @@ interface WallLayerProps {
   pageNumber: number;
   wallItems: WallItem[];
   maskItems: MaskItem[];
+  elementItems: ElementItem[];
   visible: boolean;
   tool: WallTool;
   active: boolean; // true when the wall-change mode is active at all (intercept clicks)
@@ -20,11 +21,14 @@ interface WallLayerProps {
   onSelect: (selection: WallSelection) => void;
   onUpdateWalls: (items: WallItem[]) => void;
   onUpdateMasks: (items: MaskItem[]) => void;
+  onUpdateElements: (items: ElementItem[]) => void;
   canEdit: boolean;
   currentUser: User | undefined;
 }
 
 const DEFAULT_THICKNESS_CM = 10;
+const DEFAULT_DOOR_WIDTH_CM = 90;
+const MIN_DOOR_WIDTH_CM = 20;
 
 type ItemDragKind =
   | "move-wall"
@@ -32,7 +36,11 @@ type ItemDragKind =
   | "endpoint-b"
   | "move-mask"
   | "resize-mask"
-  | "rotate-mask";
+  | "rotate-mask"
+  | "move-door"
+  | "resize-door-a"
+  | "resize-door-b"
+  | "rotate-door";
 
 interface ItemDragState {
   kind: ItemDragKind;
@@ -40,6 +48,7 @@ interface ItemDragState {
   startMouse: { x: number; y: number };
   startWall?: WallItem;
   startMask?: MaskItem;
+  startElement?: ElementItem;
 }
 
 interface CmPoint {
@@ -54,6 +63,7 @@ export const WallLayer: React.FC<WallLayerProps> = ({
   pageNumber,
   wallItems,
   maskItems,
+  elementItems,
   visible,
   tool,
   active,
@@ -61,14 +71,17 @@ export const WallLayer: React.FC<WallLayerProps> = ({
   onSelect,
   onUpdateWalls,
   onUpdateMasks,
+  onUpdateElements,
   canEdit,
   currentUser,
 }) => {
   const [draftWall, setDraftWall] = useState<WallItem | null>(null);
   const [draftMask, setDraftMask] = useState<MaskItem | null>(null);
+  const [draftElement, setDraftElement] = useState<ElementItem | null>(null);
   const dragRef = useRef<ItemDragState | null>(null);
   const draftWallRef = useRef<WallItem | null>(null);
   const draftMaskRef = useRef<MaskItem | null>(null);
+  const draftElementRef = useRef<ElementItem | null>(null);
 
   // Pending first point while drawing a new wall (2-click placement).
   const [newWallStart, setNewWallStart] = useState<CmPoint | null>(null);
@@ -77,6 +90,7 @@ export const WallLayer: React.FC<WallLayerProps> = ({
   const newMaskRectRef = useRef<{ start: CmPoint; current: CmPoint } | null>(null);
 
   const cmPerPxNow = scale ? scale.cmPerPx / pdfScale : 0;
+  const pxPerCmNow = cmPerPxNow > 0 ? 1 / cmPerPxNow : 1;
 
   const pageWalls = wallItems
     .filter((w) => w.pageNumber === pageNumber && !w.deleted)
@@ -88,10 +102,16 @@ export const WallLayer: React.FC<WallLayerProps> = ({
     .map((m) => (draftMask && draftMask.id === m.id ? draftMask : m))
     .sort((a, b) => a.zIndex - b.zIndex);
 
+  const pageElements = elementItems
+    .filter((el) => el.pageNumber === pageNumber && !el.deleted)
+    .map((el) => (draftElement && draftElement.id === el.id ? draftElement : el))
+    .sort((a, b) => a.zIndex - b.zIndex);
+
   const nextZIndex = () => {
     const maxWall = wallItems.reduce((m, w) => (w.deleted ? m : Math.max(m, w.zIndex)), 0);
     const maxMask = maskItems.reduce((m, mk) => (mk.deleted ? m : Math.max(m, mk.zIndex)), 0);
-    return Math.max(maxWall, maxMask) + 1;
+    const maxElement = elementItems.reduce((m, el) => (el.deleted ? m : Math.max(m, el.zIndex)), 0);
+    return Math.max(maxWall, maxMask, maxElement) + 1;
   };
 
   const cmPointFromEvent = (e: React.MouseEvent | MouseEvent): CmPoint | null => {
@@ -105,8 +125,8 @@ export const WallLayer: React.FC<WallLayerProps> = ({
     };
   };
 
-  // Editing drag for an existing wall or mask. Re-bound every render so
-  // closures see latest state, mirroring FurnitureLayer.
+  // Editing drag for an existing wall, mask, or door. Re-bound every render
+  // so closures see latest state, mirroring FurnitureLayer.
   useEffect(() => {
     if (!dragRef.current) return;
     const onMove = (e: MouseEvent) => {
@@ -159,6 +179,50 @@ export const WallLayer: React.FC<WallLayerProps> = ({
           (Math.atan2(e.clientY - centerClientY, e.clientX - centerClientX) * 180) / Math.PI + 90;
         const normalized = ((angle % 360) + 360) % 360;
         setDraftMask({ ...m, rotation: normalized });
+      } else if (drag.kind === "move-door" && drag.startElement) {
+        const el = drag.startElement;
+        setDraftElement({ ...el, xCm: el.xCm + dxCm, yCm: el.yCm + dyCm });
+      } else if (drag.kind === "resize-door-a" && drag.startElement) {
+        const el = drag.startElement;
+        const angleRad = (el.rotation * Math.PI) / 180;
+        const dirX = Math.cos(angleRad);
+        const dirY = Math.sin(angleRad);
+        const proj = dxCm * dirX + dyCm * dirY;
+        const newWidth = Math.max(MIN_DOOR_WIDTH_CM, el.widthCm - proj);
+        const widthDelta = newWidth - el.widthCm;
+        setDraftElement({
+          ...el,
+          widthCm: newWidth,
+          xCm: el.xCm - (widthDelta / 2) * dirX,
+          yCm: el.yCm - (widthDelta / 2) * dirY,
+        });
+      } else if (drag.kind === "resize-door-b" && drag.startElement) {
+        const el = drag.startElement;
+        const angleRad = (el.rotation * Math.PI) / 180;
+        const dirX = Math.cos(angleRad);
+        const dirY = Math.sin(angleRad);
+        const proj = dxCm * dirX + dyCm * dirY;
+        const newWidth = Math.max(MIN_DOOR_WIDTH_CM, el.widthCm + proj);
+        const widthDelta = newWidth - el.widthCm;
+        setDraftElement({
+          ...el,
+          widthCm: newWidth,
+          xCm: el.xCm + (widthDelta / 2) * dirX,
+          yCm: el.yCm + (widthDelta / 2) * dirY,
+        });
+      } else if (drag.kind === "rotate-door" && drag.startElement) {
+        const wrapper = pdfWrapperRef.current;
+        if (!wrapper) return;
+        const el = drag.startElement;
+        const rect = wrapper.getBoundingClientRect();
+        const centerXPct = cmToPagePercent(el.xCm, "x", scale);
+        const centerYPct = cmToPagePercent(el.yCm, "y", scale);
+        const centerClientX = rect.left + (centerXPct / 100) * rect.width;
+        const centerClientY = rect.top + (centerYPct / 100) * rect.height;
+        const angle =
+          (Math.atan2(e.clientY - centerClientY, e.clientX - centerClientX) * 180) / Math.PI + 90;
+        const normalized = ((angle % 360) + 360) % 360;
+        setDraftElement({ ...el, rotation: normalized });
       }
     };
     const onUp = () => {
@@ -179,10 +243,20 @@ export const WallLayer: React.FC<WallLayerProps> = ({
               maskItems.map((m) => (m.id === finalMask.id ? { ...finalMask, updatedAt: Date.now() } : m)),
             );
           }
+        } else if (drag.startElement) {
+          const finalElement = draftElementRef.current;
+          if (finalElement) {
+            onUpdateElements(
+              elementItems.map((el) =>
+                el.id === finalElement.id ? { ...finalElement, updatedAt: Date.now() } : el,
+              ),
+            );
+          }
         }
       }
       setDraftWall(null);
       setDraftMask(null);
+      setDraftElement(null);
     };
     window.addEventListener("mousemove", onMove);
     window.addEventListener("mouseup", onUp);
@@ -198,6 +272,9 @@ export const WallLayer: React.FC<WallLayerProps> = ({
   useEffect(() => {
     draftMaskRef.current = draftMask;
   }, [draftMask]);
+  useEffect(() => {
+    draftElementRef.current = draftElement;
+  }, [draftElement]);
 
   // Drag-out creation of a new mask rectangle.
   useEffect(() => {
@@ -244,7 +321,7 @@ export const WallLayer: React.FC<WallLayerProps> = ({
     };
   });
 
-  // Delete key removes the current selection (wall or mask).
+  // Delete key removes the current selection (wall, mask, or door).
   useEffect(() => {
     if (!active || !selection || !canEdit) return;
     const onKey = (e: KeyboardEvent) => {
@@ -255,9 +332,15 @@ export const WallLayer: React.FC<WallLayerProps> = ({
           onUpdateWalls(
             wallItems.map((w) => (w.id === selection.id ? { ...w, deleted: true, updatedAt: Date.now() } : w)),
           );
-        } else {
+        } else if (selection.kind === "mask") {
           onUpdateMasks(
             maskItems.map((m) => (m.id === selection.id ? { ...m, deleted: true, updatedAt: Date.now() } : m)),
+          );
+        } else {
+          onUpdateElements(
+            elementItems.map((el) =>
+              el.id === selection.id ? { ...el, deleted: true, updatedAt: Date.now() } : el,
+            ),
           );
         }
         onSelect(null);
@@ -267,7 +350,18 @@ export const WallLayer: React.FC<WallLayerProps> = ({
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [active, selection, canEdit, wallItems, maskItems, onUpdateWalls, onUpdateMasks, onSelect]);
+  }, [
+    active,
+    selection,
+    canEdit,
+    wallItems,
+    maskItems,
+    elementItems,
+    onUpdateWalls,
+    onUpdateMasks,
+    onUpdateElements,
+    onSelect,
+  ]);
 
   // Escape also cancels an in-progress wall placement even without a selection.
   useEffect(() => {
@@ -281,17 +375,30 @@ export const WallLayer: React.FC<WallLayerProps> = ({
 
   if (!visible || !scale) return null;
 
-  const handleItemMouseDown = (e: React.MouseEvent, kind: ItemDragKind, wall?: WallItem, mask?: MaskItem) => {
+  const handleItemMouseDown = (
+    e: React.MouseEvent,
+    kind: ItemDragKind,
+    wall?: WallItem,
+    mask?: MaskItem,
+    element?: ElementItem,
+  ) => {
     if (!canEdit || tool !== "select") return;
     e.stopPropagation();
     e.preventDefault();
-    onSelect(wall ? { id: wall.id, kind: "wall" } : { id: mask!.id, kind: "mask" });
+    onSelect(
+      wall
+        ? { id: wall.id, kind: "wall" }
+        : mask
+          ? { id: mask.id, kind: "mask" }
+          : { id: element!.id, kind: "door" },
+    );
     dragRef.current = {
       kind,
-      id: wall ? wall.id : mask!.id,
+      id: wall ? wall.id : mask ? mask.id : element!.id,
       startMouse: { x: e.clientX, y: e.clientY },
       startWall: wall,
       startMask: mask,
+      startElement: element,
     };
   };
 
@@ -325,6 +432,30 @@ export const WallLayer: React.FC<WallLayerProps> = ({
         onSelect({ id: item.id, kind: "wall" });
         setNewWallStart(null);
       }
+      return;
+    }
+    if (tool === "door" && canEdit && currentUser) {
+      const p = cmPointFromEvent(e);
+      if (!p) return;
+      const item: ElementItem = {
+        id: `door_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`,
+        pageNumber,
+        kind: "door",
+        xCm: p.xCm,
+        yCm: p.yCm,
+        widthCm: DEFAULT_DOOR_WIDTH_CM,
+        thicknessCm: DEFAULT_THICKNESS_CM,
+        rotation: 0,
+        flipX: false,
+        flipY: false,
+        zIndex: nextZIndex(),
+        createdBy: currentUser.id,
+        createdByName: currentUser.name,
+        createdAt: Date.now(),
+        updatedAt: Date.now(),
+      };
+      onUpdateElements([...elementItems, item]);
+      onSelect({ id: item.id, kind: "door" });
     }
   };
 
@@ -340,13 +471,21 @@ export const WallLayer: React.FC<WallLayerProps> = ({
     setNewMaskRect({ start: p, current: p });
   };
 
+  const toggleDoorFlip = (element: ElementItem, axis: "x" | "y") => {
+    const next =
+      axis === "x"
+        ? { ...element, flipX: !element.flipX, updatedAt: Date.now() }
+        : { ...element, flipY: !element.flipY, updatedAt: Date.now() };
+    onUpdateElements(elementItems.map((el) => (el.id === element.id ? next : el)));
+  };
+
   return (
     <div
       className="absolute inset-0"
       style={{
         zIndex: 3,
         pointerEvents: active ? "auto" : "none",
-        cursor: tool === "wall" || tool === "mask" ? "crosshair" : "default",
+        cursor: tool === "wall" || tool === "mask" || tool === "door" ? "crosshair" : "default",
       }}
       onClick={handleLayerClick}
       onMouseDown={handleLayerMouseDown}
@@ -518,6 +657,181 @@ export const WallLayer: React.FC<WallLayerProps> = ({
                 >
                   <Trash2 className="w-3.5 h-3.5" />
                 </button>
+              </>
+            )}
+          </React.Fragment>
+        );
+      })}
+
+      {/* Doors render above walls */}
+      {pageElements.map((el) => {
+        const widthPct = cmToPagePercent(el.widthCm, "x", scale);
+        const heightPct = cmToPagePercent(el.thicknessCm, "y", scale);
+        const leftPct = cmToPagePercent(el.xCm, "x", scale) - widthPct / 2;
+        const topPct = cmToPagePercent(el.yCm, "y", scale) - heightPct / 2;
+        const isSelected = selection?.kind === "door" && selection.id === el.id;
+
+        // Swing symbol geometry, computed in on-screen px so the leaf length
+        // and arc radius stay true circles/lines regardless of the door's
+        // (possibly tiny) thickness — see canonical (flipX=false, flipY=false)
+        // derivation: hinge at the local top-left corner, swing extends
+        // "outward" (negative local y). flipX/flipY are applied as a single
+        // CSS mirror on this group, which is simpler and less error-prone
+        // than re-deriving per-corner coordinates for all four cases.
+        const leafLenPx = Math.max(4, el.widthCm * pxPerCmNow);
+        const thicknessPx = Math.max(1, el.thicknessCm * pxPerCmNow);
+
+        const aXPct = cmToPagePercent(el.xCm - el.widthCm / 2, "x", scale);
+        const aYPct = cmToPagePercent(el.yCm, "y", scale);
+        const bXPct = cmToPagePercent(el.xCm + el.widthCm / 2, "x", scale);
+        const bYPct = cmToPagePercent(el.yCm, "y", scale);
+
+        return (
+          <React.Fragment key={el.id}>
+            <div
+              className={`absolute bg-white ${isSelected ? "ring-2 ring-indigo-500" : "border border-dashed border-indigo-300"}`}
+              style={{
+                left: `${leftPct}%`,
+                top: `${topPct}%`,
+                width: `${widthPct}%`,
+                height: `${heightPct}%`,
+                minHeight: 2,
+                transform: `rotate(${el.rotation}deg)`,
+                transformOrigin: "center center",
+                cursor: canEdit && tool === "select" ? "move" : "default",
+                zIndex: 3,
+                overflow: "visible",
+              }}
+              onMouseDown={(e) => handleItemMouseDown(e, "move-door", undefined, undefined, el)}
+              onClick={(e) => {
+                if (tool !== "select") return;
+                e.stopPropagation();
+                onSelect({ id: el.id, kind: "door" });
+              }}
+            >
+              {/* Swing group: leaf + arc, canonical orientation is hinge at
+                  local top-left, swinging above the wall (negative y). */}
+              <div
+                className="absolute pointer-events-none"
+                style={{
+                  left: 0,
+                  top: el.flipY ? thicknessPx : -leafLenPx,
+                  width: leafLenPx,
+                  height: leafLenPx,
+                  transform: `scaleX(${el.flipX ? -1 : 1}) scaleY(${el.flipY ? -1 : 1})`,
+                  transformOrigin: "center center",
+                }}
+              >
+                <div
+                  className="absolute bg-indigo-500"
+                  style={{ left: 0, bottom: 0, width: 2, height: "100%" }}
+                />
+                <svg
+                  width="100%"
+                  height="100%"
+                  viewBox="0 0 100 100"
+                  preserveAspectRatio="none"
+                  style={{ position: "absolute", left: 0, top: 0 }}
+                >
+                  <path
+                    d="M 0 0 A 100 100 0 0 1 100 100"
+                    fill="none"
+                    stroke="rgb(99 102 241)"
+                    strokeWidth={1.5}
+                    vectorEffect="non-scaling-stroke"
+                  />
+                </svg>
+              </div>
+
+              {el.label && (
+                <div
+                  className="absolute left-1/2 pointer-events-none select-none"
+                  style={{
+                    bottom: "-1.25rem",
+                    transform: `translateX(-50%) rotate(${-el.rotation}deg)`,
+                    transformOrigin: "center center",
+                  }}
+                >
+                  <span className="bg-indigo-500/75 text-white text-[10px] leading-tight px-1.5 py-0.5 rounded whitespace-nowrap">
+                    {el.label}
+                  </span>
+                </div>
+              )}
+            </div>
+
+            {isSelected && canEdit && tool === "select" && (
+              <>
+                <div
+                  className="absolute -translate-x-1/2 -translate-y-1/2 w-4 h-4 bg-white border-2 border-indigo-500 rounded-full cursor-grab shadow-md hover:scale-110 transition-transform"
+                  style={{
+                    left: `${cmToPagePercent(el.xCm, "x", scale)}%`,
+                    top: `${cmToPagePercent(el.yCm - el.thicknessCm / 2, "y", scale)}%`,
+                    marginTop: -22,
+                    zIndex: 4,
+                  }}
+                  onMouseDown={(e) => handleItemMouseDown(e, "rotate-door", undefined, undefined, el)}
+                  title="Rotate"
+                />
+                <div
+                  className="absolute w-3.5 h-3.5 bg-white border-2 border-indigo-500 rounded-full cursor-ew-resize shadow-md hover:scale-110 transition-transform"
+                  style={{ left: `${aXPct}%`, top: `${aYPct}%`, transform: "translate(-50%, -50%)", zIndex: 4 }}
+                  onMouseDown={(e) => handleItemMouseDown(e, "resize-door-a", undefined, undefined, el)}
+                  title="Resize width"
+                />
+                <div
+                  className="absolute w-3.5 h-3.5 bg-white border-2 border-indigo-500 rounded-full cursor-ew-resize shadow-md hover:scale-110 transition-transform"
+                  style={{ left: `${bXPct}%`, top: `${bYPct}%`, transform: "translate(-50%, -50%)", zIndex: 4 }}
+                  onMouseDown={(e) => handleItemMouseDown(e, "resize-door-b", undefined, undefined, el)}
+                  title="Resize width"
+                />
+                <div
+                  className="absolute flex gap-1"
+                  style={{
+                    left: `${(aXPct + bXPct) / 2}%`,
+                    top: `${(aYPct + bYPct) / 2}%`,
+                    transform: "translate(-50%, calc(-100% - 34px))",
+                    zIndex: 4,
+                  }}
+                >
+                  <button
+                    className="w-7 h-7 bg-white border border-slate-200 shadow-xl rounded-full flex items-center justify-center text-slate-600 hover:text-indigo-600 hover:bg-indigo-50 transition-all"
+                    onMouseDown={(e) => e.stopPropagation()}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      toggleDoorFlip(el, "x");
+                    }}
+                    title="Flip horizontal"
+                  >
+                    <FlipHorizontal2 className="w-3.5 h-3.5" />
+                  </button>
+                  <button
+                    className="w-7 h-7 bg-white border border-slate-200 shadow-xl rounded-full flex items-center justify-center text-slate-600 hover:text-indigo-600 hover:bg-indigo-50 transition-all"
+                    onMouseDown={(e) => e.stopPropagation()}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      toggleDoorFlip(el, "y");
+                    }}
+                    title="Flip vertical"
+                  >
+                    <FlipVertical2 className="w-3.5 h-3.5" />
+                  </button>
+                  <button
+                    className="w-7 h-7 bg-white border border-slate-200 shadow-xl rounded-full flex items-center justify-center text-red-500 hover:text-red-700 hover:bg-red-50 transition-all"
+                    onMouseDown={(e) => e.stopPropagation()}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      onUpdateElements(
+                        elementItems.map((item) =>
+                          item.id === el.id ? { ...item, deleted: true, updatedAt: Date.now() } : item,
+                        ),
+                      );
+                      onSelect(null);
+                    }}
+                    title="Delete"
+                  >
+                    <Trash2 className="w-3.5 h-3.5" />
+                  </button>
+                </div>
               </>
             )}
           </React.Fragment>

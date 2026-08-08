@@ -212,6 +212,36 @@ export interface MaskItem {
   deleted?: boolean;
 }
 
+// A canned architectural symbol (door, and later window/others) placed on
+// top of a wall change. Kept as a single type with a `kind` discriminator
+// rather than one interface per symbol so adding new canned elements later
+// is just a new `kind` value, not a new component/interface.
+export type CannedElementKind = "door";
+
+export interface ElementItem {
+  id: string;
+  pageNumber: number;
+  kind: CannedElementKind;
+  // Center, in cm, measured from the page top-left.
+  xCm: number;
+  yCm: number;
+  widthCm: number; // opening width — the only resizable dimension
+  thicknessCm: number; // matches the wall it sits in
+  rotation: number; // degrees, 0–360, clockwise
+  flipX: boolean; // mirrors which side the hinge is on
+  flipY: boolean; // mirrors which side of the wall the symbol swings into
+  zIndex: number;
+
+  label?: string;
+  note?: string;
+
+  createdBy: string;
+  createdByName: string;
+  createdAt: number;
+  updatedAt: number;
+  deleted?: boolean;
+}
+
 export interface ProjectVersion {
   id: string;
   versionNumber: number; // Global version number across all categories
@@ -228,6 +258,7 @@ export interface ProjectVersion {
   furnitureItems?: FurnitureItem[];
   wallItems?: WallItem[];
   maskItems?: MaskItem[];
+  elementItems?: ElementItem[];
 }
 
 export interface ShareSettings {
