@@ -165,6 +165,83 @@ export interface FurnitureItem {
   deleted?: boolean;
 }
 
+// --- Wall Change Layer ---
+// Ad-hoc wall changes a Designer draws on top of a plan version to
+// communicate to the GC. Scoped per ProjectVersion, same as FurnitureItem,
+// so switching versions naturally switches the change layer too.
+
+export interface WallItem {
+  id: string;
+  pageNumber: number;
+  // Endpoints in cm, measured from the page top-left.
+  x1Cm: number;
+  y1Cm: number;
+  x2Cm: number;
+  y2Cm: number;
+  thicknessCm: number;
+  zIndex: number;
+
+  label?: string;
+  note?: string;
+
+  createdBy: string;
+  createdByName: string;
+  createdAt: number;
+  updatedAt: number;
+  deleted?: boolean;
+}
+
+// A white-out rectangle used to mask obsolete plan content under a wall
+// change, so the reader isn't confused by overlapping old/new geometry.
+// Same center/size/rotation shape as FurnitureItem so it reuses
+// cmToPagePercent and the existing drag/resize/rotate math as-is.
+export interface MaskItem {
+  id: string;
+  pageNumber: number;
+  xCm: number;
+  yCm: number;
+  widthCm: number;
+  heightCm: number;
+  rotation: number; // degrees, 0–360, clockwise
+  zIndex: number;
+
+  createdBy: string;
+  createdByName: string;
+  createdAt: number;
+  updatedAt: number;
+  deleted?: boolean;
+}
+
+// A canned architectural symbol (door, and later window/others) placed on
+// top of a wall change. Kept as a single type with a `kind` discriminator
+// rather than one interface per symbol so adding new canned elements later
+// is just a new `kind` value, not a new component/interface.
+export type CannedElementKind = "door";
+
+export interface ElementItem {
+  id: string;
+  pageNumber: number;
+  kind: CannedElementKind;
+  // Center, in cm, measured from the page top-left.
+  xCm: number;
+  yCm: number;
+  widthCm: number; // opening width — the only resizable dimension
+  thicknessCm: number; // matches the wall it sits in
+  rotation: number; // degrees, 0–360, clockwise
+  flipX: boolean; // mirrors which side the hinge is on
+  flipY: boolean; // mirrors which side of the wall the symbol swings into
+  zIndex: number;
+
+  label?: string;
+  note?: string;
+
+  createdBy: string;
+  createdByName: string;
+  createdAt: number;
+  updatedAt: number;
+  deleted?: boolean;
+}
+
 export interface ProjectVersion {
   id: string;
   versionNumber: number; // Global version number across all categories
@@ -179,6 +256,9 @@ export interface ProjectVersion {
   comments: Comment[];
   moodBoardElements?: MoodBoardElement[];
   furnitureItems?: FurnitureItem[];
+  wallItems?: WallItem[];
+  maskItems?: MaskItem[];
+  elementItems?: ElementItem[];
 }
 
 export interface ShareSettings {

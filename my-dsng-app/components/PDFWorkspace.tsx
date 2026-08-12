@@ -3,6 +3,9 @@ import { Document, Page, pdfjs } from "react-pdf";
 import {
   Comment,
   FurnitureItem,
+  WallItem,
+  MaskItem,
+  ElementItem,
   LengthSystem,
   ProjectScale,
   User,
@@ -22,6 +25,10 @@ import {
   Ruler,
   Eye,
   EyeOff,
+  Minus,
+  Square,
+  MousePointer2,
+  DoorOpen,
 } from "lucide-react";
 import * as geminiService from "../services/geminiService";
 import { getPDFObjectURL, revokePDFObjectURL } from "../utils/pdfUtils";
@@ -30,6 +37,8 @@ import { MentionInput } from "./MentionInput";
 import { FurnitureLayer } from "./FurnitureLayer";
 import { FurnitureInspector } from "./FurnitureInspector";
 import { CalibrationOverlay } from "./CalibrationOverlay";
+import { WallLayer, WallTool, WallSelection } from "./WallLayer";
+import { WallInspector, MaskInspector, DoorInspector } from "./WallInspector";
 
 // Set worker
 pdfjs.GlobalWorkerOptions.workerSrc = PDF_WORKER_URL;
@@ -92,10 +101,21 @@ interface PDFWorkspaceProps {
   onUpdateFurnitureItems?: (items: FurnitureItem[]) => void;
   lengthSystem?: LengthSystem;
   // Lifted state — App owns mode + selection to coordinate with right sidebar.
-  mode?: "comment" | "furniture" | "calibrate";
-  onModeChange?: (mode: "comment" | "furniture" | "calibrate") => void;
+  mode?: "comment" | "furniture" | "calibrate" | "wall";
+  onModeChange?: (mode: "comment" | "furniture" | "calibrate" | "wall") => void;
   selectedFurnitureId?: string | null;
   onSelectFurniture?: (id: string | null) => void;
+  // Wall change layer props
+  wallItems?: WallItem[];
+  onUpdateWallItems?: (items: WallItem[]) => void;
+  maskItems?: MaskItem[];
+  onUpdateMaskItems?: (items: MaskItem[]) => void;
+  elementItems?: ElementItem[];
+  onUpdateElementItems?: (items: ElementItem[]) => void;
+  wallTool?: WallTool;
+  onWallToolChange?: (tool: WallTool) => void;
+  selectedWall?: WallSelection;
+  onSelectWall?: (selection: WallSelection) => void;
 }
 
 export const PDFWorkspace: React.FC<PDFWorkspaceProps> = ({
@@ -144,6 +164,16 @@ export const PDFWorkspace: React.FC<PDFWorkspaceProps> = ({
   onModeChange,
   selectedFurnitureId: selectedFurnitureIdProp,
   onSelectFurniture,
+  wallItems = [],
+  onUpdateWallItems,
+  maskItems = [],
+  onUpdateMaskItems,
+  elementItems = [],
+  onUpdateElementItems,
+  wallTool: wallToolProp,
+  onWallToolChange,
+  selectedWall: selectedWallProp,
+  onSelectWall,
 }) => {
   const [numPages, setNumPages] = useState<number | null>(null);
   const [tempMarker, setTempMarker] = useState<{ x: number; y: number } | null>(
@@ -179,7 +209,7 @@ export const PDFWorkspace: React.FC<PDFWorkspaceProps> = ({
 
   // Furniture layer state. Mode + selection are lifted to App so the right
   // sidebar can swap between Feedback and Furniture panels in lockstep.
-  type Mode = "comment" | "furniture" | "calibrate";
+  type Mode = "comment" | "furniture" | "calibrate" | "wall";
   const [internalMode, setInternalMode] = useState<Mode>("comment");
   const [internalSelectedId, setInternalSelectedId] = useState<string | null>(null);
   const mode = modeProp ?? internalMode;
@@ -193,14 +223,36 @@ export const PDFWorkspace: React.FC<PDFWorkspaceProps> = ({
     else setInternalSelectedId(id);
   };
 
+  // Wall change layer state, same lift-to-App pattern as furniture.
+  const [internalWallTool, setInternalWallTool] = useState<WallTool>("select");
+  const wallTool = wallToolProp ?? internalWallTool;
+  const setWallTool = (t: WallTool) => {
+    if (onWallToolChange) onWallToolChange(t);
+    else setInternalWallTool(t);
+  };
+  const [internalSelectedWall, setInternalSelectedWall] = useState<WallSelection>(null);
+  const selectedWall = selectedWallProp ?? internalSelectedWall;
+  const setSelectedWall = (sel: WallSelection) => {
+    if (onSelectWall) onSelectWall(sel);
+    else setInternalSelectedWall(sel);
+  };
+
   const [commentsVisible, setCommentsVisible] = useState(true);
   const [furnitureVisible, setFurnitureVisible] = useState(true);
+  const [wallVisible, setWallVisible] = useState(true);
 
   const canEditFurniture =
     !!currentUser && !!onUpdateFurnitureItems && !isGuest;
+  const canEditWalls = !!currentUser && !!onUpdateWallItems && !isGuest;
   const hasScale = !!projectScale;
   const selectedFurniture =
     furnitureItems.find((it) => it.id === selectedFurnitureId) || null;
+  const selectedWallItem =
+    selectedWall?.kind === "wall" ? wallItems.find((w) => w.id === selectedWall.id) || null : null;
+  const selectedMaskItem =
+    selectedWall?.kind === "mask" ? maskItems.find((m) => m.id === selectedWall.id) || null : null;
+  const selectedElementItem =
+    selectedWall?.kind === "door" ? elementItems.find((el) => el.id === selectedWall.id) || null : null;
 
   // Update pan offset when initialPanOffset changes (e.g. when category switches)
   useEffect(() => {
@@ -547,6 +599,51 @@ export const PDFWorkspace: React.FC<PDFWorkspaceProps> = ({
     );
   };
 
+  const handleUpdateSelectedWall = (next: WallItem) => {
+    if (!onUpdateWallItems) return;
+    onUpdateWallItems(wallItems.map((w) => (w.id === next.id ? next : w)));
+  };
+
+  const handleDeleteSelectedWall = () => {
+    if (!onUpdateWallItems || selectedWall?.kind !== "wall") return;
+    onUpdateWallItems(
+      wallItems.map((w) =>
+        w.id === selectedWall.id ? { ...w, deleted: true, updatedAt: Date.now() } : w,
+      ),
+    );
+    setSelectedWall(null);
+  };
+
+  const handleUpdateSelectedMask = (next: MaskItem) => {
+    if (!onUpdateMaskItems) return;
+    onUpdateMaskItems(maskItems.map((m) => (m.id === next.id ? next : m)));
+  };
+
+  const handleDeleteSelectedMask = () => {
+    if (!onUpdateMaskItems || selectedWall?.kind !== "mask") return;
+    onUpdateMaskItems(
+      maskItems.map((m) =>
+        m.id === selectedWall.id ? { ...m, deleted: true, updatedAt: Date.now() } : m,
+      ),
+    );
+    setSelectedWall(null);
+  };
+
+  const handleUpdateSelectedElement = (next: ElementItem) => {
+    if (!onUpdateElementItems) return;
+    onUpdateElementItems(elementItems.map((el) => (el.id === next.id ? next : el)));
+  };
+
+  const handleDeleteSelectedElement = () => {
+    if (!onUpdateElementItems || selectedWall?.kind !== "door") return;
+    onUpdateElementItems(
+      elementItems.map((el) =>
+        el.id === selectedWall.id ? { ...el, deleted: true, updatedAt: Date.now() } : el,
+      ),
+    );
+    setSelectedWall(null);
+  };
+
   // Build combined comment list (current + previous versions when enabled)
   const buildVisibleComments = () => {
     // Determine ordering of versions (latest first)
@@ -849,6 +946,73 @@ export const PDFWorkspace: React.FC<PDFWorkspaceProps> = ({
           <Ruler className="w-3.5 h-3.5" />
           {hasScale ? "Recalibrate" : "Calibrate"}
         </button>
+        <button
+          onClick={() => setMode(mode === "wall" ? "comment" : "wall")}
+          disabled={!canEditWalls}
+          className={`flex items-center gap-1.5 px-2.5 py-1 rounded-full transition-colors disabled:opacity-50 disabled:cursor-not-allowed ${
+            mode === "wall"
+              ? "bg-indigo-600 text-white"
+              : "bg-slate-100 text-slate-700 hover:bg-slate-200"
+          }`}
+          title={
+            !canEditWalls
+              ? "Sign in with edit access to add wall changes"
+              : "Ad-hoc wall changes for this version"
+          }
+        >
+          <Minus className="w-3.5 h-3.5" />
+          Wall Changes
+        </button>
+
+        {mode === "wall" ? (
+          <>
+            <div className="w-px h-5 bg-slate-200 mx-1" />
+            <button
+              onClick={() => setWallTool("select")}
+              className={`flex items-center gap-1 px-2 py-1 rounded-full transition-colors ${
+                wallTool === "select"
+                  ? "bg-slate-700 text-white"
+                  : "bg-slate-100 text-slate-700 hover:bg-slate-200"
+              }`}
+              title="Select / edit"
+            >
+              <MousePointer2 className="w-3.5 h-3.5" />
+            </button>
+            <button
+              onClick={() => setWallTool("wall")}
+              className={`flex items-center gap-1 px-2 py-1 rounded-full transition-colors ${
+                wallTool === "wall"
+                  ? "bg-slate-700 text-white"
+                  : "bg-slate-100 text-slate-700 hover:bg-slate-200"
+              }`}
+              title="Draw wall (click start, click end)"
+            >
+              <Minus className="w-3.5 h-3.5" />
+            </button>
+            <button
+              onClick={() => setWallTool("mask")}
+              className={`flex items-center gap-1 px-2 py-1 rounded-full transition-colors ${
+                wallTool === "mask"
+                  ? "bg-slate-700 text-white"
+                  : "bg-slate-100 text-slate-700 hover:bg-slate-200"
+              }`}
+              title="White-out area (drag to draw)"
+            >
+              <Square className="w-3.5 h-3.5" />
+            </button>
+            <button
+              onClick={() => setWallTool("door")}
+              className={`flex items-center gap-1 px-2 py-1 rounded-full transition-colors ${
+                wallTool === "door"
+                  ? "bg-slate-700 text-white"
+                  : "bg-slate-100 text-slate-700 hover:bg-slate-200"
+              }`}
+              title="Add door (click to place)"
+            >
+              <DoorOpen className="w-3.5 h-3.5" />
+            </button>
+          </>
+        ) : null}
 
         <div className="w-px h-5 bg-slate-200 mx-2" />
 
@@ -886,6 +1050,22 @@ export const PDFWorkspace: React.FC<PDFWorkspaceProps> = ({
             <EyeOff className="w-3.5 h-3.5" />
           )}
           Furniture
+        </button>
+        <button
+          onClick={() => setWallVisible((v) => !v)}
+          className={`flex items-center gap-1.5 px-2.5 py-1 rounded-full transition-colors ${
+            wallVisible
+              ? "bg-slate-100 text-slate-700 hover:bg-slate-200"
+              : "bg-slate-100 text-slate-400 line-through"
+          }`}
+          title={wallVisible ? "Hide wall changes" : "Show wall changes"}
+        >
+          {wallVisible ? (
+            <Eye className="w-3.5 h-3.5" />
+          ) : (
+            <EyeOff className="w-3.5 h-3.5" />
+          )}
+          Wall Changes
         </button>
       </div>
 
@@ -946,6 +1126,29 @@ export const PDFWorkspace: React.FC<PDFWorkspaceProps> = ({
                   className="rounded-lg overflow-hidden cursor-crosshair shadow-lg"
                 />
               </Document>
+            )}
+
+            {/* Wall Change Layer */}
+            {!loadError && (
+              <WallLayer
+                pdfWrapperRef={pdfWrapperRef}
+                pdfScale={scale}
+                scale={projectScale}
+                pageNumber={pageNumber}
+                wallItems={wallItems}
+                maskItems={maskItems}
+                elementItems={elementItems}
+                visible={wallVisible}
+                tool={wallTool}
+                active={mode === "wall"}
+                selection={selectedWall}
+                onSelect={setSelectedWall}
+                onUpdateWalls={onUpdateWallItems || (() => {})}
+                onUpdateMasks={onUpdateMaskItems || (() => {})}
+                onUpdateElements={onUpdateElementItems || (() => {})}
+                canEdit={canEditWalls}
+                currentUser={currentUser}
+              />
             )}
 
             {/* Furniture Layer */}
@@ -1188,6 +1391,39 @@ export const PDFWorkspace: React.FC<PDFWorkspaceProps> = ({
           onClose={() => setSelectedFurnitureId(null)}
           onBringToFront={handleBringToFront}
           onSendToBack={handleSendToBack}
+        />
+      )}
+
+      {/* Wall inspector (top-left) */}
+      {selectedWallItem && canEditWalls && (
+        <WallInspector
+          wall={selectedWallItem}
+          lengthSystem={lengthSystem}
+          onChange={handleUpdateSelectedWall}
+          onDelete={handleDeleteSelectedWall}
+          onClose={() => setSelectedWall(null)}
+        />
+      )}
+
+      {/* Mask inspector (top-left) */}
+      {selectedMaskItem && canEditWalls && (
+        <MaskInspector
+          mask={selectedMaskItem}
+          lengthSystem={lengthSystem}
+          onChange={handleUpdateSelectedMask}
+          onDelete={handleDeleteSelectedMask}
+          onClose={() => setSelectedWall(null)}
+        />
+      )}
+
+      {/* Door inspector (top-left) */}
+      {selectedElementItem && canEditWalls && (
+        <DoorInspector
+          element={selectedElementItem}
+          lengthSystem={lengthSystem}
+          onChange={handleUpdateSelectedElement}
+          onDelete={handleDeleteSelectedElement}
+          onClose={() => setSelectedWall(null)}
         />
       )}
     </div>
